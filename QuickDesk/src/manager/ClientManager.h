@@ -8,6 +8,7 @@
 #include <QJsonObject>
 #include <QList>
 #include <QMap>
+#include <QStringList>
 
 namespace quickdesk {
 
@@ -34,6 +35,7 @@ class ClientManager : public QObject {
     Q_PROPERTY(int connectionCount READ connectionCount NOTIFY connectionCountChanged)
     Q_PROPERTY(QString activeConnectionId READ activeConnectionId 
                WRITE setActiveConnectionId NOTIFY activeConnectionChanged)
+    Q_PROPERTY(QStringList connectionIds READ connectionIds NOTIFY connectionListChanged)
 
 public:
     explicit ClientManager(QObject* parent = nullptr);
@@ -67,6 +69,8 @@ public:
     void setActiveConnectionId(const QString& id);
     QList<ConnectionInfo> connections() const;
     ConnectionInfo getConnection(const QString& connectionId) const;
+    QStringList connectionIds() const;
+    Q_INVOKABLE QString getConnectionState(const QString& connectionId) const;
 
 signals:
     void connectionCountChanged();

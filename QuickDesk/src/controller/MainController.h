@@ -79,6 +79,21 @@ public:
      */
     Q_INVOKABLE void disconnectFromRemoteHost(const QString& connectionId);
 
+    /**
+     * @brief Refresh temporary password
+     */
+    Q_INVOKABLE void refreshTempPassword();
+
+    /**
+     * @brief Copy text to clipboard
+     */
+    Q_INVOKABLE void copyToClipboard(const QString& text);
+
+    /**
+     * @brief Copy device info (ID and access code) to clipboard
+     */
+    Q_INVOKABLE void copyDeviceInfo();
+
     // Property getters
     bool isInitialized() const;
     QString initStatus() const;

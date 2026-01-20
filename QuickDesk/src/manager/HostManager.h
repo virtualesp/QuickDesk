@@ -55,6 +55,9 @@ public:
     // Client management
     Q_INVOKABLE void authorizeClient(const QString& connectionId, bool authorized);
     Q_INVOKABLE void kickClient(const QString& connectionId);
+    
+    // Password management
+    Q_INVOKABLE void refreshTempPassword();
 
     // State getters
     QString deviceId() const;
@@ -86,6 +89,7 @@ signals:
                                 const QString& ip);
     void clientListChanged();
     void errorOccurred(const QString& code, const QString& message);
+    void refreshTempPasswordResult(bool success, const QString& errorCode, const QString& errorMessage);
 
 private slots:
     void onMessageReceived(const QJsonObject& message);
@@ -113,6 +117,7 @@ private:
     void handleClientListChanged(const QJsonObject& message);
     void handleError(const QJsonObject& message);
     void handleSignalingStateChanged(const QJsonObject& message);
+    void handleRefreshTempPasswordResponse(const QJsonObject& message);
 };
 
 } // namespace quickdesk

@@ -5,6 +5,8 @@
 #include "../manager/NativeMessaging.h"
 #include <QDebug>
 #include <QTimer>
+#include <QClipboard>
+#include <QGuiApplication>
 
 namespace quickdesk {
 
@@ -115,6 +117,34 @@ QString MainController::connectToRemoteHost(const QString& deviceId,
 void MainController::disconnectFromRemoteHost(const QString& connectionId)
 {
     m_clientManager->disconnectFromHost(connectionId);
+}
+
+void MainController::refreshTempPassword()
+{
+    m_hostManager->refreshTempPassword();
+}
+
+void MainController::copyToClipboard(const QString& text)
+{
+    QClipboard* clipboard = QGuiApplication::clipboard();
+    if (clipboard) {
+        clipboard->setText(text);
+        qInfo() << "Copied to clipboard:" << text;
+    }
+}
+
+void MainController::copyDeviceInfo()
+{
+    QString deviceId = m_hostManager->deviceId();
+    QString accessCode = m_hostManager->accessCode();
+    
+    if (deviceId.isEmpty() && accessCode.isEmpty()) {
+        qWarning() << "No device info to copy";
+        return;
+    }
+    
+    QString info = QString("设备ID: %1\n访问码: %2").arg(deviceId, accessCode);
+    copyToClipboard(info);
 }
 
 bool MainController::isInitialized() const

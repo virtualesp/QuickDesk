@@ -139,7 +139,7 @@ ApplicationWindow {
                     // Access code card
                     Rectangle {
                         Layout.fillWidth: true
-                        height: 100
+                        height: 120
                         color: "white"
                         radius: 8
                         border.color: "#E0E0E0"
@@ -167,12 +167,14 @@ ApplicationWindow {
                                 
                                 Item { Layout.fillWidth: true }
                                 
-                                // Refresh button (placeholder)
+                                // Refresh button
                                 Rectangle {
                                     width: 30
                                     height: 30
                                     radius: 15
                                     color: refreshArea.containsMouse ? "#E3F2FD" : "transparent"
+                                    enabled: mainController.signalingState === "connected"
+                                    opacity: enabled ? 1.0 : 0.5
                                     
                                     Text {
                                         anchors.centerIn: parent
@@ -184,10 +186,91 @@ ApplicationWindow {
                                         id: refreshArea
                                         anchors.fill: parent
                                         hoverEnabled: true
+                                        enabled: parent.enabled
+                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
                                         onClicked: {
                                             console.log("Refresh access code clicked")
-                                            // TODO: Implement refresh
+                                            mainController.refreshTempPassword()
                                         }
+                                    }
+                                    
+                                    ToolTip.visible: refreshArea.containsMouse
+                                    ToolTip.text: mainController.signalingState === "connected" ? 
+                                                  "刷新临时密码" : "需要先连接信令服务器"
+                                }
+                            }
+                            
+                            // Copy buttons row
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                
+                                Button {
+                                    text: "复制设备ID"
+                                    font.pixelSize: 11
+                                    enabled: mainController.deviceId.length > 0
+                                    onClicked: {
+                                        mainController.copyToClipboard(mainController.deviceId)
+                                        copyIdTip.visible = true
+                                        copyIdTimer.start()
+                                    }
+                                    
+                                    ToolTip {
+                                        id: copyIdTip
+                                        text: "已复制!"
+                                        visible: false
+                                    }
+                                    
+                                    Timer {
+                                        id: copyIdTimer
+                                        interval: 1500
+                                        onTriggered: copyIdTip.visible = false
+                                    }
+                                }
+                                
+                                Button {
+                                    text: "复制访问码"
+                                    font.pixelSize: 11
+                                    enabled: mainController.accessCode.length > 0
+                                    onClicked: {
+                                        mainController.copyToClipboard(mainController.accessCode)
+                                        copyCodeTip.visible = true
+                                        copyCodeTimer.start()
+                                    }
+                                    
+                                    ToolTip {
+                                        id: copyCodeTip
+                                        text: "已复制!"
+                                        visible: false
+                                    }
+                                    
+                                    Timer {
+                                        id: copyCodeTimer
+                                        interval: 1500
+                                        onTriggered: copyCodeTip.visible = false
+                                    }
+                                }
+                                
+                                Button {
+                                    text: "复制全部"
+                                    font.pixelSize: 11
+                                    enabled: mainController.deviceId.length > 0 && mainController.accessCode.length > 0
+                                    onClicked: {
+                                        mainController.copyDeviceInfo()
+                                        copyAllTip.visible = true
+                                        copyAllTimer.start()
+                                    }
+                                    
+                                    ToolTip {
+                                        id: copyAllTip
+                                        text: "已复制!"
+                                        visible: false
+                                    }
+                                    
+                                    Timer {
+                                        id: copyAllTimer
+                                        interval: 1500
+                                        onTriggered: copyAllTip.visible = false
                                     }
                                 }
                             }
@@ -400,18 +483,119 @@ ApplicationWindow {
                         radius: 8
                         border.color: "#E0E0E0"
                         border.width: 1
+                        clip: true
 
+                        // Empty state
                         Text {
                             anchors.centerIn: parent
-                            text: mainController.clientManager ?
-                                  (mainController.clientManager.connectionCount > 0 ?
-                                   mainController.clientManager.connectionCount + " 个连接" :
-                                   "暂无远程连接") :
-                                  "加载中..."
+                            visible: !mainController.clientManager || 
+                                     mainController.clientManager.connectionCount === 0
+                            text: mainController.clientManager ? "暂无远程连接" : "加载中..."
                             color: "#999"
+                        }
+
+                        // Connection list
+                        ListView {
+                            id: connectionList
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            visible: mainController.clientManager && 
+                                     mainController.clientManager.connectionCount > 0
+                            model: mainController.clientManager ? 
+                                   mainController.clientManager.connectionIds : []
+                            spacing: 8
+                            
+                            delegate: Rectangle {
+                                width: connectionList.width
+                                height: 50
+                                color: "#F5F5F5"
+                                radius: 6
+                                
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 10
+                                    spacing: 10
+                                    
+                                    // Connection info
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 2
+                                        
+                                        Text {
+                                            text: "设备: " + modelData
+                                            font.pixelSize: 13
+                                            font.bold: true
+                                            color: "#333"
+                                        }
+                                        
+                                        Text {
+                                            text: mainController.clientManager.getConnectionState(modelData) || "连接中..."
+                                            font.pixelSize: 11
+                                            color: "#666"
+                                        }
+                                    }
+                                    
+                                    // Disconnect button
+                                    Button {
+                                        text: "断开"
+                                        font.pixelSize: 11
+                                        onClicked: {
+                                            console.log("Disconnecting:", modelData)
+                                            mainController.disconnectFromRemoteHost(modelData)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
+            }
+        }
+    }
+    
+    // Toast notification for errors
+    Rectangle {
+        id: toast
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 50
+        width: toastText.width + 40
+        height: 40
+        radius: 20
+        color: "#333"
+        opacity: 0
+        visible: opacity > 0
+        
+        Text {
+            id: toastText
+            anchors.centerIn: parent
+            color: "white"
+            font.pixelSize: 14
+        }
+        
+        Behavior on opacity {
+            NumberAnimation { duration: 200 }
+        }
+        
+        Timer {
+            id: toastTimer
+            interval: 3000
+            onTriggered: toast.opacity = 0
+        }
+        
+        function show(message) {
+            toastText.text = message
+            toast.opacity = 1
+            toastTimer.restart()
+        }
+    }
+    
+    // Connect to refresh password result
+    Connections {
+        target: mainController.hostManager
+        function onRefreshTempPasswordResult(success, errorCode, errorMessage) {
+            if (!success) {
+                toast.show("刷新失败: " + errorMessage)
             }
         }
     }

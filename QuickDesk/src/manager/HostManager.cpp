@@ -103,6 +103,25 @@ void HostManager::kickClient(const QString& connectionId)
     m_messaging->sendMessage(message);
 }
 
+void HostManager::refreshTempPassword()
+{
+    if (!m_messaging || !m_messaging->isReady()) {
+        emit refreshTempPasswordResult(false, "NOT_READY", "Host process not ready");
+        return;
+    }
+
+    // Check if connected to signaling server
+    if (m_signalingState != "connected") {
+        emit refreshTempPasswordResult(false, "NOT_CONNECTED", 
+            "Not connected to signaling server");
+        return;
+    }
+
+    QJsonObject message;
+    message["type"] = "refreshTempPassword";
+    m_messaging->sendMessage(message);
+}
+
 QString HostManager::deviceId() const
 {
     return m_deviceId;
@@ -152,6 +171,8 @@ void HostManager::onMessageReceived(const QJsonObject& message)
         handleError(message);
     } else if (type == "signalingStateChanged") {
         handleSignalingStateChanged(message);
+    } else if (type == "refreshTempPasswordResponse") {
+        handleRefreshTempPasswordResponse(message);
     } else {
         qWarning() << "Unknown message type from host:" << type;
     }
@@ -339,6 +360,26 @@ int HostManager::signalingNextRetryIn() const
 QString HostManager::signalingError() const
 {
     return m_signalingError;
+}
+
+void HostManager::handleRefreshTempPasswordResponse(const QJsonObject& message)
+{
+    bool success = message["success"].toBool();
+    
+    if (success) {
+        QString newPassword = message["newPassword"].toString();
+        qInfo() << "Temporary password refreshed:" << newPassword;
+        
+        m_accessCode = newPassword;
+        emit accessCodeChanged();
+        emit temporaryPasswordChanged(newPassword);
+        emit refreshTempPasswordResult(true, "", "");
+    } else {
+        QString errorCode = message["error"].toString();
+        QString errorMessage = message["errorMessage"].toString();
+        qWarning() << "Failed to refresh password:" << errorCode << errorMessage;
+        emit refreshTempPasswordResult(false, errorCode, errorMessage);
+    }
 }
 
 } // namespace quickdesk

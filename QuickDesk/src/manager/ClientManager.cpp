@@ -198,6 +198,25 @@ ConnectionInfo ClientManager::getConnection(const QString& connectionId) const
     return m_connections.value(connectionId);
 }
 
+QStringList ClientManager::connectionIds() const
+{
+    return m_connections.keys();
+}
+
+QString ClientManager::getConnectionState(const QString& connectionId) const
+{
+    if (m_connections.contains(connectionId)) {
+        QString state = m_connections[connectionId].state;
+        // Translate state to Chinese
+        if (state == "connecting") return "连接中...";
+        if (state == "connected") return "已连接";
+        if (state == "disconnected") return "已断开";
+        if (state == "failed") return "连接失败";
+        return state;
+    }
+    return "";
+}
+
 void ClientManager::onMessageReceived(const QJsonObject& message)
 {
     QString type = message["type"].toString();
