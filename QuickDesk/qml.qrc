@@ -5,16 +5,24 @@
         <file>qml/component/QDButton.qml</file>
         <file>qml/component/QDTextField.qml</file>
         <file>qml/component/QDCheckBox.qml</file>
-        <file>qml/component/QDCard.qml</file>
-        <file>qml/component/QDToast.qml</file>
-        <file>qml/component/QDDialog.qml</file>
+        <file>qml/component/QDRadioButton.qml</file>
         <file>qml/component/QDSwitch.qml</file>
         <file>qml/component/QDSlider.qml</file>
         <file>qml/component/QDProgressBar.qml</file>
         <file>qml/component/QDComboBox.qml</file>
+        <file>qml/component/QDCard.qml</file>
+        <file>qml/component/QDToast.qml</file>
+        <file>qml/component/QDDialog.qml</file>
+        <file>qml/component/QDMessageBox.qml</file>
         <file>qml/component/QDDivider.qml</file>
         <file>qml/component/QDBadge.qml</file>
+        <file>qml/component/QDChip.qml</file>
         <file>qml/component/QDToolTip.qml</file>
+        <file>qml/component/QDSpinner.qml</file>
+        <file>qml/component/QDAvatar.qml</file>
+        <file>qml/component/QDMenu.qml</file>
+        <file>qml/component/QDMenuItem.qml</file>
+        <file>qml/component/QDMenuSeparator.qml</file>
         <file>qml/component/qmldir</file>
         <file>qml/Example.qml</file>
         <file>res/font/SegoeFluentIcons.ttf</file>

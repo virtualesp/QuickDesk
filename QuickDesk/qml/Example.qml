@@ -1,6 +1,6 @@
 // Fluent Design Components Example
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls as QQC
 import QtQuick.Layouts
 import "component"
 
@@ -16,6 +16,12 @@ Item {
     
     QDToast {
         id: globalToast
+    }
+    
+    // ============ Global MessageBox ============
+    
+    QDMessageBox {
+        id: globalMessageBox
     }
     
     // ============ Example Dialog ============
@@ -75,7 +81,7 @@ Item {
         color: Theme.background
     }
     
-    ScrollView {
+    QQC.ScrollView {
         anchors.fill: parent
         contentWidth: availableWidth
         
@@ -970,6 +976,456 @@ Item {
                                 QDBadge {
                                     text: "Error"
                                     badgeType: QDBadge.Type.Error
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // ============ Radio & Chip & Avatar Section ============
+                
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingLarge
+                    
+                    Text {
+                        text: "单选、标签与头像 (Radio, Chip & Avatar)"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeHeading
+                        font.weight: Font.Bold
+                        color: Theme.text
+                    }
+                    
+                    QDCard {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: radioContent.implicitHeight + Theme.spacingXLarge * 2
+                        elevation: 1
+                        
+                        ColumnLayout {
+                            id: radioContent
+                            anchors.fill: parent
+                            anchors.margins: Theme.spacingXLarge
+                            spacing: Theme.spacingLarge
+                            
+                            Text {
+                                text: "RadioButton 单选按钮"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeLarge
+                                font.weight: Font.DemiBold
+                                color: Theme.text
+                            }
+                            
+                            ColumnLayout {
+                                spacing: Theme.spacingMedium
+                                
+                                QQC.ButtonGroup {
+                                    id: radioGroup
+                                }
+                                
+                                QDRadioButton {
+                                    text: "选项 1"
+                                    checked: true
+                                    QQC.ButtonGroup.group: radioGroup
+                                }
+                                
+                                QDRadioButton {
+                                    text: "选项 2"
+                                    QQC.ButtonGroup.group: radioGroup
+                                }
+                                
+                                QDRadioButton {
+                                    text: "选项 3"
+                                    QQC.ButtonGroup.group: radioGroup
+                                }
+                                
+                                QDRadioButton {
+                                    text: "禁用选项"
+                                    enabled: false
+                                }
+                            }
+                            
+                            QDDivider {
+                                Layout.fillWidth: true
+                            }
+                            
+                            Text {
+                                text: "Chip 标签"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeLarge
+                                font.weight: Font.DemiBold
+                                color: Theme.text
+                            }
+                            
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: Theme.spacingMedium
+                                
+                                QDChip {
+                                    text: "默认"
+                                    chipType: QDChip.Type.Default
+                                }
+                                
+                                QDChip {
+                                    text: "主要"
+                                    chipType: QDChip.Type.Primary
+                                }
+                                
+                                QDChip {
+                                    text: "成功"
+                                    chipType: QDChip.Type.Success
+                                    iconText: FluentIconGlyph.checkMarkGlyph
+                                }
+                                
+                                QDChip {
+                                    text: "警告"
+                                    chipType: QDChip.Type.Warning
+                                    iconText: FluentIconGlyph.warningGlyph
+                                }
+                                
+                                QDChip {
+                                    text: "错误"
+                                    chipType: QDChip.Type.Error
+                                    iconText: FluentIconGlyph.errorGlyph
+                                }
+                                
+                                QDChip {
+                                    text: "信息"
+                                    chipType: QDChip.Type.Info
+                                    iconText: FluentIconGlyph.infoGlyph
+                                }
+                                
+                                QDChip {
+                                    text: "可关闭"
+                                    chipType: QDChip.Type.Primary
+                                    closable: true
+                                    onCloseClicked: globalToast.show("标签已关闭", QDToast.Type.Info)
+                                }
+                                
+                                QDChip {
+                                    text: "轮廓"
+                                    chipType: QDChip.Type.Primary
+                                    outlined: true
+                                }
+                            }
+                            
+                            QDDivider {
+                                Layout.fillWidth: true
+                            }
+                            
+                            Text {
+                                text: "Avatar 头像"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeLarge
+                                font.weight: Font.DemiBold
+                                color: Theme.text
+                            }
+                            
+                            Row {
+                                spacing: Theme.spacingLarge
+                                
+                                ColumnLayout {
+                                    spacing: Theme.spacingSmall
+                                    
+                                    QDAvatar {
+                                        name: "Zhang San"
+                                        avatarSize: QDAvatar.Size.Small
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                    
+                                    Text {
+                                        text: "Small"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.textSecondary
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                }
+                                
+                                ColumnLayout {
+                                    spacing: Theme.spacingSmall
+                                    
+                                    QDAvatar {
+                                        name: "Li Si"
+                                        avatarSize: QDAvatar.Size.Medium
+                                        backgroundColor: Theme.success
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                    
+                                    Text {
+                                        text: "Medium"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.textSecondary
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                }
+                                
+                                ColumnLayout {
+                                    spacing: Theme.spacingSmall
+                                    
+                                    QDAvatar {
+                                        name: "Wang Wu"
+                                        avatarSize: QDAvatar.Size.Large
+                                        backgroundColor: Theme.warning
+                                        showBadge: true
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                    
+                                    Text {
+                                        text: "Large (在线)"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.textSecondary
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                }
+                                
+                                ColumnLayout {
+                                    spacing: Theme.spacingSmall
+                                    
+                                    QDAvatar {
+                                        name: "Zhao Liu"
+                                        avatarSize: QDAvatar.Size.XLarge
+                                        backgroundColor: Theme.error
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                    
+                                    Text {
+                                        text: "XLarge"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.textSecondary
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // ============ Spinner & Menu & MessageBox Section ============
+                
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingLarge
+                    
+                    Text {
+                        text: "加载、菜单与消息框 (Spinner, Menu & MessageBox)"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeHeading
+                        font.weight: Font.Bold
+                        color: Theme.text
+                    }
+                    
+                    QDCard {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: spinnerContent.implicitHeight + Theme.spacingXLarge * 2
+                        elevation: 1
+                        
+                        ColumnLayout {
+                            id: spinnerContent
+                            anchors.fill: parent
+                            anchors.margins: Theme.spacingXLarge
+                            spacing: Theme.spacingLarge
+                            
+                            Text {
+                                text: "Spinner 加载动画"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeLarge
+                                font.weight: Font.DemiBold
+                                color: Theme.text
+                            }
+                            
+                            Row {
+                                spacing: Theme.spacingXLarge
+                                
+                                ColumnLayout {
+                                    spacing: Theme.spacingSmall
+                                    
+                                    QDSpinner {
+                                        size: 24
+                                        spinnerColor: Theme.primary
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                    
+                                    Text {
+                                        text: "主色"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.textSecondary
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                }
+                                
+                                ColumnLayout {
+                                    spacing: Theme.spacingSmall
+                                    
+                                    QDSpinner {
+                                        size: 32
+                                        spinnerColor: Theme.success
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                    
+                                    Text {
+                                        text: "成功色"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.textSecondary
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                }
+                                
+                                ColumnLayout {
+                                    spacing: Theme.spacingSmall
+                                    
+                                    QDSpinner {
+                                        size: 40
+                                        spinnerColor: Theme.warning
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                    
+                                    Text {
+                                        text: "警告色"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.textSecondary
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                }
+                            }
+                            
+                            QDDivider {
+                                Layout.fillWidth: true
+                            }
+                            
+                            Text {
+                                text: "Menu 菜单"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeLarge
+                                font.weight: Font.DemiBold
+                                color: Theme.text
+                            }
+                            
+                            QDButton {
+                                text: "打开菜单"
+                                iconText: FluentIconGlyph.moreGlyph
+                                buttonType: QDButton.Type.Secondary
+                                onClicked: contextMenu.open()
+                                
+                                QDMenu {
+                                    id: contextMenu
+                                    x: 0  // 左对齐
+                                    y: parent.height
+                                    
+                                    QDMenuItem {
+                                        text: "新建"
+                                        onTriggered: globalToast.show("点击了新建", QDToast.Type.Info)
+                                    }
+                                    
+                                    QDMenuItem {
+                                        text: "打开"
+                                        onTriggered: globalToast.show("点击了打开", QDToast.Type.Info)
+                                    }
+                                    
+                                    QDMenuSeparator { }
+                                    
+                                    QDMenuItem {
+                                        text: "保存"
+                                        checkable: true
+                                        checked: true
+                                    }
+                                    
+                                    QDMenuItem {
+                                        text: "另存为"
+                                        checkable: true
+                                    }
+                                    
+                                    QDMenuSeparator { }
+                                    
+                                    QDMenuItem {
+                                        text: "退出"
+                                        onTriggered: globalToast.show("点击了退出", QDToast.Type.Warning)
+                                    }
+                                }
+                            }
+                            
+                            QDDivider {
+                                Layout.fillWidth: true
+                            }
+                            
+                            Text {
+                                text: "MessageBox 消息框"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeLarge
+                                font.weight: Font.DemiBold
+                                color: Theme.text
+                            }
+                            
+                            Row {
+                                spacing: Theme.spacingMedium
+                                
+                                QDButton {
+                                    text: "信息"
+                                    buttonType: QDButton.Type.Primary
+                                    onClicked: {
+                                        globalMessageBox.title = "信息"
+                                        globalMessageBox.message = "这是一条信息消息"
+                                        globalMessageBox.messageType = QDMessageBox.Type.Information
+                                        globalMessageBox.buttons = QDMessageBox.Buttons.Ok
+                                        globalMessageBox.show()
+                                    }
+                                }
+                                
+                                QDButton {
+                                    text: "警告"
+                                    buttonType: QDButton.Type.Secondary
+                                    onClicked: {
+                                        globalMessageBox.title = "警告"
+                                        globalMessageBox.message = "这是一条警告消息"
+                                        globalMessageBox.detailMessage = "请注意检查相关设置"
+                                        globalMessageBox.messageType = QDMessageBox.Type.Warning
+                                        globalMessageBox.buttons = QDMessageBox.Buttons.OkCancel
+                                        globalMessageBox.show()
+                                    }
+                                }
+                                
+                                QDButton {
+                                    text: "错误"
+                                    buttonType: QDButton.Type.Danger
+                                    onClicked: {
+                                        globalMessageBox.title = "错误"
+                                        globalMessageBox.message = "操作失败"
+                                        globalMessageBox.messageType = QDMessageBox.Type.Error
+                                        globalMessageBox.buttons = QDMessageBox.Buttons.Ok
+                                        globalMessageBox.show()
+                                    }
+                                }
+                                
+                                QDButton {
+                                    text: "询问"
+                                    buttonType: QDButton.Type.Secondary
+                                    onClicked: {
+                                        globalMessageBox.title = "确认操作"
+                                        globalMessageBox.message = "确定要删除这些文件吗？"
+                                        globalMessageBox.messageType = QDMessageBox.Type.Question
+                                        globalMessageBox.buttons = QDMessageBox.Buttons.YesNo
+                                        globalMessageBox.accepted.connect(function() {
+                                            globalToast.show("已确认删除", QDToast.Type.Success)
+                                        })
+                                        globalMessageBox.show()
+                                    }
+                                }
+                                
+                                QDButton {
+                                    text: "成功"
+                                    buttonType: QDButton.Type.Success
+                                    onClicked: {
+                                        globalMessageBox.title = "操作成功"
+                                        globalMessageBox.message = "所有文件已成功上传"
+                                        globalMessageBox.messageType = QDMessageBox.Type.Success
+                                        globalMessageBox.buttons = QDMessageBox.Buttons.Ok
+                                        globalMessageBox.show()
+                                    }
                                 }
                             }
                         }
