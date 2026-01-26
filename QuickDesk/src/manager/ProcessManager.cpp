@@ -53,7 +53,7 @@ bool ProcessManager::startHostProcess()
             QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &ProcessManager::onHostProcessFinished);
 
-    if (!startProcess(m_hostProcess.get(), m_hostExePath, "Host")) {
+    if (!startProcess(m_hostProcess.get(), m_hostExePath, "Host", m_logDir)) {
         m_hostProcess.reset();
         return false;
     }
@@ -86,7 +86,7 @@ bool ProcessManager::startClientProcess()
             QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &ProcessManager::onClientProcessFinished);
 
-    if (!startProcess(m_clientProcess.get(), m_clientExePath, "Client")) {
+    if (!startProcess(m_clientProcess.get(), m_clientExePath, "Client", m_logDir)) {
         m_clientProcess.reset();
         return false;
     }
@@ -197,6 +197,16 @@ void ProcessManager::setHostExePath(const QString& path)
 void ProcessManager::setClientExePath(const QString& path)
 {
     m_clientExePath = path;
+}
+
+void ProcessManager::setLogDir(const QString& logDir)
+{
+    m_logDir = logDir;
+}
+
+QString ProcessManager::logDir() const
+{
+    return m_logDir;
 }
 
 QString ProcessManager::hostExePath() const
@@ -416,7 +426,7 @@ void ProcessManager::onClientRestartTimer()
 }
 
 bool ProcessManager::startProcess(QProcess* process, const QString& exePath, 
-                                  const QString& processName)
+                                  const QString& processName, const QString& logDir)
 {
     QFileInfo fileInfo(exePath);
     if (!fileInfo.exists() || !fileInfo.isExecutable()) {
@@ -430,7 +440,22 @@ bool ProcessManager::startProcess(QProcess* process, const QString& exePath,
         return false;
     }
 
+    connect(process, &QProcess::readyReadStandardError, this, [process, processName]() {
+        QByteArray err = process->readAllStandardError();
+        if (!err.isEmpty()) {
+            qInfo() << "[" << processName << " stderr]" << err;
+        }
+    });
+
+    // Prepare command line arguments
+    QStringList arguments;
+    if (!logDir.isEmpty()) {
+        // Use --log-dir=path format (Chromium style)
+        arguments << QString("--log-dir=%1").arg(logDir);
+    }
+
     process->setProgram(exePath);
+    process->setArguments(arguments);
     process->setWorkingDirectory(fileInfo.absolutePath());
     
     // Native Messaging uses stdin/stdout

@@ -3,6 +3,7 @@
 #include "MainController.h"
 #include "../manager/ProcessManager.h"
 #include "../manager/NativeMessaging.h"
+#include "infra/env/applicationcontext.h"
 #include <QDebug>
 #include <QTimer>
 #include <QClipboard>
@@ -67,6 +68,10 @@ void MainController::initialize()
     if (!m_processManager->autoDetectPaths()) {
         qWarning() << "Could not auto-detect all executable paths";
     }
+
+    // Set log directory from ApplicationContext
+    QString logDir = infra::ApplicationContext::instance().applicationDirPath();
+    m_processManager->setLogDir(logDir);
 
     // Start Host process
     updateInitStatus("启动 Host 进程...");

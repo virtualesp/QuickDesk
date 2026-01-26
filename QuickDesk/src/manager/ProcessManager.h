@@ -48,6 +48,10 @@ public:
     QString hostExePath() const;
     QString clientExePath() const;
 
+    // Log directory
+    void setLogDir(const QString& logDir);
+    QString logDir() const;
+
     // Auto-detect executable paths
     bool autoDetectPaths();
 
@@ -95,6 +99,7 @@ private:
 
     QString m_hostExePath;
     QString m_clientExePath;
+    QString m_logDir;
 
     // Auto-restart settings
     bool m_hostAutoRestart = true;
@@ -115,7 +120,7 @@ private:
     QString m_clientStatus = "stopped";
 
     bool startProcess(QProcess* process, const QString& exePath, 
-                      const QString& processName);
+                      const QString& processName, const QString& logDir);
     QString findExecutable(const QString& name);
     int calculateRestartDelay(int retryCount) const;
     void setHostStatus(const QString &status);
