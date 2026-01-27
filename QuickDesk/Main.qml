@@ -290,6 +290,141 @@ ApplicationWindow {
                         }
                     }
 
+                    // Server configuration
+                    Rectangle {
+                        id: serverConfigCard
+                        Layout.fillWidth: true
+                        height: serverConfigExpanded ? 140 : 44
+                        color: "white"
+                        radius: 8
+                        border.color: "#E0E0E0"
+                        border.width: 1
+                        clip: true
+                        z: 1  // Ensure it doesn't overlap with other elements
+                        
+                        property bool serverConfigExpanded: false
+                        
+                        Behavior on height {
+                            NumberAnimation { duration: 150 }
+                        }
+                        
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 10
+                            spacing: 8
+                            
+                            // Header row (always visible)
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                
+                                Text {
+                                    text: "信令服务器"
+                                    font.pixelSize: 12
+                                    color: "#666"
+                                }
+                                
+                                Text {
+                                    text: mainController.serverManager ? 
+                                          mainController.serverManager.serverUrl : "未配置"
+                                    font.pixelSize: 12
+                                    font.family: "Consolas"
+                                    color: "#333"
+                                    elide: Text.ElideMiddle
+                                    Layout.fillWidth: true
+                                    visible: !serverConfigCard.serverConfigExpanded
+                                }
+                                
+                                Item { 
+                                    Layout.fillWidth: true 
+                                    visible: serverConfigCard.serverConfigExpanded
+                                }
+                                
+                                // Toggle button
+                                Rectangle {
+                                    width: 24
+                                    height: 24
+                                    radius: 4
+                                    color: serverConfigToggle.containsMouse ? "#E3F2FD" : "transparent"
+                                    
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: serverConfigCard.serverConfigExpanded ? "▲" : "▼"
+                                        font.pixelSize: 10
+                                        color: "#666"
+                                    }
+                                    
+                                    MouseArea {
+                                        id: serverConfigToggle
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            serverConfigCard.serverConfigExpanded = !serverConfigCard.serverConfigExpanded
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Expanded content
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                visible: serverConfigCard.serverConfigExpanded
+                                
+                                TextField {
+                                    id: serverUrlInput
+                                    Layout.fillWidth: true
+                                    placeholderText: "ws://服务器地址:8000"
+                                    font.pixelSize: 12
+                                    text: mainController.serverManager ? 
+                                          mainController.serverManager.serverUrl : ""
+                                }
+                                
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    
+                                    Button {
+                                        text: "保存"
+                                        font.pixelSize: 11
+                                        enabled: serverUrlInput.text.length > 0 &&
+                                                 serverUrlInput.text !== (mainController.serverManager ? mainController.serverManager.serverUrl : "")
+                                        onClicked: {
+                                            // Use property assignment instead of method call
+                                            mainController.serverManager.serverUrl = serverUrlInput.text
+                                            toast.show("服务器地址已保存")
+                                        }
+                                    }
+                                    
+                                    Button {
+                                        text: "重连"
+                                        font.pixelSize: 11
+                                        enabled: mainController.isInitialized &&
+                                                 mainController.signalingState !== "connecting"
+                                        onClicked: {
+                                            // Save first if changed
+                                            if (serverUrlInput.text !== mainController.serverManager.serverUrl) {
+                                                mainController.serverManager.serverUrl = serverUrlInput.text
+                                            }
+                                            // Stop and restart hosting
+                                            mainController.stopHosting()
+                                            mainController.startHosting(serverUrlInput.text)
+                                        }
+                                    }
+                                    
+                                    Item { Layout.fillWidth: true }
+                                    
+                                    Text {
+                                        text: "局域网用IP"
+                                        font.pixelSize: 10
+                                        color: "#999"
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Connection status
                     Rectangle {
                         Layout.fillWidth: true

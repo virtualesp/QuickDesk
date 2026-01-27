@@ -32,10 +32,12 @@ set(CONTROLLER_HEADERS
 
 set(COMPONENT_SOURCES
     src/component/VideoFrameProvider.cpp
+    src/component/KeycodeMapper.cpp
 )
 
 set(COMPONENT_HEADERS
     src/component/VideoFrameProvider.h
+    src/component/KeycodeMapper.h
 )
 
 set(CORE_SOURCES

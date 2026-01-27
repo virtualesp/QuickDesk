@@ -6,6 +6,7 @@
 #include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QJSEngine>
 #include <QtQuickControls2/QQuickStyle>
 
 #include "core/localconfigcenter.h"
@@ -19,6 +20,7 @@
 #include "manager/ClientManager.h"
 #include "manager/SharedMemoryManager.h"
 #include "component/VideoFrameProvider.h"
+#include "component/KeycodeMapper.h"
 
 int main(int argc, char *argv[])
 {
@@ -56,6 +58,12 @@ int main(int argc, char *argv[])
     qmlRegisterUncreatableType<quickdesk::SharedMemoryManager>("QuickDesk", 1, 0, "SharedMemoryManager",
         "SharedMemoryManager is accessed through ClientManager");
     qmlRegisterType<quickdesk::VideoFrameProvider>("QuickDesk", 1, 0, "VideoFrameProvider");
+    
+    // Register KeycodeMapper as singleton
+    qmlRegisterSingletonType<quickdesk::KeycodeMapper>("QuickDesk", 1, 0, "KeycodeMapper",
+        [](QQmlEngine*, QJSEngine*) -> QObject* {
+            return quickdesk::KeycodeMapper::instance();
+        });
 
     QQmlApplicationEngine engine;
     QFontDatabase::addApplicationFont(":/res/font/SegoeFluentIcons.ttf");
