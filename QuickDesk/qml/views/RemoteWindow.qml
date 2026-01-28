@@ -22,6 +22,15 @@ Window {
     
     // Add connection to this window
     function addConnection(connectionId, deviceId) {
+        // Check if connection already exists
+        for (var i = 0; i < connections.length; i++) {
+            if (connections[i].id === connectionId) {
+                console.log("Connection already exists in window:", connectionId)
+                currentTabIndex = i
+                return
+            }
+        }
+        
         var conn = {
             id: connectionId,
             deviceId: deviceId,
@@ -29,10 +38,14 @@ Window {
             ping: 0,
             state: "connecting"
         }
-        connections.push(conn)
-        connectionsChanged()
+        
+        // Create new array to trigger property binding update
+        var newConnections = connections.slice()
+        newConnections.push(conn)
+        connections = newConnections
+        
         currentTabIndex = connections.length - 1
-        console.log("Added connection to remote window:", connectionId)
+        console.log("Added connection to remote window:", connectionId, "Total tabs:", connections.length)
     }
     
     // Remove connection from this window
@@ -40,8 +53,11 @@ Window {
         if (index < 0 || index >= connections.length) return
         
         var connId = connections[index].id
-        connections.splice(index, 1)
-        connectionsChanged()
+        
+        // Create new array to trigger property binding update
+        var newConnections = connections.slice()
+        newConnections.splice(index, 1)
+        connections = newConnections
         
         // Update current tab index
         if (currentTabIndex >= connections.length) {
@@ -53,7 +69,7 @@ Window {
             remoteWindow.close()
         }
         
-        console.log("Removed connection from remote window:", connId)
+        console.log("Removed connection from remote window:", connId, "Remaining tabs:", connections.length)
     }
     
     // Clean up all connections when window closes
@@ -70,13 +86,20 @@ Window {
     
     // Update connection state
     function updateConnectionState(connectionId, state, ping) {
+        var updated = false
         for (var i = 0; i < connections.length; i++) {
             if (connections[i].id === connectionId) {
-                connections[i].state = state
-                connections[i].ping = ping || 0
-                connectionsChanged()
+                // Create new array to trigger property binding update
+                var newConnections = connections.slice()
+                newConnections[i].state = state
+                newConnections[i].ping = ping || 0
+                connections = newConnections
+                updated = true
                 break
             }
+        }
+        if (updated) {
+            console.log("Updated connection state:", connectionId, "->", state)
         }
     }
     

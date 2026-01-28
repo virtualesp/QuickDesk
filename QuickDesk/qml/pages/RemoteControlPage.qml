@@ -270,13 +270,10 @@ Item {
                                 // Start connecting
                                 connectingState = true
                                 
-                                var connectionId = mainController.connectToRemoteHost(
-                                    remoteDeviceIdInput.text,
-                                    remotePasswordInput.text,
-                                    "" // Use default server URL
-                                )
+                                // Emit signal to MainWindow which will create the remote window
+                                connectRequested(remoteDeviceIdInput.text, remotePasswordInput.text)
                                 
-                                console.log("Connection initiated, connectionId:", connectionId)
+                                console.log("Connection requested, waiting for window creation")
                                 toast.show(qsTr("Connecting..."), QDToast.Type.Info)
                             }
                             
@@ -311,7 +308,11 @@ Item {
             
             if (state === "connected") {
                 toast.show(qsTr("Connected successfully"), QDToast.Type.Success)
-                openRemoteWindow(connectionId, hostInfo)
+                // Window is already created by MainWindow.showRemoteWindow()
+                
+                // Clear input fields after successful connection
+                remoteDeviceIdInput.text = ""
+                remotePasswordInput.text = ""
             } else if (state === "failed") {
                 var errorMsg = hostInfo.error || qsTr("Connection failed")
                 toast.show(qsTr("Connection failed: ") + errorMsg, QDToast.Type.Error)
@@ -329,37 +330,6 @@ Item {
             if (connectBtn) {
                 connectBtn.connectingState = false
             }
-        }
-    }
-    
-    // Function to open remote desktop window
-    function openRemoteWindow(connectionId, hostInfo) {
-        console.log("Opening remote window for connection:", connectionId)
-        
-        // Create RemoteWindow component dynamically
-        var component = Qt.createComponent("../views/RemoteWindow.qml")
-        
-        if (component.status === Component.Ready) {
-            var window = component.createObject(root, {
-                clientManager: mainController.clientManager
-            })
-            
-            if (window) {
-                // Add the connection to the window
-                window.addConnection(connectionId, hostInfo.deviceId || remoteDeviceIdInput.text)
-                window.show()
-                console.log("Remote window created and shown")
-                
-                // Clear input fields after successful connection
-                remoteDeviceIdInput.text = ""
-                remotePasswordInput.text = ""
-            } else {
-                console.error("Failed to create remote window object")
-                toast.show(qsTr("Failed to create remote window"), QDToast.Type.Error)
-            }
-        } else if (component.status === Component.Error) {
-            console.error("Error loading RemoteWindow.qml:", component.errorString())
-            toast.show(qsTr("Failed to load remote window"), QDToast.Type.Error)
         }
     }
     

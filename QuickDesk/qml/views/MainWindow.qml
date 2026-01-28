@@ -24,8 +24,8 @@ ApplicationWindow {
         Qt.quit()
     }
     
-    // Remote window management
-    property var remoteWindows: ({}) // Map of connectionId -> Window
+    // Remote window management - single window for all connections
+    property var remoteWindow: null
     
     // Main controller - reuse existing controller
     property MainController mainController: MainController {
@@ -59,45 +59,43 @@ ApplicationWindow {
     function showRemoteWindow(connectionId, deviceId) {
         console.log("showRemoteWindow called:", connectionId, deviceId)
         
-        // Check if window already exists for this connection
-        if (remoteWindows[connectionId]) {
-            // Window exists, activate it
-            var existingWindow = remoteWindows[connectionId]
-            existingWindow.raise()
-            existingWindow.requestActivate()
-            console.log("Activated existing remote window for:", connectionId)
-            return
-        }
-        
-        // Create new remote window
-        var component = Qt.createComponent("RemoteWindow.qml")
-        if (component.status === Component.Error) {
-            console.error("Error creating RemoteWindow:", component.errorString())
-            return
-        }
-        
-        if (component.status === Component.Ready) {
-            var window = component.createObject(root, {
-                clientManager: mainController.clientManager
-            })
+        // Create RemoteWindow if not exists
+        if (!remoteWindow) {
+            var component = Qt.createComponent("RemoteWindow.qml")
             
-            if (window) {
-                window.addConnection(connectionId, deviceId)
-                
-                // Handle window closing
-                window.closing.connect(function() {
-                    console.log("Remote window closing for:", connectionId)
-                    delete remoteWindows[connectionId]
+            if (component.status === Component.Error) {
+                console.error("Error creating RemoteWindow:", component.errorString())
+                return
+            }
+            
+            if (component.status === Component.Ready) {
+                remoteWindow = component.createObject(root, {
+                    clientManager: mainController.clientManager
                 })
                 
-                remoteWindows[connectionId] = window
-                window.show()
-                console.log("Created new remote window for:", connectionId)
+                if (!remoteWindow) {
+                    console.error("Failed to create RemoteWindow object")
+                    return
+                }
+                
+                // Handle window destruction
+                remoteWindow.closing.connect(function() {
+                    console.log("RemoteWindow destroyed")
+                    remoteWindow = null
+                })
             } else {
-                console.error("Failed to create remote window object")
+                console.error("RemoteWindow component not ready:", component.status)
+                return
             }
-        } else {
-            console.error("RemoteWindow component not ready:", component.status)
+        }
+        
+        // Add connection to window
+        if (remoteWindow) {
+            remoteWindow.addConnection(connectionId, deviceId)
+            remoteWindow.show()
+            remoteWindow.raise()
+            remoteWindow.requestActivate()
+            console.log("Added connection to remote window:", connectionId)
         }
     }
     
@@ -219,9 +217,15 @@ ApplicationWindow {
         function onConnectionStateChanged(connectionId, state, hostInfo) {
             console.log("MainWindow: Connection state changed:", connectionId, "->", state)
             
-            // If connection is established and no window exists, create one
-            if (state === "已连接" && !remoteWindows[connectionId]) {
-                root.showRemoteWindow(connectionId, connectionId)
+            // If connection is established, ensure the window is shown
+            if (state === "connected") {
+                // Window should already exist from onConnectRequested, 
+                // but we'll ensure it's visible and raised
+                if (remoteWindow) {
+                    remoteWindow.show()
+                    remoteWindow.raise()
+                    remoteWindow.requestActivate()
+                }
             }
         }
     }
