@@ -57,22 +57,26 @@ Item {
                         
                         Row {
                             width: parent.width
+                            height: copyIdBtn.height
                             spacing: Theme.spacingSmall
                             
                             Text {
                                 width: parent.width - copyIdBtn.width - parent.spacing
                                 text: mainController.deviceId || qsTr("Loading...")
-                                font.pixelSize: 20
+                                font.pixelSize: 26
                                 font.weight: Font.Bold
                                 font.family: "Consolas"
                                 color: mainController.deviceId ? Theme.primary : Theme.textDisabled
                                 elide: Text.ElideMiddle
+                                verticalAlignment: Text.AlignVCenter
+                                anchors.verticalCenter: parent.verticalCenter
                             }
                             
                             QDIconButton {
                                 id: copyIdBtn
                                 iconSource: FluentIconGlyph.copyGlyph
                                 enabled: mainController.deviceId && mainController.deviceId.length > 0
+                                anchors.verticalCenter: parent.verticalCenter
                                 onClicked: {
                                     mainController.copyToClipboard(mainController.deviceId)
                                     toast.show(qsTr("Device ID copied"), QDToast.Type.Success)
@@ -101,21 +105,25 @@ Item {
                         
                         Row {
                             width: parent.width
+                            height: refreshBtn.height
                             spacing: Theme.spacingSmall
                             
                             Text {
                                 width: parent.width - refreshBtn.width - copyPwdBtn.width - parent.spacing * 2
                                 text: mainController.accessCode || qsTr("Loading...")
-                                font.pixelSize: 18
+                                font.pixelSize: 24
                                 font.weight: Font.Bold
                                 font.family: "Consolas"
                                 color: mainController.accessCode ? Theme.success : Theme.textDisabled
+                                verticalAlignment: Text.AlignVCenter
+                                anchors.verticalCenter: parent.verticalCenter
                             }
                             
                             QDIconButton {
                                 id: refreshBtn
                                 iconSource: FluentIconGlyph.refreshGlyph
                                 enabled: mainController.signalingState === "connected"
+                                anchors.verticalCenter: parent.verticalCenter
                                 onClicked: {
                                     console.log("Refresh access code clicked")
                                     mainController.refreshTempPassword()
@@ -132,6 +140,7 @@ Item {
                                 id: copyPwdBtn
                                 iconSource: FluentIconGlyph.copyGlyph
                                 enabled: mainController.accessCode && mainController.accessCode.length > 0
+                                anchors.verticalCenter: parent.verticalCenter
                                 onClicked: {
                                     mainController.copyToClipboard(mainController.accessCode)
                                     toast.show(qsTr("Password copied"), QDToast.Type.Success)
