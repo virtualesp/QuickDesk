@@ -203,7 +203,7 @@ ApplicationWindow {
                                         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
                                         onClicked: {
                                             console.log("Refresh access code clicked")
-                                            mainController.refreshTempPassword()
+                                            mainController.refreshAccessCode()
                                         }
                                     }
                                     

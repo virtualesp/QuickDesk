@@ -48,7 +48,7 @@ void HostManager::setMessaging(NativeMessaging* messaging)
     }
 }
 
-void HostManager::connectToServer(const QString& serverUrl, const QString& savedPassword)
+void HostManager::connectToServer(const QString& serverUrl, const QString& savedAccessCode)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         emit errorOccurred("NOT_READY", "Host process is not ready");
@@ -60,10 +60,10 @@ void HostManager::connectToServer(const QString& serverUrl, const QString& saved
     // Only serverUrl is needed - Host will auto-generate deviceId and accessCode
     message["signalingServerUrl"] = serverUrl;
     
-    // If savedPassword is provided (never refresh mode), include it
-    if (!savedPassword.isEmpty()) {
-        message["password"] = savedPassword;
-        LOG_INFO("Sending connect message with saved password: {}", savedPassword.toStdString());
+    // If savedAccessCode is provided (never refresh mode), include it
+    if (!savedAccessCode.isEmpty()) {
+        message["accessCode"] = savedAccessCode;
+        LOG_INFO("Sending connect message with saved access code: {}", savedAccessCode.toStdString());
     } else {
         LOG_INFO("Sending connect message to host, serverUrl: {}", serverUrl.toStdString());
     }
@@ -130,22 +130,22 @@ void HostManager::kickClient(const QString& connectionId)
     m_messaging->sendMessage(message);
 }
 
-void HostManager::refreshTempPassword()
+void HostManager::refreshAccessCode()
 {
     if (!m_messaging || !m_messaging->isReady()) {
-        emit refreshTempPasswordResult(false, "NOT_READY", "Host process not ready");
+        emit refreshAccessCodeResult(false, "NOT_READY", "Host process not ready");
         return;
     }
 
     // Check if connected to signaling server
     if (m_signalingState != "connected") {
-        emit refreshTempPasswordResult(false, "NOT_CONNECTED", 
+        emit refreshAccessCodeResult(false, "NOT_CONNECTED", 
             "Not connected to signaling server");
         return;
     }
 
     QJsonObject message;
-    message["type"] = "refreshTempPassword";
+    message["type"] = "refreshAccessCode";
     m_messaging->sendMessage(message);
 }
 
@@ -211,8 +211,8 @@ void HostManager::onMessageReceived(const QJsonObject& message)
         handleConnectResponse(message);
     } else if (type == "hostReady") {
         handleHostReady(message);
-    } else if (type == "temporaryPasswordChanged") {
-        handleTemporaryPasswordChanged(message);
+    } else if (type == "accessCodeChanged") {
+        handleAccessCodeChanged(message);
     } else if (type == "natPolicyChanged") {
         handleNatPolicyChanged(message);
     } else if (type == "clientConnected") {
@@ -227,8 +227,8 @@ void HostManager::onMessageReceived(const QJsonObject& message)
         handleError(message);
     } else if (type == "signalingStateChanged") {
         handleSignalingStateChanged(message);
-    } else if (type == "refreshTempPasswordResponse") {
-        handleRefreshTempPasswordResponse(message);
+    } else if (type == "refreshAccessCodeResponse") {
+        handleRefreshAccessCodeResponse(message);
     } else if (type == "disconnectResponse") {
         handleDisconnectResponse(message);
     } else {
@@ -275,17 +275,16 @@ void HostManager::handleHostReady(const QJsonObject& message)
     emit hostReady(m_deviceId, m_accessCode);
 }
 
-void HostManager::handleTemporaryPasswordChanged(const QJsonObject& message)
+void HostManager::handleAccessCodeChanged(const QJsonObject& message)
 {
-    QString newPassword = message["accessCode"].toString();
+    QString newAccessCode = message["accessCode"].toString();
     
-    if (!newPassword.isEmpty()) {
-        m_accessCode = newPassword;
+    if (!newAccessCode.isEmpty()) {
+        m_accessCode = newAccessCode;
         
-        LOG_INFO("Temporary password changed to: {}", m_accessCode.toStdString());
+        LOG_INFO("Access code changed to: {}", m_accessCode.toStdString());
         
         emit accessCodeChanged();
-        emit temporaryPasswordChanged(m_accessCode);
     }
 }
 
@@ -453,23 +452,22 @@ QString HostManager::signalingError() const
     return m_signalingError;
 }
 
-void HostManager::handleRefreshTempPasswordResponse(const QJsonObject& message)
+void HostManager::handleRefreshAccessCodeResponse(const QJsonObject& message)
 {
     bool success = message["success"].toBool();
     
     if (success) {
-        QString newPassword = message["newPassword"].toString();
-        LOG_INFO("Temporary password refreshed: {}", newPassword.toStdString());
+        QString newAccessCode = message["accessCode"].toString();
+        LOG_INFO("Access code refreshed: {}", newAccessCode.toStdString());
         
-        m_accessCode = newPassword;
+        m_accessCode = newAccessCode;
         emit accessCodeChanged();
-        emit temporaryPasswordChanged(newPassword);
-        emit refreshTempPasswordResult(true, "", "");
+        emit refreshAccessCodeResult(true, "", "");
     } else {
         QString errorCode = message["error"].toString();
         QString errorMessage = message["errorMessage"].toString();
-        LOG_WARN("Failed to refresh password: {} {}", errorCode.toStdString(), errorMessage.toStdString());
-        emit refreshTempPasswordResult(false, errorCode, errorMessage);
+        LOG_WARN("Failed to refresh access code: {} {}", errorCode.toStdString(), errorMessage.toStdString());
+        emit refreshAccessCodeResult(false, errorCode, errorMessage);
     }
 }
 

@@ -55,24 +55,29 @@ MainController::MainController(QObject* parent)
     connect(m_hostManager.get(), &HostManager::signalingStateChanged,
             this, &MainController::signalingStateChanged);
     
-    // Listen to temporary password changes to save when in "never refresh" mode
-    connect(m_hostManager.get(), &HostManager::temporaryPasswordChanged,
-            this, [this](const QString& newPassword) {
-        core::LocalConfigCenter::instance().setSavedTempPassword(newPassword);
-        LOG_INFO("Saved temporary password for 'never refresh' mode");
+    // Listen to access code changes to save when in "never refresh" mode
+    connect(m_hostManager.get(), &HostManager::accessCodeChanged,
+            this, [this]() {
+        QString currentCode = m_hostManager->accessCode();
+        LOG_INFO("Host access code changed: {}", currentCode.toStdString());
+        if (currentCode.isEmpty()) {
+            return;
+        }
+        core::LocalConfigCenter::instance().setSavedAccessCode(currentCode);
+        LOG_INFO("Saved access code for 'never refresh' mode: {}", currentCode.toStdString()); 
     });
     
-    // Setup password auto-refresh timer
-    connect(&m_passwordRefreshTimer, &QTimer::timeout,
-            this, &MainController::onPasswordRefreshTimer);
+    // Setup access code auto-refresh timer
+    connect(&m_accessCodeRefreshTimer, &QTimer::timeout,
+            this, &MainController::onAccessCodeRefreshTimer);
     
     // Listen to configuration changes
     connect(&core::LocalConfigCenter::instance(), 
-            &core::LocalConfigCenter::signalPasswordRefreshIntervalChanged,
+            &core::LocalConfigCenter::signalAccessCodeRefreshIntervalChanged,
             this, [this](int interval) {
-        LOG_INFO("Password refresh interval changed to: {} minutes", interval);
-        m_passwordRefreshIntervalMinutes = interval;
-        updatePasswordRefreshTimer();
+        LOG_INFO("Access code refresh interval changed to: {} minutes", interval);
+        m_accessCodeRefreshIntervalMinutes = interval;
+        updateAccessCodeRefreshTimer();
     });
 }
 
@@ -135,16 +140,16 @@ void MainController::startHosting(const QString& serverUrl)
     m_lastServerUrl = url;
     m_hostWasHosting = true;
     
-    // Check if we should use saved password (never refresh mode)
-    int interval = core::LocalConfigCenter::instance().passwordRefreshInterval();
-    QString savedPassword = core::LocalConfigCenter::instance().savedTempPassword();
+    // Check if we should use saved access code (never refresh mode)
+    int interval = core::LocalConfigCenter::instance().accessCodeRefreshInterval();
+    QString savedAccessCode = core::LocalConfigCenter::instance().savedAccessCode();
     
-    if (interval == -1 && !savedPassword.isEmpty()) {
-        // Pass saved password to host
-        LOG_INFO("Using saved password for 'never refresh' mode");
-        m_hostManager->connectToServer(url, savedPassword);
+    if (interval == -1 && !savedAccessCode.isEmpty()) {
+        // Pass saved access code to host
+        LOG_INFO("Using saved access code for 'never refresh' mode");
+        m_hostManager->connectToServer(url, savedAccessCode);
     } else {
-        // Normal connection (host will generate new password)
+        // Normal connection (host will generate new access code)
         m_hostManager->connectToServer(url, QString());
     }
 }
@@ -169,25 +174,25 @@ void MainController::disconnectFromRemoteHost(const QString& connectionId)
     m_clientManager->disconnectFromHost(connectionId);
 }
 
-void MainController::refreshTempPassword()
+void MainController::refreshAccessCode()
 {
-    m_hostManager->refreshTempPassword();
+    m_hostManager->refreshAccessCode();
     
     // Reset auto-refresh timer when user manually refreshes
-    resetPasswordRefreshTimer();
+    resetAccessCodeRefreshTimer();
 }
 
-void MainController::resetPasswordRefreshTimer()
+void MainController::resetAccessCodeRefreshTimer()
 {
     // Only reset if auto-refresh is enabled
-    if (m_passwordRefreshIntervalMinutes <= 0) {
+    if (m_accessCodeRefreshIntervalMinutes <= 0) {
         return;
     }
     
     // Restart the timer (will reset the countdown)
-    updatePasswordRefreshTimer();
+    updateAccessCodeRefreshTimer();
     
-    LOG_INFO("Password refresh timer reset after manual refresh, next at {}", 
+    LOG_INFO("Access code refresh timer reset after manual refresh, next at {}", 
              m_nextRefreshTime.toString("MM-dd HH:mm:ss").toStdString());
 }
 
@@ -335,9 +340,9 @@ QString MainController::clientProcessStatus() const
     return status;
 }
 
-QString MainController::nextPasswordRefreshTime() const
+QString MainController::nextAccessCodeRefreshTime() const
 {
-    if (m_passwordRefreshIntervalMinutes <= 0) {
+    if (m_accessCodeRefreshIntervalMinutes <= 0) {
         return "永不";
     }
     
@@ -368,7 +373,14 @@ void MainController::onHostProcessStarted()
         if (m_hostWasHosting && !m_lastServerUrl.isEmpty()) {
             LOG_INFO("Auto-reconnecting to signaling server after Host restart");
             QTimer::singleShot(500, this, [this]() {
-                m_hostManager->connectToServer(m_lastServerUrl);
+                // Check if we should use saved access code (never refresh mode)
+                QString savedAccessCode;
+                int interval = core::LocalConfigCenter::instance().accessCodeRefreshInterval();
+                if (interval == -1) {
+                    savedAccessCode = core::LocalConfigCenter::instance().savedAccessCode();
+                }
+
+                m_hostManager->connectToServer(m_lastServerUrl, savedAccessCode);
             });
         }
     });
@@ -449,18 +461,18 @@ void MainController::onHostReady(const QString& deviceId, const QString& accessC
     m_deviceId = deviceId;
     m_accessCode = accessCode;
     
-    // Load password refresh interval from config
-    m_passwordRefreshIntervalMinutes = core::LocalConfigCenter::instance().passwordRefreshInterval();
-    LOG_INFO("Password refresh interval: {} minutes", m_passwordRefreshIntervalMinutes);
+    // Load access code refresh interval from config
+    m_accessCodeRefreshIntervalMinutes = core::LocalConfigCenter::instance().accessCodeRefreshInterval();
+    LOG_INFO("Access code refresh interval: {} minutes", m_accessCodeRefreshIntervalMinutes);
     
-    // Save password for "never refresh" mode
-    if (m_passwordRefreshIntervalMinutes == -1) {
-        core::LocalConfigCenter::instance().setSavedTempPassword(accessCode);
-        LOG_INFO("Saved password for 'never refresh' mode: {}", accessCode.toStdString());
+    // Save access code for "never refresh" mode
+    if (m_accessCodeRefreshIntervalMinutes == -1) {
+        core::LocalConfigCenter::instance().setSavedAccessCode(accessCode);
+        LOG_INFO("Saved access code for 'never refresh' mode: {}", accessCode.toStdString());
     } else {
         // Auto-refresh enabled - start timer
-        LOG_INFO("Starting password auto-refresh timer: {} minutes", m_passwordRefreshIntervalMinutes);
-        updatePasswordRefreshTimer();
+        LOG_INFO("Starting access code auto-refresh timer: {} minutes", m_accessCodeRefreshIntervalMinutes);
+        updateAccessCodeRefreshTimer();
     }
 
     QTimer::singleShot(0, this, [this]() {
@@ -497,9 +509,9 @@ QString MainController::getDefaultServerUrl() const
     return m_serverManager->serverUrl();
 }
 
-void MainController::onPasswordRefreshTimer()
+void MainController::onAccessCodeRefreshTimer()
 {
-    LOG_INFO("Password auto-refresh timer triggered");
+    LOG_INFO("Access code auto-refresh timer triggered");
     
     // Check if host is still connected
     if (!m_hostManager->isConnected()) {
@@ -507,39 +519,39 @@ void MainController::onPasswordRefreshTimer()
         return;
     }
     
-    // Call refresh password
-    m_hostManager->refreshTempPassword();
+    // Call refresh access code
+    m_hostManager->refreshAccessCode();
     
     // Update next refresh time
-    if (m_passwordRefreshIntervalMinutes > 0) {
-        m_nextRefreshTime = QDateTime::currentDateTime().addSecs(m_passwordRefreshIntervalMinutes * 60);
-        emit nextPasswordRefreshTimeChanged();
+    if (m_accessCodeRefreshIntervalMinutes > 0) {
+        m_nextRefreshTime = QDateTime::currentDateTime().addSecs(m_accessCodeRefreshIntervalMinutes * 60);
+        emit nextAccessCodeRefreshTimeChanged();
     }
 }
 
-void MainController::updatePasswordRefreshTimer()
+void MainController::updateAccessCodeRefreshTimer()
 {
     // Stop existing timer
-    m_passwordRefreshTimer.stop();
+    m_accessCodeRefreshTimer.stop();
     m_nextRefreshTime = QDateTime();
-    emit nextPasswordRefreshTimeChanged();
+    emit nextAccessCodeRefreshTimeChanged();
     
     // -1 means never refresh
-    if (m_passwordRefreshIntervalMinutes <= 0) {
-        LOG_INFO("Password auto-refresh disabled (interval: {})", m_passwordRefreshIntervalMinutes);
+    if (m_accessCodeRefreshIntervalMinutes <= 0) {
+        LOG_INFO("Access code auto-refresh disabled (interval: {})", m_accessCodeRefreshIntervalMinutes);
         return;
     }
     
     // Start timer with interval in milliseconds
-    int intervalMs = m_passwordRefreshIntervalMinutes * 60 * 1000;
-    m_passwordRefreshTimer.start(intervalMs);
+    int intervalMs = m_accessCodeRefreshIntervalMinutes * 60 * 1000;
+    m_accessCodeRefreshTimer.start(intervalMs);
     
     // Set next refresh time
-    m_nextRefreshTime = QDateTime::currentDateTime().addSecs(m_passwordRefreshIntervalMinutes * 60);
-    emit nextPasswordRefreshTimeChanged();
+    m_nextRefreshTime = QDateTime::currentDateTime().addSecs(m_accessCodeRefreshIntervalMinutes * 60);
+    emit nextAccessCodeRefreshTimeChanged();
     
-    LOG_INFO("Password auto-refresh timer started: {} minutes ({} ms), next at {}", 
-             m_passwordRefreshIntervalMinutes, intervalMs, 
+    LOG_INFO("Access code auto-refresh timer started: {} minutes ({} ms), next at {}", 
+             m_accessCodeRefreshIntervalMinutes, intervalMs, 
              m_nextRefreshTime.toString("MM-dd HH:mm:ss").toStdString());
 }
 

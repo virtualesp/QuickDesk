@@ -31,8 +31,8 @@ class MainController : public QObject {
     Q_PROPERTY(QString hostProcessStatus READ hostProcessStatus NOTIFY hostProcessStatusChanged)
     Q_PROPERTY(QString clientProcessStatus READ clientProcessStatus NOTIFY clientProcessStatusChanged)
     
-    // Password auto-refresh info
-    Q_PROPERTY(QString nextPasswordRefreshTime READ nextPasswordRefreshTime NOTIFY nextPasswordRefreshTimeChanged)
+    // Access code auto-refresh info
+    Q_PROPERTY(QString nextAccessCodeRefreshTime READ nextAccessCodeRefreshTime NOTIFY nextAccessCodeRefreshTimeChanged)
 
     // Host properties (convenience for QML)
     Q_PROPERTY(QString deviceId READ deviceId NOTIFY deviceIdChanged)
@@ -86,14 +86,14 @@ public:
     Q_INVOKABLE void disconnectFromRemoteHost(const QString& connectionId);
 
     /**
-     * @brief Refresh temporary password
+     * @brief Refresh access code
      */
-    Q_INVOKABLE void refreshTempPassword();
+    Q_INVOKABLE void refreshAccessCode();
     
     /**
-     * @brief Reset password refresh timer (called after manual refresh)
+     * @brief Reset access code refresh timer (called after manual refresh)
      */
-    void resetPasswordRefreshTimer();
+    void resetAccessCodeRefreshTimer();
 
     /**
      * @brief Copy text to clipboard
@@ -129,8 +129,8 @@ public:
     QString hostProcessStatus() const;
     QString clientProcessStatus() const;
     
-    // Password auto-refresh info
-    QString nextPasswordRefreshTime() const;
+    // Access code auto-refresh info
+    QString nextAccessCodeRefreshTime() const;
 
 signals:
     void initializedChanged();
@@ -144,7 +144,7 @@ signals:
     void clientProcessStatusChanged();
     void hostProcessRestarting(int retryCount, int maxRetries);
     void clientProcessRestarting(int retryCount, int maxRetries);
-    void nextPasswordRefreshTimeChanged();
+    void nextAccessCodeRefreshTimeChanged();
 
 private slots:
     void onHostProcessStarted();
@@ -174,13 +174,13 @@ private:
     QString m_lastServerUrl;  // For auto-reconnect after Host restart
     bool m_hostWasHosting = false;  // Was Host connected before restart
     
-    // Password auto-refresh timer
-    QTimer m_passwordRefreshTimer;
-    int m_passwordRefreshIntervalMinutes = -1;  // -1 = disabled
+    // Access code auto-refresh timer
+    QTimer m_accessCodeRefreshTimer;
+    int m_accessCodeRefreshIntervalMinutes = -1;  // -1 = disabled
     QDateTime m_nextRefreshTime;  // Next scheduled refresh time
     
-    void onPasswordRefreshTimer();
-    void updatePasswordRefreshTimer();
+    void onAccessCodeRefreshTimer();
+    void updateAccessCodeRefreshTimer();
 
     void updateInitStatus(const QString& status);
     void checkInitialized();

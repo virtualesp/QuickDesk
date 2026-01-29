@@ -70,23 +70,23 @@ Item {
                         width: parent.width
                         spacing: Theme.spacingMedium
                         
-                        // Password Refresh Interval
+                        // Access Code Refresh Interval
                         Row {
                             width: parent.width
                             spacing: Theme.spacingMedium
                             
                             Column {
-                                width: parent.width - passwordRefreshCombo.width - parent.spacing
+                                width: parent.width - accessCodeRefreshCombo.width - parent.spacing
                                 spacing: Theme.spacingXSmall
                                 
                                 Text {
-                                    text: qsTr("Temporary Password Auto-Refresh")
+                                    text: qsTr("Access Code Auto-Refresh")
                                     font.pixelSize: Theme.fontSizeMedium
                                     color: Theme.text
                                 }
                                 
                                 Text {
-                                    text: qsTr("Automatically refresh temporary password at intervals")
+                                    text: qsTr("Automatically refresh access code at intervals")
                                     font.pixelSize: Theme.fontSizeSmall
                                     color: Theme.textSecondary
                                     wrapMode: Text.WordWrap
@@ -95,9 +95,9 @@ Item {
                             }
                             
                             QDComboBox {
-                                id: passwordRefreshCombo
+                                id: accessCodeRefreshCombo
                                 model: ListModel {
-                                    id: passwordRefreshModel
+                                    id: accessCodeRefreshModel
                                 }
                                 textRole: "text"
                                 valueRole: "value"
@@ -122,21 +122,21 @@ Item {
                                                 )
 
                                     for (let i = 0; i < options.length; i++) {
-                                        passwordRefreshModel.append(options[i])
+                                        accessCodeRefreshModel.append(options[i])
                                     }
 
                                     // Set current value
-                                    currentIndex = indexOfValue(configViewModel.passwordRefreshInterval)
+                                    currentIndex = indexOfValue(configViewModel.accessCodeRefreshInterval)
                                 }
 
                                 onActivated: {
                                     // Save to config (timer will be updated automatically via signal)
-                                    configViewModel.passwordRefreshInterval = selectedValue
+                                    configViewModel.accessCodeRefreshInterval = selectedValue
                                 }
 
                                 function indexOfValue(value) {
-                                    for (let i = 0; i < passwordRefreshModel.count; i++) {
-                                        if (passwordRefreshModel.get(i).value === value) {
+                                    for (let i = 0; i < accessCodeRefreshModel.count; i++) {
+                                        if (accessCodeRefreshModel.get(i).value === value) {
                                             return i
                                         }
                                     }

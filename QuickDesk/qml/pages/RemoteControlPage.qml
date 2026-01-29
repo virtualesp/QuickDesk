@@ -101,14 +101,14 @@ Item {
                             spacing: Theme.spacingXXLarge
                             
                             Text {
-                                text: qsTr("Temporary Password")
+                                text: qsTr("Access Code")
                                 font.pixelSize: Theme.fontSizeSmall
                                 color: Theme.textSecondary
                                 anchors.verticalCenter: parent.verticalCenter
                             }
                             
                             Text {
-                                text: qsTr("Auto-refresh: ") + (mainController.nextPasswordRefreshTime || qsTr("Never"))
+                                text: qsTr("Auto-refresh: ") + (mainController.nextAccessCodeRefreshTime || qsTr("Never"))
                                 font.pixelSize: Theme.fontSizeSmall - 1
                                 color: Theme.textSecondary
                                 anchors.verticalCenter: parent.verticalCenter
@@ -139,13 +139,13 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 onClicked: {
                                     console.log("Refresh access code clicked")
-                                    mainController.refreshTempPassword()
+                                    mainController.refreshAccessCode()
                                 }
                                 
                                 QDToolTip {
                                     visible: parent.hovered
                                     text: mainController.signalingState === "connected" ? 
-                                          qsTr("Refresh Password") : qsTr("Connect to server first")
+                                          qsTr("Refresh Access Code") : qsTr("Connect to server first")
                                 }
                             }
                             
@@ -156,12 +156,12 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 onClicked: {
                                     mainController.copyToClipboard(mainController.accessCode)
-                                    toast.show(qsTr("Password copied"), QDToast.Type.Success)
+                                    toast.show(qsTr("Access Code copied"), QDToast.Type.Success)
                                 }
                                 
                                 QDToolTip {
                                     visible: parent.hovered
-                                    text: qsTr("Copy Password")
+                                    text: qsTr("Copy Access Code")
                                 }
                             }
                         }
@@ -369,12 +369,12 @@ Item {
         id: toast
     }
     
-    // Connect to refresh password result
+    // Connect to refresh access code result
     Connections {
         target: mainController.hostManager
-        function onRefreshTempPasswordResult(success, errorCode, errorMessage) {
+        function onRefreshAccessCodeResult(success, errorCode, errorMessage) {
             if (success) {
-                toast.show(qsTr("Password refreshed successfully"), QDToast.Type.Success)
+                toast.show(qsTr("Access code refreshed successfully"), QDToast.Type.Success)
             } else {
                 toast.show(qsTr("Refresh failed: ") + errorMessage, QDToast.Type.Error)
             }

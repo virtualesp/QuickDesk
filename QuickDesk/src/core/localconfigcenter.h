@@ -28,11 +28,11 @@ public:
 
     LCC_FUNCTION_DEC_BOOL(groupWindowVerticalScreen, GroupWindowVerticalScreen, true);
 
-    LCC_FUNCTION_DEC_INT(passwordRefreshInterval, PasswordRefreshInterval, 120);  // minutes: never=-1, 1, 30, 120(default), 360, 720, 1440
+    LCC_FUNCTION_DEC_INT(accessCodeRefreshInterval, AccessCodeRefreshInterval, 120);  // minutes: never=-1, 1, 30, 120(default), 360, 720, 1440
     LCC_FUNCTION_DEC_INT(darkTheme, DarkTheme, 1);  // 0=Light, 1=Dark, default=Dark
 
     LCC_FUNCTION_DEC_STRING(language, Language, "Auto");
-    LCC_FUNCTION_DEC_STRING(savedTempPassword, SavedTempPassword, "");  // Saved password for "never refresh" mode
+    LCC_FUNCTION_DEC_STRING(savedAccessCode, SavedAccessCode, "");  // Saved access code for "never refresh" mode
 
 private:
     AppConfigDataBase* m_configDatabase = nullptr;

@@ -7,7 +7,7 @@ ConfigViewModel::ConfigViewModel(QObject* parent)
 {
     connect(&core::LocalConfigCenter::instance(), &core::LocalConfigCenter::signalDarkThemeChanged, this, &ConfigViewModel::darkThemeChanged);
     connect(&core::LocalConfigCenter::instance(), &core::LocalConfigCenter::signalLanguageChanged, this, &ConfigViewModel::languageChanged);
-    connect(&core::LocalConfigCenter::instance(), &core::LocalConfigCenter::signalPasswordRefreshIntervalChanged, this, &ConfigViewModel::passwordRefreshIntervalChanged);
+    connect(&core::LocalConfigCenter::instance(), &core::LocalConfigCenter::signalAccessCodeRefreshIntervalChanged, this, &ConfigViewModel::accessCodeRefreshIntervalChanged);
 }
 
 ConfigViewModel::~ConfigViewModel()
@@ -34,12 +34,12 @@ void ConfigViewModel::setLanguage(const QString& value)
     core::LocalConfigCenter::instance().setLanguage(value);
 }
 
-int ConfigViewModel::passwordRefreshInterval()
+int ConfigViewModel::accessCodeRefreshInterval()
 {
-    return core::LocalConfigCenter::instance().passwordRefreshInterval();
+    return core::LocalConfigCenter::instance().accessCodeRefreshInterval();
 }
 
-void ConfigViewModel::setPasswordRefreshInterval(int value)
+void ConfigViewModel::setAccessCodeRefreshInterval(int value)
 {
-    core::LocalConfigCenter::instance().setPasswordRefreshInterval(value);
+    core::LocalConfigCenter::instance().setAccessCodeRefreshInterval(value);
 }

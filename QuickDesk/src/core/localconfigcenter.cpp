@@ -103,10 +103,10 @@ bool LocalConfigCenter::init()
 
 LCC_FUNCTION_IMP_BOOL(groupWindowVerticalScreen, GroupWindowVerticalScreen);
 
-LCC_FUNCTION_IMP_INT(passwordRefreshInterval, PasswordRefreshInterval);
+LCC_FUNCTION_IMP_INT(accessCodeRefreshInterval, AccessCodeRefreshInterval);
 LCC_FUNCTION_IMP_INT(darkTheme, DarkTheme);
 
 LCC_FUNCTION_IMP_STRING(language, Language);
-LCC_FUNCTION_IMP_STRING(savedTempPassword, SavedTempPassword);
+LCC_FUNCTION_IMP_STRING(savedAccessCode, SavedAccessCode);
 
 }
