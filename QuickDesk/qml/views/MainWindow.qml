@@ -70,7 +70,7 @@ ApplicationWindow {
             }
             
             if (component.status === Component.Ready) {
-                remoteWindow = component.createObject(root, {
+                remoteWindow = component.createObject(null, {
                     clientManager: mainController.clientManager
                 })
                 
