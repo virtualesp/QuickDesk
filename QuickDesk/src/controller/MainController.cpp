@@ -17,6 +17,7 @@ MainController::MainController(QObject* parent)
     : QObject(parent)
     , m_processManager(std::make_unique<ProcessManager>(this))
     , m_serverManager(std::make_unique<ServerManager>(this))
+    , m_turnServerManager(std::make_unique<TurnServerManager>(this))
     , m_hostManager(std::make_unique<HostManager>(this))
     , m_clientManager(std::make_unique<ClientManager>(this))
 {
@@ -253,6 +254,11 @@ ClientManager* MainController::clientManager() const
     return m_clientManager.get();
 }
 
+TurnServerManager* MainController::turnServerManager() const
+{
+    return m_turnServerManager.get();
+}
+
 QString MainController::deviceId() const
 {
     return m_hostManager->deviceId();
@@ -360,6 +366,11 @@ void MainController::onHostProcessStarted()
     
     // Set up Native Messaging
     m_hostManager->setMessaging(m_processManager->hostMessaging());
+    
+    // Set ICE servers from TurnServerManager
+    QJsonArray effectiveServers = m_turnServerManager->getEffectiveServers();
+    m_hostManager->setIceServers(effectiveServers);
+    LOG_INFO("Set ICE servers for Host: {} server(s)", effectiveServers.size());
     
     // Send hello to verify communication and connect to signaling server
     QTimer::singleShot(500, this, [this]() {

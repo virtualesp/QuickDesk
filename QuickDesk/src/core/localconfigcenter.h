@@ -33,6 +33,7 @@ public:
 
     LCC_FUNCTION_DEC_STRING(language, Language, "Auto");
     LCC_FUNCTION_DEC_STRING(savedAccessCode, SavedAccessCode, "");  // Saved access code for "never refresh" mode
+    LCC_FUNCTION_DEC_STRING(turnServersJson, TurnServersJson, "");  // TURN/STUN servers configuration in JSON format
 
 private:
     AppConfigDataBase* m_configDatabase = nullptr;

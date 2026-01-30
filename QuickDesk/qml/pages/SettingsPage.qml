@@ -10,9 +10,68 @@ Item {
     // Controller reference passed from MainWindow
     property var mainController
     
+    // Server list model for Repeater
+    property var serverListModel: []
+    
+    // Toast reference for nested components
+    //property alias toast: toast
+    
     // Config ViewModel
     ConfigViewModel {
         id: configViewModel
+    }
+    
+    // Helper function for removing server (accessible from delegates)
+    function removeServerAt(index, url) {
+        if (mainController) {
+            mainController.turnServerManager.removeServer(index)
+            toast.show(qsTr("Server removed: ") + url, QDToast.Type.Info)
+        }
+    }
+    
+    // Update server list when servers change
+    function updateServerList() {
+        if (!mainController || !mainController.turnServerManager) {
+            serverListModel = []
+            return
+        }
+        
+        let servers = mainController.turnServerManager.servers
+        let newModel = []
+        
+        for (let i = 0; i < servers.length; i++) {
+            let server = servers[i]
+            let urls = server.urls || []
+            let url = urls.length > 0 ? urls[0] : ""
+            let isTurn = server.username ? true : false
+            
+            newModel.push({
+                index: i,
+                url: url,
+                isTurn: isTurn
+            })
+        }
+        
+        serverListModel = newModel
+    }
+    
+    // Listen to server changes
+    Connections {
+        target: mainController ? mainController.turnServerManager : null
+        function onServersChanged() {
+            updateServerList()
+        }
+    }
+    
+    // Watch mainController changes
+    onMainControllerChanged: {
+        if (mainController && mainController.turnServerManager) {
+            Qt.callLater(updateServerList)
+        }
+    }
+    
+    Component.onCompleted: {
+        Qt.callLater(updateServerList)
     }
     
     // Theme apply function
@@ -141,6 +200,179 @@ Item {
                                         }
                                     }
                                     return 3  // Default to 2 hours if not found
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Network Settings (TURN/STUN servers)
+                QDAccordion {
+                    x: Theme.spacingXLarge
+                    width: parent.width - Theme.spacingXLarge * 2
+                    title: qsTr("Network")
+                    iconSource: FluentIconGlyph.networkGlyph
+                    expanded: true
+                    
+                    Column {
+                        width: parent.width
+                        spacing: Theme.spacingMedium
+                        
+                        // Server list
+                        Column {
+                            width: parent.width
+                            spacing: Theme.spacingSmall
+                            
+                            Repeater {
+                                id: serverRepeater
+                                model: root.serverListModel
+                                
+                                delegate: QDCard {
+                                    width: parent.width
+                                    height: 60
+                                    
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: Theme.spacingMedium
+                                        spacing: Theme.spacingMedium
+                                        
+                                        Column {
+                                            Layout.fillWidth: true
+                                            spacing: Theme.spacingXSmall
+                                            
+                                            Text {
+                                                text: modelData.url || ""
+                                                font.pixelSize: Theme.fontSizeMedium
+                                                font.weight: Font.DemiBold
+                                                color: Theme.text
+                                            }
+                                            
+                                            Text {
+                                                text: modelData.isTurn ? qsTr("TURN Server") : qsTr("STUN Server")
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                color: Theme.textSecondary
+                                            }
+                                        }
+                                        
+                                        QDIconButton {
+                                            Layout.preferredWidth: 32
+                                            Layout.preferredHeight: 32
+                                            iconSource: FluentIconGlyph.deleteGlyph
+                                            onClicked: {
+                                                root.removeServerAt(modelData.index, modelData.url)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            Text {
+                                visible: serverRepeater.count === 0
+                                text: qsTr("No custom servers configured")
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.textSecondary
+                                horizontalAlignment: Text.AlignHCenter
+                                width: parent.width
+                            }
+                        }
+                        
+                        Rectangle { width: parent.width; height: 1; color: Theme.border }
+                        
+                        // Add TURN server
+                        Column {
+                            width: parent.width
+                            spacing: Theme.spacingSmall
+                            
+                            Text {
+                                text: qsTr("Add TURN Server")
+                                font.pixelSize: Theme.fontSizeMedium
+                                font.weight: Font.DemiBold
+                                color: Theme.text
+                            }
+                            
+                            QDTextField {
+                                id: turnUrlField
+                                width: parent.width
+                                placeholderText: qsTr("turn:your-server.com:3478")
+                            }
+                            
+                            Row {
+                                width: parent.width
+                                spacing: Theme.spacingSmall
+                                
+                                QDTextField {
+                                    id: turnUsernameField
+                                    width: (parent.width - parent.spacing) / 2
+                                    placeholderText: qsTr("Username")
+                                }
+                                
+                                QDTextField {
+                                    id: turnPasswordField
+                                    width: (parent.width - parent.spacing) / 2
+                                    placeholderText: qsTr("Password")
+                                    echoMode: TextInput.Password
+                                }
+                            }
+                            
+                            QDButton {
+                                text: qsTr("Add TURN Server")
+                                iconText: FluentIconGlyph.addGlyph
+                                buttonType: QDButton.Type.Primary
+                                enabled: turnUrlField.text.length > 0 && 
+                                        turnUsernameField.text.length > 0 && 
+                                        turnPasswordField.text.length > 0
+                                
+                                onClicked: {
+                                    if (!mainController) return
+                                    if (mainController.turnServerManager.addTurnServer(
+                                            turnUrlField.text,
+                                            turnUsernameField.text,
+                                            turnPasswordField.text)) {
+                                        turnUrlField.text = ""
+                                        turnUsernameField.text = ""
+                                        turnPasswordField.text = ""
+                                        toast.show(qsTr("TURN server added successfully"), QDToast.Type.Success)
+                                    } else {
+                                        toast.show(qsTr("Invalid server URL format"), QDToast.Type.Error)
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Rectangle { width: parent.width; height: 1; color: Theme.border }
+                        
+                        // Add STUN server
+                        Column {
+                            width: parent.width
+                            spacing: Theme.spacingSmall
+                            
+                            Text {
+                                text: qsTr("Add STUN Server")
+                                font.pixelSize: Theme.fontSizeMedium
+                                font.weight: Font.DemiBold
+                                color: Theme.text
+                            }
+                            
+                            QDTextField {
+                                id: stunUrlField
+                                width: parent.width
+                                placeholderText: qsTr("stun:stun.l.google.com:19302")
+                            }
+                            
+                            QDButton {
+                                text: qsTr("Add STUN Server")
+                                iconText: FluentIconGlyph.addGlyph
+                                buttonType: QDButton.Type.Primary
+                                enabled: stunUrlField.text.length > 0
+                                
+                                onClicked: {
+                                    if (!mainController) return
+                                    if (mainController.turnServerManager.addStunServer(stunUrlField.text)) {
+                                        stunUrlField.text = ""
+                                        toast.show(qsTr("STUN server added successfully"), QDToast.Type.Success)
+                                    } else {
+                                        toast.show(qsTr("Invalid server URL format"), QDToast.Type.Error)
+                                    }
                                 }
                             }
                         }
@@ -320,5 +552,10 @@ Item {
                 Item { width: 1; height: Theme.spacingXLarge }
             }
         }
+    }
+    
+    // Toast notification
+    QDToast {
+        id: toast
     }
 }

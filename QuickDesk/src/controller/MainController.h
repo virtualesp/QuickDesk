@@ -11,6 +11,7 @@
 #include "../manager/ServerManager.h"
 #include "../manager/HostManager.h"
 #include "../manager/ClientManager.h"
+#include "../manager/TurnServerManager.h"
 #include "../common/ProcessStatus.h"
 
 namespace quickdesk {
@@ -27,6 +28,7 @@ class MainController : public QObject {
     Q_PROPERTY(ServerManager* serverManager READ serverManager CONSTANT)
     Q_PROPERTY(HostManager* hostManager READ hostManager CONSTANT)
     Q_PROPERTY(ClientManager* clientManager READ clientManager CONSTANT)
+    Q_PROPERTY(TurnServerManager* turnServerManager READ turnServerManager CONSTANT)
     
     // Host status
     Q_PROPERTY(ProcessStatus::Status hostProcessStatus READ hostProcessStatus NOTIFY hostProcessStatusChanged)
@@ -104,6 +106,7 @@ public:
     ServerManager* serverManager() const;
     HostManager* hostManager() const;
     ClientManager* clientManager() const;
+    TurnServerManager* turnServerManager() const;
 
     // Host convenience properties
     QString deviceId() const;
@@ -159,6 +162,7 @@ private slots:
 private:
     std::unique_ptr<ProcessManager> m_processManager;
     std::unique_ptr<ServerManager> m_serverManager;
+    std::unique_ptr<TurnServerManager> m_turnServerManager;
     std::unique_ptr<HostManager> m_hostManager;
     std::unique_ptr<ClientManager> m_clientManager;
 

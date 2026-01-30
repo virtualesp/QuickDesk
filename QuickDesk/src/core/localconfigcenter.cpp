@@ -108,5 +108,6 @@ LCC_FUNCTION_IMP_INT(darkTheme, DarkTheme);
 
 LCC_FUNCTION_IMP_STRING(language, Language);
 LCC_FUNCTION_IMP_STRING(savedAccessCode, SavedAccessCode);
+LCC_FUNCTION_IMP_STRING(turnServersJson, TurnServersJson);
 
 }

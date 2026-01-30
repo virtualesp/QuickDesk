@@ -8,6 +8,7 @@ set(MANAGER_SOURCES
     src/manager/NativeMessaging.cpp
     src/manager/ProcessManager.cpp
     src/manager/ServerManager.cpp
+    src/manager/TurnServerManager.cpp
     src/manager/HostManager.cpp
     src/manager/ClientManager.cpp
     src/manager/SharedMemoryManager.cpp
@@ -17,6 +18,7 @@ set(MANAGER_HEADERS
     src/manager/NativeMessaging.h
     src/manager/ProcessManager.h
     src/manager/ServerManager.h
+    src/manager/TurnServerManager.h
     src/manager/HostManager.h
     src/manager/ClientManager.h
     src/manager/SharedMemoryManager.h

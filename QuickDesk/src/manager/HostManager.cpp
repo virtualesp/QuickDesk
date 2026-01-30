@@ -10,20 +10,9 @@ namespace quickdesk {
 HostManager::HostManager(QObject* parent)
     : QObject(parent)
 {
-    // 硬编码默认 TURN 服务器配置（用于测试）
-    QJsonArray iceServers;
-    
-    // 添加默认 TURN 服务器
-    QJsonObject turnServer;
-    turnServer["urls"] = QJsonArray{"turn:115.190.196.189:3478"};
-    turnServer["username"] = "qfturn";
-    turnServer["credential"] = "iunngalgag";
-    //turnServer["maxRateKbps"] = 8000.0;  // 可选：带宽限制 8 Mbps
-    iceServers.append(turnServer);    
-    
-    // 设置默认配置
-    m_iceServers = iceServers;
-    LOG_INFO("Initialized with default ICE servers: {} server(s)", m_iceServers.size());
+    // Don't hardcode TURN servers here anymore
+    // They will be set from TurnServerManager when connecting
+    LOG_INFO("HostManager initialized");
 }
 
 void HostManager::setMessaging(NativeMessaging* messaging)
