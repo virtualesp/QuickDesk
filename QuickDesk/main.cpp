@@ -105,8 +105,10 @@ int main(int argc, char *argv[])
 
     // Load main QML
     engine.loadFromModule("QuickDesk", "MainWindow");
-
     LOG_INFO("QuickDesk started successfully");
+    
+    int runRet = app.exec();
+    LOG_INFO("QuickDesk exiting with code {}", runRet);
 
-    return app.exec();
+    return runRet;
 }

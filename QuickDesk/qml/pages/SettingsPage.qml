@@ -123,7 +123,7 @@ Item {
                     width: parent.width - Theme.spacingXLarge * 2
                     title: qsTr("Security")
                     iconSource: FluentIconGlyph.lockGlyph
-                    expanded: true
+                    expanded: false
                     
                     Column {
                         width: parent.width
@@ -212,7 +212,7 @@ Item {
                     width: parent.width - Theme.spacingXLarge * 2
                     title: qsTr("Network")
                     iconSource: FluentIconGlyph.networkGlyph
-                    expanded: true
+                    expanded: false
                     
                     Column {
                         width: parent.width
@@ -482,7 +482,7 @@ Item {
                     width: parent.width - Theme.spacingXLarge * 2
                     title: qsTr("Application")
                     iconSource: FluentIconGlyph.settingsGlyph
-                    expanded: true
+                    expanded: false
                     
                     Column {
                         width: parent.width
