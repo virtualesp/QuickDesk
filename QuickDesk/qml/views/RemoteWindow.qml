@@ -285,6 +285,10 @@ Window {
                     }
                 }
             }
+            
+            onShowToast: function(message, toastType) {
+                toast.show(message, toastType)
+            }
         }
     }
     
@@ -313,5 +317,14 @@ Window {
                 }
             }
         }
+    }
+    
+    // Toast for notifications
+    QDToast {
+        id: toast
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 50
+        z: 9999
     }
 }

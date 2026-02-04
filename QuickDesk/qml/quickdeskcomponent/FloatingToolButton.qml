@@ -28,6 +28,7 @@ Item {
     
     // Signals
     signal disconnectRequested(string connectionId)
+    signal showToast(string message, var toastType)
     
     // Apply framerate boost mode
     function applyFramerateBoostMode(mode) {
@@ -413,6 +414,7 @@ Item {
             onTriggered: {
                 root.framerateBoostMode = root.boostModeOff
                 root.applyFramerateBoostMode(root.boostModeOff)
+                root.showToast(qsTr("Smart Boost: Off"), QDToast.Type.Success)
             }
         }
         
@@ -422,6 +424,7 @@ Item {
             onTriggered: {
                 root.framerateBoostMode = root.boostModeOffice
                 root.applyFramerateBoostMode(root.boostModeOffice)
+                root.showToast(qsTr("Smart Boost: Office Mode"), QDToast.Type.Success)
             }
         }
         
@@ -431,6 +434,7 @@ Item {
             onTriggered: {
                 root.framerateBoostMode = root.boostModeGaming
                 root.applyFramerateBoostMode(root.boostModeGaming)
+                root.showToast(qsTr("Smart Boost: Gaming Mode"), QDToast.Type.Success)
             }
         }
     }
@@ -455,6 +459,7 @@ Item {
                 root.targetFramerate = 60
                 if (root.clientManager) {
                     root.clientManager.setTargetFramerate(root.connectionId, 60)
+                    root.showToast(qsTr("Target Framerate: 60 FPS"), QDToast.Type.Success)
                 }
             }
         }
@@ -466,6 +471,7 @@ Item {
                 root.targetFramerate = 30
                 if (root.clientManager) {
                     root.clientManager.setTargetFramerate(root.connectionId, 30)
+                    root.showToast(qsTr("Target Framerate: 30 FPS"), QDToast.Type.Success)
                 }
             }
         }
@@ -477,6 +483,7 @@ Item {
                 root.targetFramerate = 15
                 if (root.clientManager) {
                     root.clientManager.setTargetFramerate(root.connectionId, 15)
+                    root.showToast(qsTr("Target Framerate: 15 FPS"), QDToast.Type.Success)
                 }
             }
         }
@@ -488,6 +495,7 @@ Item {
                 root.targetFramerate = 5
                 if (root.clientManager) {
                     root.clientManager.setTargetFramerate(root.connectionId, 5)
+                    root.showToast(qsTr("Target Framerate: 5 FPS"), QDToast.Type.Success)
                 }
             }
         }
@@ -524,6 +532,7 @@ Item {
                         root.videoInfo.originalHeight, 
                         96
                     )
+                    root.showToast(qsTr("Resolution: ") + root.videoInfo.originalWidth + "x" + root.videoInfo.originalHeight + " (" + qsTr("Original") + ")", QDToast.Type.Success)
                 } else {
                     console.log("Cannot restore to original: invalid resolution data. Width:", root.videoInfo ? root.videoInfo.originalWidth : "null", "Height:", root.videoInfo ? root.videoInfo.originalHeight : "null")
                 }
@@ -538,6 +547,7 @@ Item {
                 console.log("Set resolution 3840x2160 for:", root.connectionId)
                 if (root.clientManager) {
                     root.clientManager.setResolution(root.connectionId, 3840, 2160, 96)
+                    root.showToast(qsTr("Resolution: 3840x2160 (4K)"), QDToast.Type.Success)
                 }
             }
         }
@@ -548,6 +558,7 @@ Item {
                 console.log("Set resolution 2560x1440 for:", root.connectionId)
                 if (root.clientManager) {
                     root.clientManager.setResolution(root.connectionId, 2560, 1440, 96)
+                    root.showToast(qsTr("Resolution: 2560x1440 (2K)"), QDToast.Type.Success)
                 }
             }
         }
@@ -558,6 +569,7 @@ Item {
                 console.log("Set resolution 1920x1080 for:", root.connectionId)
                 if (root.clientManager) {
                     root.clientManager.setResolution(root.connectionId, 1920, 1080, 96)
+                    root.showToast(qsTr("Resolution: 1920x1080 (FHD)"), QDToast.Type.Success)
                 }
             }
         }
@@ -568,6 +580,7 @@ Item {
                 console.log("Set resolution 1600x900 for:", root.connectionId)
                 if (root.clientManager) {
                     root.clientManager.setResolution(root.connectionId, 1600, 900, 96)
+                    root.showToast(qsTr("Resolution: 1600x900"), QDToast.Type.Success)
                 }
             }
         }
@@ -578,6 +591,7 @@ Item {
                 console.log("Set resolution 1366x768 for:", root.connectionId)
                 if (root.clientManager) {
                     root.clientManager.setResolution(root.connectionId, 1366, 768, 96)
+                    root.showToast(qsTr("Resolution: 1366x768"), QDToast.Type.Success)
                 }
             }
         }
@@ -588,6 +602,7 @@ Item {
                 console.log("Set resolution 1280x720 for:", root.connectionId)
                 if (root.clientManager) {
                     root.clientManager.setResolution(root.connectionId, 1280, 720, 96)
+                    root.showToast(qsTr("Resolution: 1280x720"), QDToast.Type.Success)
                 }
             }
         }
@@ -598,6 +613,7 @@ Item {
                 console.log("Set resolution 1024x768 for:", root.connectionId)
                 if (root.clientManager) {
                     root.clientManager.setResolution(root.connectionId, 1024, 768, 96)
+                    root.showToast(qsTr("Resolution: 1024x768"), QDToast.Type.Success)
                 }
             }
         }
@@ -623,6 +639,7 @@ Item {
                 root.preferredMinBitrate = 104857600  // 100 * 1024 * 1024
                 if (root.clientManager) {
                     root.clientManager.setBitrate(root.connectionId, 104857600)
+                    root.showToast(qsTr("Bitrate: 100 MiB"), QDToast.Type.Success)
                 }
             }
         }
@@ -634,6 +651,7 @@ Item {
                 root.preferredMinBitrate = 52428800  // 50 * 1024 * 1024
                 if (root.clientManager) {
                     root.clientManager.setBitrate(root.connectionId, 52428800)
+                    root.showToast(qsTr("Bitrate: 50 MiB"), QDToast.Type.Success)
                 }
             }
         }
@@ -645,6 +663,7 @@ Item {
                 root.preferredMinBitrate = 10485760  // 10 * 1024 * 1024
                 if (root.clientManager) {
                     root.clientManager.setBitrate(root.connectionId, 10485760)
+                    root.showToast(qsTr("Bitrate: 10 MiB"), QDToast.Type.Success)
                 }
             }
         }
@@ -656,6 +675,7 @@ Item {
                 root.preferredMinBitrate = 5242880  // 5 * 1024 * 1024
                 if (root.clientManager) {
                     root.clientManager.setBitrate(root.connectionId, 5242880)
+                    root.showToast(qsTr("Bitrate: 5 MiB"), QDToast.Type.Success)
                 }
             }
         }
@@ -667,6 +687,7 @@ Item {
                 root.preferredMinBitrate = 2097152  // 2 * 1024 * 1024
                 if (root.clientManager) {
                     root.clientManager.setBitrate(root.connectionId, 2097152)
+                    root.showToast(qsTr("Bitrate: 2 MiB"), QDToast.Type.Success)
                 }
             }
         }
