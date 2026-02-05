@@ -11,9 +11,8 @@ Rectangle {
     // Properties
     property var connections: [] // Array of connection objects
     property int currentIndex: 0
-    property var videoInfoMap: ({})
-    property int videoInfoVersion: 0  // Used to trigger updates
-    property var connectionStatsMap: ({})  // Map of connection stats (ping, etc.)
+    property var performanceStatsMap: ({})
+    property int statsVersion: 0  // Used to trigger updates
     
     // Signals
     signal tabClicked(int index)
@@ -53,18 +52,20 @@ Rectangle {
                 connectionState: modelData.state || "connected"
                 isActive: index === control.currentIndex
                 
-                // Get video info from map
-                property var videoInfo: {
-                    var _ = control.videoInfoVersion  // Trigger update when version changes
-                    return control.videoInfoMap[modelData.id] || {frameWidth: 0, frameHeight: 0, frameRate: 0}
+                // Get performance stats from map
+                property var stats: {
+                    var _ = control.statsVersion  // Trigger update when version changes
+                    return control.performanceStatsMap[modelData.id] || {
+                        frameWidth: 0, 
+                        frameHeight: 0, 
+                        frameRate: 0,
+                        ping: 0
+                    }
                 }
-                frameWidth: videoInfo.frameWidth
-                frameHeight: videoInfo.frameHeight
-                frameRate: videoInfo.frameRate
-                
-                // Get connection stats from map
-                property var connectionStats: control.connectionStatsMap[modelData.id] || {ping: 0}
-                ping: connectionStats.ping
+                frameWidth: stats.frameWidth
+                frameHeight: stats.frameHeight
+                frameRate: stats.frameRate
+                ping: stats.ping
                 
                 onClicked: {
                     control.tabClicked(index)

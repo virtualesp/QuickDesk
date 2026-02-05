@@ -17,74 +17,78 @@ Window {
     
     // Properties
     property var clientManager: null
-    property var connections: [] // Array of connection objects: [{id, deviceId, name, state}] - ping removed
+    property var connections: [] // Array of connection objects: [{id, deviceId, name, state}]
     property int currentTabIndex: 0
     
-    // Video info stored separately to avoid triggering Repeater rebuild
-    // Map: connectionId -> {frameWidth, frameHeight, frameRate, originalWidth, originalHeight}
-    property var videoInfoMap: ({})
-    property int videoInfoVersion: 0  // Increment to notify changes
+    // Performance stats stored separately to avoid triggering Repeater rebuild
+    // Map: connectionId -> {frameWidth, frameHeight, frameRate, ping, originalWidth, originalHeight}
+    property var performanceStatsMap: ({})
+    property int statsVersion: 0  // Increment to notify changes
     
-    // Connection stats stored separately to avoid triggering Repeater rebuild
-    // Map: connectionId -> {ping}
-    property var connectionStatsMap: ({})
-    
-    // Get video info for a connection
-    function getVideoInfo(connectionId) {
-        return videoInfoMap[connectionId] || {frameWidth: 0, frameHeight: 0, frameRate: 0, originalWidth: 0, originalHeight: 0}
+    // Get performance stats for a connection
+    function getPerformanceStats(connectionId) {
+        return performanceStatsMap[connectionId] || {
+            frameWidth: 0, 
+            frameHeight: 0, 
+            frameRate: 0, 
+            ping: 0,
+            originalWidth: 0, 
+            originalHeight: 0
+        }
     }
     
-    // Get connection stats for a connection
-    function getConnectionStats(connectionId) {
-        return connectionStatsMap[connectionId] || {ping: 0}
-    }
-    
-    // Update video info without modifying connections array
-    function updateConnectionVideoInfo(connectionId, width, height, fps) {
-        // Validate input - width and height must be positive, fps can be 0 or positive
-        if (!connectionId || width <= 0 || height <= 0) {
-            console.warn("Invalid video info update:", connectionId, width + "x" + height, fps + "fps")
-            return
-        }
+    // Update performance stats without modifying connections array
+    function updatePerformanceStats(connectionId, width, height, fps, ping) {
+        var stats = performanceStatsMap[connectionId]
         
-        // Ensure fps is non-negative and round to integer for comparison
-        fps = Math.max(0, Math.round(fps))
-        
-        var info = videoInfoMap[connectionId]
-        
-        // Check if there's any actual change
-        if (info && info.frameWidth === width && info.frameHeight === height && info.frameRate === fps) {
-            // No change, skip update
-            return
-        }
-        
-        // Record original resolution on first valid frame
-        var originalWidth = info ? info.originalWidth : 0
-        var originalHeight = info ? info.originalHeight : 0
-        
-        // Only record if both width and height are valid (> 0) and not yet recorded
-        if (!info || (info.originalWidth === 0 && width > 0 && height > 0)) {
-            // First frame with valid dimensions - record as original
-            originalWidth = width
-            originalHeight = height
-            console.log("✓ Recorded original resolution for", connectionId, ":", width + "x" + height)
-        }
-        
-        // Update the map
-        var newMap = Object.assign({}, videoInfoMap)
-        newMap[connectionId] = {
-            frameWidth: width, 
-            frameHeight: height, 
-            frameRate: fps,
-            originalWidth: originalWidth,
-            originalHeight: originalHeight
-        }
-        videoInfoMap = newMap
-        
-        // Only increment version if width or height changed (affects layout)
-        // Don't increment for fps-only changes to avoid unnecessary redraws
-        if (!info || info.frameWidth !== width || info.frameHeight !== height) {
-            videoInfoVersion++
+        // Handle video size update
+        if (width !== undefined && height !== undefined && width > 0 && height > 0) {
+            // Ensure fps is non-negative and round to integer for comparison
+            if (fps !== undefined) {
+                fps = Math.max(0, Math.round(fps))
+            }
+            
+            // Check if there's any actual change
+            if (stats && stats.frameWidth === width && stats.frameHeight === height && 
+                (fps === undefined || stats.frameRate === fps)) {
+                // No video change, but might need to update ping
+                if (ping === undefined) {
+                    return  // Nothing to update
+                }
+            }
+            
+            // Record original resolution on first valid frame
+            var originalWidth = stats ? stats.originalWidth : 0
+            var originalHeight = stats ? stats.originalHeight : 0
+            
+            if (!stats || (stats.originalWidth === 0 && width > 0 && height > 0)) {
+                originalWidth = width
+                originalHeight = height
+                console.log("✓ Recorded original resolution for", connectionId, ":", width + "x" + height)
+            }
+            
+            // Create new stats object
+            var newStatsMap = Object.assign({}, performanceStatsMap)
+            newStatsMap[connectionId] = {
+                frameWidth: width,
+                frameHeight: height,
+                frameRate: fps !== undefined ? fps : (stats ? stats.frameRate : 0),
+                ping: ping !== undefined ? ping : (stats ? stats.ping : 0),
+                originalWidth: originalWidth,
+                originalHeight: originalHeight
+            }
+            performanceStatsMap = newStatsMap
+            
+            // Only increment version if width or height changed (affects layout)
+            if (!stats || stats.frameWidth !== width || stats.frameHeight !== height) {
+                statsVersion++
+            }
+        } 
+        // Handle ping-only update
+        else if (ping !== undefined && stats) {
+            var newStatsMap = Object.assign({}, performanceStatsMap)
+            newStatsMap[connectionId] = Object.assign({}, stats, {ping: ping})
+            performanceStatsMap = newStatsMap
         }
     }
     
@@ -112,15 +116,17 @@ Window {
         newConnections.push(conn)
         connections = newConnections
         
-        // Initialize video info
-        var newVideoMap = Object.assign({}, videoInfoMap)
-        newVideoMap[connectionId] = {frameWidth: 0, frameHeight: 0, frameRate: 0, originalWidth: 0, originalHeight: 0}
-        videoInfoMap = newVideoMap
-        
-        // Initialize connection stats
-        var newStatsMap = Object.assign({}, connectionStatsMap)
-        newStatsMap[connectionId] = {ping: 0}
-        connectionStatsMap = newStatsMap
+        // Initialize performance stats
+        var newStatsMap = Object.assign({}, performanceStatsMap)
+        newStatsMap[connectionId] = {
+            frameWidth: 0, 
+            frameHeight: 0, 
+            frameRate: 0, 
+            ping: 0,
+            originalWidth: 0, 
+            originalHeight: 0
+        }
+        performanceStatsMap = newStatsMap
         
         currentTabIndex = connections.length - 1
         console.log("Added connection to remote window:", connectionId, "Total tabs:", connections.length)
@@ -151,15 +157,10 @@ Window {
         
         var connId = connections[index].id
         
-        // Remove from video info map
-        var newVideoMap = Object.assign({}, videoInfoMap)
-        delete newVideoMap[connId]
-        videoInfoMap = newVideoMap
-        
-        // Remove from connection stats map
-        var newStatsMap = Object.assign({}, connectionStatsMap)
+        // Remove from performance stats map
+        var newStatsMap = Object.assign({}, performanceStatsMap)
         delete newStatsMap[connId]
-        connectionStatsMap = newStatsMap
+        performanceStatsMap = newStatsMap
         
         // Create new array to trigger property binding update
         var newConnections = connections.slice()
@@ -195,25 +196,20 @@ Window {
     function updateConnectionState(connectionId, state, ping) {
         // Update state in connections array (only if state changed)
         if (state !== "") {
-            var stateUpdated = false
             for (var i = 0; i < connections.length; i++) {
                 if (connections[i].id === connectionId && connections[i].state !== state) {
-                    // Create new array to trigger property binding update
                     var newConnections = connections.slice()
                     newConnections[i].state = state
                     connections = newConnections
-                    stateUpdated = true
                     console.log("Updated connection state:", connectionId, "->", state)
                     break
                 }
             }
         }
         
-        // Update ping in separate map (doesn't trigger Repeater rebuild)
+        // Update ping in performance stats map (doesn't trigger Repeater rebuild)
         if (ping !== undefined) {
-            var newStatsMap = Object.assign({}, connectionStatsMap)
-            newStatsMap[connectionId] = {ping: ping || 0}
-            connectionStatsMap = newStatsMap
+            updatePerformanceStats(connectionId, undefined, undefined, undefined, ping)
         }
     }
     
@@ -227,9 +223,8 @@ Window {
             Layout.fillWidth: true
             connections: remoteWindow.connections
             currentIndex: remoteWindow.currentTabIndex
-            videoInfoMap: remoteWindow.videoInfoMap
-            videoInfoVersion: remoteWindow.videoInfoVersion
-            connectionStatsMap: remoteWindow.connectionStatsMap
+            performanceStatsMap: remoteWindow.performanceStatsMap
+            statsVersion: remoteWindow.statsVersion
             
             onTabClicked: function(index) {
                 remoteWindow.currentTabIndex = index
@@ -267,19 +262,17 @@ Window {
                         clientManager: remoteWindow.clientManager
                         active: index === remoteWindow.currentTabIndex
                         
-                        // Monitor video size changes (frameRate is updated from PerformanceTracker)
+                        // Monitor video size changes (frameRate and ping updated from PerformanceTracker)
                         onFrameWidthChanged: {
                             if (frameWidth > 0 && frameHeight > 0) {
-                                var info = remoteWindow.getVideoInfo(modelData.id)
-                                var currentFps = info ? info.frameRate : 0
-                                remoteWindow.updateConnectionVideoInfo(modelData.id, frameWidth, frameHeight, currentFps)
+                                var stats = remoteWindow.getPerformanceStats(modelData.id)
+                                remoteWindow.updatePerformanceStats(modelData.id, frameWidth, frameHeight, stats.frameRate, stats.ping)
                             }
                         }
                         onFrameHeightChanged: {
                             if (frameWidth > 0 && frameHeight > 0) {
-                                var info = remoteWindow.getVideoInfo(modelData.id)
-                                var currentFps = info ? info.frameRate : 0
-                                remoteWindow.updateConnectionVideoInfo(modelData.id, frameWidth, frameHeight, currentFps)
+                                var stats = remoteWindow.getPerformanceStats(modelData.id)
+                                remoteWindow.updatePerformanceStats(modelData.id, frameWidth, frameHeight, stats.frameRate, stats.ping)
                             }
                         }
                     }
@@ -307,7 +300,7 @@ Window {
                 var connId = remoteWindow.currentTabIndex >= 0 && remoteWindow.currentTabIndex < remoteWindow.connections.length 
                     ? remoteWindow.connections[remoteWindow.currentTabIndex].id 
                     : ""
-                return connId ? remoteWindow.getVideoInfo(connId) : null
+                return connId ? remoteWindow.getPerformanceStats(connId) : null
             }
             desktopView: {
                 // Find the current desktop view
@@ -372,9 +365,9 @@ Window {
             remoteWindow.updateConnectionState(connectionId, "", totalLatencyMs)
             
             // Update frameRate from PerformanceTracker
-            var info = remoteWindow.getVideoInfo(connectionId)
-            if (info && info.frameWidth > 0 && info.frameHeight > 0) {
-                remoteWindow.updateConnectionVideoInfo(connectionId, info.frameWidth, info.frameHeight, frameRate)
+            var stats = remoteWindow.getPerformanceStats(connectionId)
+            if (stats && stats.frameWidth > 0 && stats.frameHeight > 0) {
+                remoteWindow.updatePerformanceStats(connectionId, stats.frameWidth, stats.frameHeight, frameRate, totalLatencyMs)
             }
         }
     }
