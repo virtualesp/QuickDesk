@@ -450,9 +450,27 @@ void MainController::onClientProcessStarted()
     // Set up Native Messaging
     m_clientManager->setMessaging(m_processManager->clientMessaging());
     
-    // Send hello to verify communication
+    // Send hello to verify communication and pass local device_id for signaling identification
+    // Wait for Host's device_id to be ready before sending
     QTimer::singleShot(500, this, [this]() {
-        m_clientManager->sendHello();
+        QString localDeviceId = m_hostManager->deviceId();
+        if (localDeviceId.isEmpty()) {
+            LOG_WARN("Client hello: Host device_id not ready yet, waiting for deviceIdChanged signal");
+            // Connect to deviceIdChanged signal to send hello when device_id is ready
+            QMetaObject::Connection* conn = new QMetaObject::Connection();
+            *conn = connect(m_hostManager.get(), &HostManager::deviceIdChanged, this, [this, conn]() {
+                QString deviceId = m_hostManager->deviceId();
+                if (!deviceId.isEmpty()) {
+                    LOG_INFO("Client hello: Received device_id from Host: {}", deviceId.toStdString());
+                    m_clientManager->sendHello(deviceId);
+                    disconnect(*conn);
+                    delete conn;
+                }
+            });
+        } else {
+            LOG_INFO("Client hello: Using device_id: {}", localDeviceId.toStdString());
+            m_clientManager->sendHello(localDeviceId);
+        }
     });
 }
 

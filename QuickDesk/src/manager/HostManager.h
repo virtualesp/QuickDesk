@@ -21,6 +21,7 @@ class NativeMessaging;
 struct SessionInfo {
     QString connectionId;
     QString username;
+    QString deviceId;  // Client's device ID (extracted from client_id)
     QString ip;
     QString deviceName;
     QString connectedAt;

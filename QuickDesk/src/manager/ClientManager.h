@@ -66,7 +66,7 @@ public:
                                       const QString& serverUrl);
     Q_INVOKABLE void disconnectFromHost(const QString& connectionId);
     Q_INVOKABLE void disconnectAll();
-    Q_INVOKABLE void sendHello();
+    Q_INVOKABLE void sendHello(const QString& deviceId = QString());
 
     // Input events
     Q_INVOKABLE void sendMouseMove(const QString& connectionId, int x, int y);

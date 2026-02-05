@@ -141,7 +141,7 @@ void ClientManager::disconnectAll()
     emit connectionListChanged();
 }
 
-void ClientManager::sendHello()
+void ClientManager::sendHello(const QString& deviceId)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         emit errorOccurred("", "NOT_READY", "Client process is not ready");
@@ -150,6 +150,10 @@ void ClientManager::sendHello()
 
     QJsonObject message;
     message["type"] = "hello";
+    // Send local device_id so client process can use it for signaling identification
+    if (!deviceId.isEmpty()) {
+        message["deviceId"] = deviceId;
+    }
     m_messaging->sendMessage(message);
 }
 
