@@ -28,6 +28,11 @@
 
 int main(int argc, char *argv[])
 {
+    // Ensure high DPI scaling uses accurate rounding policy
+    // This prevents blurriness on displays with fractional DPI scaling (e.g. 125%, 150%)
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(
+        Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+
     QGuiApplication app(argc, argv);
     
     // 设置应用图标

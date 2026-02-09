@@ -45,49 +45,38 @@ Rectangle {
     }
     
     // Convert local mouse coordinates to remote desktop coordinates
+    // Uses VideoOutput.contentRect to get the actual video display area,
+    // ensuring perfect alignment with the rendered video region.
     function mapToRemote(localX, localY) {
         if (frameWidth <= 0 || frameHeight <= 0) {
-            return { x: 0, y: 0 };
+            return null;
         }
-        
-        // Calculate the actual video display area (considering aspect ratio)
-        var viewAspect = width / height;
-        var frameAspect = frameWidth / frameHeight;
-        
-        var displayWidth, displayHeight, offsetX, offsetY;
-        
-        if (viewAspect > frameAspect) {
-            // View is wider than video, black bars on sides
-            displayHeight = height;
-            displayWidth = height * frameAspect;
-            offsetX = (width - displayWidth) / 2;
-            offsetY = 0;
-        } else {
-            // View is taller than video, black bars on top/bottom
-            displayWidth = width;
-            displayHeight = width / frameAspect;
-            offsetX = 0;
-            offsetY = (height - displayHeight) / 2;
+
+        // VideoOutput.contentRect gives the exact rectangle where the video
+        // is actually rendered (excludes black bars from PreserveAspectFit)
+        var rect = videoOutput.contentRect;
+        if (rect.width <= 0 || rect.height <= 0) {
+            return null;
         }
-        
-        // Adjust for offset and scale
-        var relativeX = localX - offsetX;
-        var relativeY = localY - offsetY;
-        
-        // Check if click is within video area
-        if (relativeX < 0 || relativeX > displayWidth || 
-            relativeY < 0 || relativeY > displayHeight) {
-            return null;  // Outside video area
+
+        // Calculate position relative to the video content area
+        var relativeX = localX - rect.x;
+        var relativeY = localY - rect.y;
+
+        // Check if the mouse is within the video area (not on black bars)
+        if (relativeX < 0 || relativeX > rect.width ||
+            relativeY < 0 || relativeY > rect.height) {
+            return null;
         }
-        
-        // Scale to remote coordinates
-        var remoteX = Math.round(relativeX * frameWidth / displayWidth);
-        var remoteY = Math.round(relativeY * frameHeight / displayHeight);
-        
+
+        // Scale to remote desktop coordinates
+        var remoteX = Math.round(relativeX * frameWidth / rect.width);
+        var remoteY = Math.round(relativeY * frameHeight / rect.height);
+
         // Clamp to valid range
         remoteX = Math.max(0, Math.min(frameWidth - 1, remoteX));
         remoteY = Math.max(0, Math.min(frameHeight - 1, remoteY));
-        
+
         return { x: remoteX, y: remoteY };
     }
     
