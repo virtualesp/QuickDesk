@@ -274,40 +274,6 @@ Window {
         }
     }
 
-    // When switching tabs, check if the new tab's resolution differs significantly
-    // from the current window size, and show a toast hint if so.
-    onCurrentTabIndexChanged: {
-        if (connectionModel.count <= 1) return  // No need for single tab
-        if (currentTabIndex < 0 || currentTabIndex >= connectionModel.count) return
-
-        var connId = connectionModel.connectionIdAt(currentTabIndex)
-        var s = getPerformanceStats(connId)
-        if (!s || s.frameWidth <= 0 || s.frameHeight <= 0) return
-
-        // Use Qt.callLater so the StackLayout transition completes first
-        var fw = s.frameWidth
-        var fh = s.frameHeight
-        Qt.callLater(function() {
-            var tabBarH = tabBar.height > 0 ? tabBar.height : 36
-            var contentWidth = remoteWindow.width
-            var contentHeight = remoteWindow.height - tabBarH
-
-            if (contentWidth <= 0 || contentHeight <= 0) return
-
-            // Calculate how well the current window fits the remote desktop
-            var scaleX = contentWidth / fw
-            var scaleY = contentHeight / fh
-            var scale = Math.min(scaleX, scaleY)
-
-            // If scale is significantly off (< 0.7 or > 1.4), suggest resize
-            if (scale < 0.7 || scale > 1.4) {
-                toast.show(qsTr("Remote resolution") + " " + fw + "x" + fh +
-                           " " + qsTr("differs from window. Use toolbar \"Fit Window\" to adjust."),
-                           QDToast.Type.Info)
-            }
-        })
-    }
-
     // Update connection state
     function updateConnectionState(connectionId, state, ping) {
         // Update state in model (only emits dataChanged for the affected row)
