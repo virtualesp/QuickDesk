@@ -64,7 +64,7 @@ void HostManager::connectToServer(const QString& serverUrl, const QString& saved
     message["signalingServerUrl"] = serverUrl;
 
 #ifdef Q_OS_WIN    
-    message["useElevatedHost"] = true;
+    message["useElevatedHost"] = false;
 #endif
 
     // If savedAccessCode is provided (never refresh mode), include it
