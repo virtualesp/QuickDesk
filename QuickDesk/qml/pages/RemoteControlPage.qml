@@ -192,6 +192,21 @@ Item {
                                 }
                             }
                         }
+                        
+                        QDButton {
+                            width: parent.width
+                            text: qsTr("Copy Device Info")
+                            buttonType: QDButton.Type.Secondary
+                            iconText: FluentIconGlyph.shareGlyph
+                            enabled: mainController.deviceId && mainController.deviceId.length > 0
+                                     && mainController.accessCode && mainController.accessCode.length > 0
+                            onClicked: {
+                                var shareText = qsTr("Device ID") + ": " + mainController.deviceId + "\n"
+                                              + qsTr("Access Code") + ": " + mainController.accessCode
+                                mainController.copyToClipboard(shareText)
+                                root.showToast(qsTr("Device info copied to clipboard"), QDToast.Type.Success)
+                            }
+                        }
                     }
                 }
             }
