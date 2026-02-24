@@ -54,7 +54,7 @@ echo=
 
 set cpu_mode=x64
 set cmake_vs_build_mode=x64
-set qt_cmake_path=%ENV_QT_PATH%\msvc2022_64\lib\cmake\Qt6
+set qt_cmake_path=%ENV_QT_PATH%\msvc2022_64
 
 echo=
 echo Qt cmake Â·¾¶: %qt_cmake_path%
