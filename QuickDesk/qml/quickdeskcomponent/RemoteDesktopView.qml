@@ -33,6 +33,12 @@ Rectangle {
     readonly property int frameHeight: frameProvider.frameSize.height
     readonly property int frameRate: frameProvider.frameRate
     readonly property bool hasVideo: frameWidth > 0 && frameHeight > 0
+
+    // DIP dimensions from host VideoLayout (logical pixels / points).
+    // Used for mouse coordinate mapping. Falls back to frame pixel size
+    // when VideoLayout has not been received yet.
+    property int remoteDipWidth: 0
+    property int remoteDipHeight: 0
     
     color: "#1a1a1a"  // Dark background
     focus: inputEnabled  // Enable keyboard focus when input is enabled
@@ -44,9 +50,11 @@ Rectangle {
         fillMode: VideoOutput.PreserveAspectFit
     }
     
-    // Convert local mouse coordinates to remote desktop coordinates
+    // Convert local mouse coordinates to remote desktop DIP coordinates.
     // Uses VideoOutput.contentRect to get the actual video display area,
     // ensuring perfect alignment with the rendered video region.
+    // Outputs DIP coordinates that match what the host's InputInjector
+    // expects (logical points on macOS, DIPs on Windows/Linux).
     function mapToRemote(localX, localY) {
         if (frameWidth <= 0 || frameHeight <= 0) {
             return null;
@@ -69,13 +77,18 @@ Rectangle {
             return null;
         }
 
-        // Scale to remote desktop coordinates
-        var remoteX = Math.round(relativeX * frameWidth / rect.width);
-        var remoteY = Math.round(relativeY * frameHeight / rect.height);
+        // Use DIP dimensions from VideoLayout when available, otherwise
+        // fall back to frame pixel dimensions (correct for non-HiDPI hosts).
+        var targetWidth = remoteDipWidth > 0 ? remoteDipWidth : frameWidth;
+        var targetHeight = remoteDipHeight > 0 ? remoteDipHeight : frameHeight;
+
+        // Scale to remote desktop DIP coordinates
+        var remoteX = Math.round(relativeX * targetWidth / rect.width);
+        var remoteY = Math.round(relativeY * targetHeight / rect.height);
 
         // Clamp to valid range
-        remoteX = Math.max(0, Math.min(frameWidth - 1, remoteX));
-        remoteY = Math.max(0, Math.min(frameHeight - 1, remoteY));
+        remoteX = Math.max(0, Math.min(targetWidth - 1, remoteX));
+        remoteY = Math.max(0, Math.min(targetHeight - 1, remoteY));
 
         return { x: remoteX, y: remoteY };
     }
@@ -212,6 +225,13 @@ Rectangle {
         function onCursorShapeChanged(connId, width, height, hotspotX, hotspotY, data) {
             if (connId === root.connectionId) {
                 frameProvider.onCursorShapeChanged(width, height, hotspotX, hotspotY, data)
+            }
+        }
+
+        function onVideoLayoutChanged(connId, widthDips, heightDips) {
+            if (connId === root.connectionId) {
+                root.remoteDipWidth = widthDips
+                root.remoteDipHeight = heightDips
             }
         }
     }

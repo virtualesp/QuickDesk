@@ -396,7 +396,7 @@ void ClientManager::onMessageReceived(const QJsonObject& message)
 {
     QString type = message["type"].toString();
 
-    if (type != "videoFrameReady" && type != "performanceStatsUpdate") {
+    if (type != "videoFrameReady" && type != "performanceStatsUpdate" && type != "videoLayoutChanged") {
         LOG_DEBUG("Client received message: {}", type.toStdString());
     }
 
@@ -432,6 +432,8 @@ void ClientManager::onMessageReceived(const QJsonObject& message)
         handleCursorShapeChanged(message);
     } else if (type == "performanceStatsUpdate") {
         handlePerformanceStatsUpdate(message);
+    } else if (type == "videoLayoutChanged") {
+        handleVideoLayoutChanged(message);
     } else if (type == "setFramerateResponse" || type == "setResolutionResponse" || type == "setFramerateBoostResponse" || type == "setBitrateResponse") {
         // Acknowledgement responses - just log success/failure
         bool success = message["success"].toBool();
@@ -801,6 +803,18 @@ void ClientManager::handlePerformanceStatsUpdate(const QJsonObject& message)
     stats["encodedRectHeight"]  = message["encodedRectHeight"].toInt();
     
     emit performanceStatsUpdated(connectionId, stats);
+}
+
+void ClientManager::handleVideoLayoutChanged(const QJsonObject& message)
+{
+    QString connectionId = message["connectionId"].toString();
+    int widthDips = message["widthDips"].toInt();
+    int heightDips = message["heightDips"].toInt();
+
+    LOG_DEBUG("VideoLayout changed: connection={}, dips={}x{}",
+              connectionId.toStdString(), widthDips, heightDips);
+
+    emit videoLayoutChanged(connectionId, widthDips, heightDips);
 }
 
 void ClientManager::sendMouseEvent(const QString& connectionId, const QString& eventType,

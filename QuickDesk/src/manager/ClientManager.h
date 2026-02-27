@@ -150,6 +150,10 @@ signals:
     void performanceStatsUpdated(const QString& connectionId,
                                  const QVariantMap& stats);
 
+    // Host display DIP dimensions changed (for correct mouse coordinate mapping)
+    void videoLayoutChanged(const QString& connectionId,
+                            int widthDips, int heightDips);
+
 private slots:
     void onMessageReceived(const QJsonObject& message);
     void onMessagingError(const QString& error);
@@ -181,6 +185,7 @@ private:
     void handleDisconnectAllResponse(const QJsonObject& message);
     void handleCursorShapeChanged(const QJsonObject& message);
     void handlePerformanceStatsUpdate(const QJsonObject& message);
+    void handleVideoLayoutChanged(const QJsonObject& message);
     
     void sendMouseEvent(const QString& connectionId, const QString& eventType,
                         int x, int y, int button, int wheelDelta);
