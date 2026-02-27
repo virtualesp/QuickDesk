@@ -2803,8 +2803,23 @@ Window {
                             
                             QDStatusBar {
                                 width: parent.width
-                                message: "就绪"
-                                rightText: "第 1 行，第 1 列"
+                                
+                                Text {
+                                    text: "就绪"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.text
+                                    verticalAlignment: Text.AlignVCenter
+                                    Layout.fillWidth: true
+                                }
+                                
+                                Text {
+                                    text: "第 1 行，第 1 列"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.textSecondary
+                                    verticalAlignment: Text.AlignVCenter
+                                }
                             }
                             
                             Text {
@@ -2816,9 +2831,31 @@ Window {
                             
                             QDStatusBar {
                                 width: parent.width
-                                leftText: "已连接"
-                                message: "正在同步..."
-                                rightText: "10:30 AM"
+                                
+                                Text {
+                                    text: "已连接"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.text
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                                
+                                Text {
+                                    text: "正在同步..."
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.text
+                                    verticalAlignment: Text.AlignVCenter
+                                    Layout.fillWidth: true
+                                }
+                                
+                                Text {
+                                    text: "10:30 AM"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.textSecondary
+                                    verticalAlignment: Text.AlignVCenter
+                                }
                             }
                             
                             Text {
@@ -2830,7 +2867,14 @@ Window {
                             
                             QDStatusBar {
                                 width: parent.width
-                                leftText: "QuickDesk"
+                                
+                                Text {
+                                    text: "QuickDesk"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.text
+                                    verticalAlignment: Text.AlignVCenter
+                                }
                                 
                                 Row {
                                     spacing: Theme.spacingMedium
@@ -2867,7 +2911,15 @@ Window {
                                     }
                                 }
                                 
-                                rightText: "v1.0.0"
+                                Item { Layout.fillWidth: true }
+                                
+                                Text {
+                                    text: "v1.0.0"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.textSecondary
+                                    verticalAlignment: Text.AlignVCenter
+                                }
                             }
                         }
                     }
