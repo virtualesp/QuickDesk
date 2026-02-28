@@ -96,45 +96,59 @@ mkdir "%publish_path%"
 echo [*] copying program files...
 xcopy "%release_path%" "%publish_path%" /E /Y
 
-:: copy host and client from src/out
+:: copy host and client (priority: src/out > 3rdparty)
+set thirdparty_path=%script_path%..\QuickDesk\3rdparty\quickdesk-remoting\x64
+echo [*] 3rdparty path: %thirdparty_path%
 echo [*] copying host and client...
-if not exist "%src_out_path%" (
-    echo [!] warning: src/out path does not exist: %src_out_path%
+
+if exist "%src_out_path%\quickdesk_core.dll" (
+    copy /Y "%src_out_path%\quickdesk_core.dll" "%publish_path%\" >nul
+    echo [*] copied quickdesk_core.dll from src/out
+) else if exist "%thirdparty_path%\quickdesk_core.dll" (
+    copy /Y "%thirdparty_path%\quickdesk_core.dll" "%publish_path%\" >nul
+    echo [*] copied quickdesk_core.dll from 3rdparty
 ) else (
-    if exist "%src_out_path%\quickdesk_core.dll" (
-        copy /Y "%src_out_path%\quickdesk_core.dll" "%publish_path%\" >nul
-        echo [*] copied quickdesk_core.dll
-    ) else (
-        echo [!] warning: quickdesk_core.dll not found
-    )
+    echo [!] warning: quickdesk_core.dll not found
+)
 
-    if exist "%src_out_path%\quickdesk_host.exe" (
-        copy /Y "%src_out_path%\quickdesk_host.exe" "%publish_path%\" >nul
-        echo [*] copied quickdesk_host.exe
-    ) else (
-        echo [!] warning: quickdesk_host.exe not found
-    )
+if exist "%src_out_path%\quickdesk_host.exe" (
+    copy /Y "%src_out_path%\quickdesk_host.exe" "%publish_path%\" >nul
+    echo [*] copied quickdesk_host.exe from src/out
+) else if exist "%thirdparty_path%\quickdesk_host.exe" (
+    copy /Y "%thirdparty_path%\quickdesk_host.exe" "%publish_path%\" >nul
+    echo [*] copied quickdesk_host.exe from 3rdparty
+) else (
+    echo [!] warning: quickdesk_host.exe not found
+)
 
-    if exist "%src_out_path%\quickdesk_host_uiaccess.exe" (
-        copy /Y "%src_out_path%\quickdesk_host_uiaccess.exe" "%publish_path%\" >nul
-        echo [*] copied quickdesk_host_uiaccess.exe
-    ) else (
-        echo [!] warning: quickdesk_host_uiaccess.exe not found
-    )
-    
-    if exist "%src_out_path%\quickdesk_client.exe" (
-        copy /Y "%src_out_path%\quickdesk_client.exe" "%publish_path%\" >nul
-        echo [*] copied quickdesk_client.exe
-    ) else (
-        echo [!] warning: quickdesk_client.exe not found
-    )    
+if exist "%src_out_path%\quickdesk_host_uiaccess.exe" (
+    copy /Y "%src_out_path%\quickdesk_host_uiaccess.exe" "%publish_path%\" >nul
+    echo [*] copied quickdesk_host_uiaccess.exe from src/out
+) else if exist "%thirdparty_path%\quickdesk_host_uiaccess.exe" (
+    copy /Y "%thirdparty_path%\quickdesk_host_uiaccess.exe" "%publish_path%\" >nul
+    echo [*] copied quickdesk_host_uiaccess.exe from 3rdparty
+) else (
+    echo [!] warning: quickdesk_host_uiaccess.exe not found
+)
 
-    if exist "%src_out_path%\icudtl.dat" (
-        copy /Y "%src_out_path%\icudtl.dat" "%publish_path%\" >nul
-        echo [*] copied icudtl.dat
-    ) else (
-        echo [!] warning: icudtl.dat not found
-    )
+if exist "%src_out_path%\quickdesk_client.exe" (
+    copy /Y "%src_out_path%\quickdesk_client.exe" "%publish_path%\" >nul
+    echo [*] copied quickdesk_client.exe from src/out
+) else if exist "%thirdparty_path%\quickdesk_client.exe" (
+    copy /Y "%thirdparty_path%\quickdesk_client.exe" "%publish_path%\" >nul
+    echo [*] copied quickdesk_client.exe from 3rdparty
+) else (
+    echo [!] warning: quickdesk_client.exe not found
+)
+
+if exist "%src_out_path%\icudtl.dat" (
+    copy /Y "%src_out_path%\icudtl.dat" "%publish_path%\" >nul
+    echo [*] copied icudtl.dat from src/out
+) else if exist "%thirdparty_path%\icudtl.dat" (
+    copy /Y "%thirdparty_path%\icudtl.dat" "%publish_path%\" >nul
+    echo [*] copied icudtl.dat from 3rdparty
+) else (
+    echo [!] warning: icudtl.dat not found
 )
 echo=
 

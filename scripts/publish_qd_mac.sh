@@ -82,24 +82,28 @@ macos_dir="$publish_path/QuickDesk.app/Contents/MacOS"
 frameworks_dir="$publish_path/QuickDesk.app/Contents/Frameworks"
 
 echo "[*] copying host and client..."
-if [ ! -d "$src_out_path" ]; then
-    echo "[!] warning: src/out path does not exist: $src_out_path"
+thirdparty_path="$script_path/../QuickDesk/3rdparty/quickdesk-remoting/arm64"
+echo "[*] 3rdparty path: $thirdparty_path"
+mkdir -p "$frameworks_dir"
+
+if [ -d "$src_out_path/quickdesk_host.app" ]; then
+    cp -R "$src_out_path/quickdesk_host.app" "$frameworks_dir/"
+    echo "[*] copied quickdesk_host.app from src/out"
+elif [ -d "$thirdparty_path/quickdesk_host.app" ]; then
+    cp -R "$thirdparty_path/quickdesk_host.app" "$frameworks_dir/"
+    echo "[*] copied quickdesk_host.app from 3rdparty"
 else
-    mkdir -p "$frameworks_dir"
+    echo "[!] warning: quickdesk_host.app not found"
+fi
 
-    if [ -d "$src_out_path/quickdesk_host.app" ]; then
-        cp -R "$src_out_path/quickdesk_host.app" "$frameworks_dir/"
-        echo "[*] copied quickdesk_host.app -> Frameworks/"
-    else
-        echo "[!] warning: quickdesk_host.app not found"
-    fi
-
-    if [ -f "$src_out_path/quickdesk_client" ]; then
-        cp "$src_out_path/quickdesk_client" "$frameworks_dir/"
-        echo "[*] copied quickdesk_client -> Frameworks/"
-    else
-        echo "[!] warning: quickdesk_client not found"
-    fi
+if [ -f "$src_out_path/quickdesk_client" ]; then
+    cp "$src_out_path/quickdesk_client" "$frameworks_dir/"
+    echo "[*] copied quickdesk_client from src/out"
+elif [ -f "$thirdparty_path/quickdesk_client" ]; then
+    cp "$thirdparty_path/quickdesk_client" "$frameworks_dir/"
+    echo "[*] copied quickdesk_client from 3rdparty"
+else
+    echo "[!] warning: quickdesk_client not found"
 fi
 echo
 

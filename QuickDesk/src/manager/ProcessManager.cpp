@@ -584,6 +584,8 @@ QString ProcessManager::findExecutable(const QString& name)
 #endif
 
 #ifdef Q_OS_MAC
+    // 3rdparty directory (for development)
+    searchPaths << QDir(appDir).filePath("../../../QuickDesk/3rdparty/quickdesk-remoting/arm64");
     // Contents/Frameworks/ for .app bundles (publish layout)
     searchPaths << QDir(appDir).filePath("../Frameworks");
 #endif

@@ -4,7 +4,7 @@ set(CRASHPAD_URL https://github.com/barry-ran/quickdesk-remoting/releases/downlo
 if(WIN32)
     set(CRASHPAD_URL ${CRASHPAD_URL}/Windows-${QD_CPU_ARCH}.zip.zip)
 elseif(APPLE)
-    set(CRASHPAD_URL ${CRASHPAD_URL}/Mac-${QD_CPU_ARCH}.zip.zip)
+    set(CRASHPAD_URL ${CRASHPAD_URL}/Mac-${QD_CPU_ARCH}.zip)
 endif()
 
 

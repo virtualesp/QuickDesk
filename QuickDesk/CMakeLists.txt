@@ -1,8 +1,6 @@
 include(spdlog)
 
-if(WIN32)
-    include(quickdesk-remoting)
-endif()
+include(quickdesk-remoting)
 
 add_subdirectory(base)
 add_subdirectory(infra)
