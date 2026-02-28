@@ -17,6 +17,9 @@ on:
       - '.github/workflows/quickdesk-windows.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build
