@@ -5,8 +5,8 @@
 <h1 align="center">QuickDesk</h1>
 
 <p align="center">
-  <strong>Open-Source, Free, High-Performance Remote Desktop</strong><br>
-  Built on Chromium Remoting · Pure C++ · Self-Hosted
+  <strong>The First AI-Native Remote Desktop</strong><br>
+  Built-in MCP Server · AI Agents Control Any Remote Computer · Open-Source & Free
 </p>
 
 <p align="center">
@@ -37,9 +37,11 @@
 
 ---
 
-QuickDesk is an **open-source, free** remote desktop application built on Google Chromium Remoting technology, developed entirely in **pure C++**. It is the **first commercial-grade, pure C++ open-source remote desktop software**.
+QuickDesk is the **first AI-native remote desktop** — an open-source, free application with a **built-in MCP (Model Context Protocol) Server** that lets any AI agent see and control remote computers.
 
-Chromium Remoting is the underlying technology behind Google Chrome Remote Desktop, battle-tested for over a decade at massive scale, serving hundreds of millions of users worldwide with industrial-grade performance, stability, and security. QuickDesk stands on the shoulders of Chromium to deliver a freely deployable, fully data-sovereign remote desktop solution.
+While other remote desktop tools only serve human users, QuickDesk extends **AI Computer Use** from "local machine only" to **"any remote machine in the world"**. Connect Claude, GPT, Cursor, or any MCP-compatible AI to QuickDesk, and it can screenshot, click, type, drag, and automate across remote desktops — just like a human operator, but faster and 24/7.
+
+Built on Google Chromium Remoting technology (the engine behind Chrome Remote Desktop), QuickDesk delivers industrial-grade performance, stability, and security refined over 10+ years by Google.
 
 Main Interface
 ![Main Interface](docs/image/screenshot_main.png)
@@ -48,6 +50,16 @@ Remote Desktop
 ![Remote Desktop](docs/image/screenshot_remote.png)
 
 ## Why QuickDesk?
+
+### AI-First: The Only Remote Desktop with MCP Support  [ → MCP Integration Guide](docs/mcp-integration.md)
+
+- **Built-in MCP Server**: AI agents connect via standard MCP protocol — no plugins, no hacks, zero configuration
+- **Full Computer Use Toolkit**: 20+ MCP tools — screenshot, click, type, drag, scroll, hotkeys, clipboard, and more
+- **Real-Time Visibility**: AI operations are displayed in the QuickDesk GUI in real time — the user sees every mouse move and keystroke, and can intervene at any time
+- **Multi-Device AI Orchestration**: AI can connect to and control multiple remote machines simultaneously — batch automation, cross-device workflows, fleet management
+- **Guided Prompts**: Built-in MCP prompt templates teach AI agents best practices for remote desktop operation
+
+### High-Performance Foundation
 
 - **Open-Source & Free**: MIT License, no feature restrictions, no connection limits, commercial use welcome
 - **Self-Hosted**: Deploy your own signaling and TURN relay servers, keep full control of your data
@@ -62,6 +74,7 @@ Remote Desktop
 
 | Feature | QuickDesk | RustDesk | BildDesk | ToDesk | TeamViewer |
 |---------|:---------:|:--------:|:--------:|:------:|:----------:|
+| **AI Agent Support (MCP)** | ✅ Built-in | ❌ | ❌ | ❌ | ❌ |
 | **Open Source** | ✅ MIT | ✅ AGPL-3.0 | ❌ | ❌ | ❌ |
 | **Free for Commercial Use** | ✅ | ❌ License required | ❌ | ❌ | ❌ |
 | **Core Language** | C++ | Rust + Dart | — | — | — |
@@ -89,6 +102,15 @@ Remote Desktop
 4. **GPU-Accelerated Rendering**: YUV data is fed directly into the GPU rendering pipeline via Qt 6's `QVideoSink`, achieving zero-CPU-copy video rendering.
 
 ## Features
+
+### AI Integration (MCP Server)
+- Built-in MCP Server — AI agents connect via standard protocol, works with Cursor, Claude Desktop, and any MCP client
+- 20+ remote control tools: screenshot, mouse click/drag/scroll, keyboard type/hotkey, key press/release, clipboard read/write, screen size query
+- MCP Resources: real-time device status, connection info, host details
+- MCP Prompts: built-in operation guide templates (remote desktop operation, find-and-click, run command)
+- Real-time event streaming: connection state changes, clipboard updates, performance stats
+- Background automation mode: `show_window=false` for headless batch operations
+- Screenshot scaling: adjustable resolution for faster AI processing
 
 ### Remote Control
 - High-definition, low-latency remote desktop display
@@ -128,12 +150,20 @@ QuickDesk uses a modular multi-process architecture:
 
 ```mermaid
 graph TD
+    subgraph AI["AI Agent (Claude / GPT / Cursor)"]
+        A1["MCP Protocol"]
+    end
+
+    subgraph MCP["quickdesk-mcp (Rust Bridge)"]
+        M1["MCP stdio ↔ WebSocket"]
+    end
+
     subgraph GUI["QuickDesk GUI (Qt 6)"]
         direction LR
+        WS["WebSocket API Server"]
         QML["QML/C++"]
         MainWin["Main Window"]
         RemoteWin["Remote Desktop Window"]
-        Settings["Settings"]
     end
 
     subgraph Host["quickdesk-host (Chromium Remoting)"]
@@ -161,6 +191,8 @@ graph TD
         T1["Relay when P2P traversal fails"]
     end
 
+    AI -- "stdio (JSON-RPC)" --> MCP
+    MCP -- "WebSocket" --> WS
     GUI -- "Native Messaging\n(stdin/stdout JSON)" --> Host
     GUI -- "Native Messaging\n(stdin/stdout JSON)" --> Client
     Host -- "WebSocket" --> Signaling
@@ -173,6 +205,7 @@ graph TD
 
 | Layer | Technology |
 |-------|------------|
+| AI Integration | MCP Server (Rust) + WebSocket API |
 | GUI Client | Qt 6 (QML + C++17) |
 | UI Style | Fluent Design Component Library (custom-built) |
 | Remote Protocol Core | Chromium Remoting (C++) |
@@ -286,6 +319,7 @@ QuickDesk/
 ├── QuickDesk/                    # Qt GUI client
 │   ├── main.cpp                  # Application entry point
 │   ├── src/
+│   │   ├── api/                  # WebSocket API server + request handlers
 │   │   ├── controller/           # Main controller
 │   │   ├── manager/              # Business managers (Host/Client/Process/TURN/...)
 │   │   ├── component/            # Video rendering, key mapping, cursor sync
@@ -299,11 +333,18 @@ QuickDesk/
 │   │   └── quickdeskcomponent/   # QuickDesk-specific components
 │   ├── base/                     # Base utilities
 │   └── infra/                    # Infrastructure (database, logging, HTTP)
+├── quickdesk-mcp/                # Rust MCP Bridge (stdio ↔ WebSocket)
+│   └── src/
+│       ├── main.rs               # Entry point, CLI args, MCP server startup
+│       ├── server.rs             # MCP tools, prompts, resources
+│       └── ws_client.rs          # WebSocket client for Qt API
 ├── SignalingServer/              # Go signaling server
 │   ├── cmd/signaling/            # Entry point
 │   └── internal/                 # Business logic
-├── cmake/                        # CMake modules
 ├── scripts/                      # Build, package, publish scripts
+├── docs/                         # Documentation
+│   ├── mcp-integration.md        # MCP integration guide (English)
+│   └── MCP接入指南.md             # MCP integration guide (Chinese)
 ├── .github/workflows/            # CI/CD configuration
 └── version                       # Version number
 ```
@@ -319,6 +360,9 @@ QuickDesk/
 - [x] Fluent Design UI
 - [x] Light and dark themes
 - [x] i18n (Chinese / English)
+- [x] **MCP Server — AI agents can control remote desktops**
+- [x] **20+ MCP tools (screenshot, click, type, drag, hotkey, clipboard, etc.)**
+- [x] **MCP Resources & Prompts**
 - [ ] Linux support
 - [ ] File transfer
 - [ ] Audio streaming
