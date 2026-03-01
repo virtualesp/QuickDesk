@@ -34,13 +34,21 @@ void ClientManager::setMessaging(NativeMessaging* messaging)
                 this, &ClientManager::onMessagingError);
     } else {
         // Clear all state when messaging is disconnected (process stopped)
-        bool hadConnections = !m_connections.isEmpty();
-        m_connections.clear();
+        QStringList ids = m_connections.keys();
+        for (const auto& connId : ids) {
+            m_connections[connId].rtcState = RtcStatus::Disconnected;
+            emit connectionStateChanged(connId, "disconnected", QJsonObject());
+            m_sharedMemoryManager->detach(connId);
+            m_connections.remove(connId);
+            emit connectionRemoved(connId);
+        }
+
         m_activeConnectionId.clear();
         // Note: Don't reset m_connectionCounter to avoid ID conflicts after restart
-        
-        if (hadConnections) {
+
+        if (!ids.isEmpty()) {
             emit connectionCountChanged();
+            emit activeConnectionChanged();
             emit connectionListChanged();
         }
     }
@@ -113,6 +121,13 @@ void ClientManager::disconnectFromHost(const QString& connectionId)
     message["connectionId"] = connectionId;
     m_messaging->sendMessage(message);
 
+    if (m_connections.contains(connectionId)) {
+        m_connections[connectionId].rtcState = RtcStatus::Disconnected;
+        emit connectionStateChanged(connectionId, "disconnected", QJsonObject());
+    }
+
+    m_sharedMemoryManager->detach(connectionId);
+
     m_connections.remove(connectionId);
 
     emit connectionCountChanged();
@@ -139,7 +154,15 @@ void ClientManager::disconnectAll()
     message["type"] = "disconnectAll";
     m_messaging->sendMessage(message);
 
-    m_connections.clear();
+    QStringList ids = m_connections.keys();
+    for (const auto& connId : ids) {
+        m_connections[connId].rtcState = RtcStatus::Disconnected;
+        emit connectionStateChanged(connId, "disconnected", QJsonObject());
+        m_sharedMemoryManager->detach(connId);
+        m_connections.remove(connId);
+        emit connectionRemoved(connId);
+    }
+
     m_activeConnectionId.clear();
 
     emit connectionCountChanged();

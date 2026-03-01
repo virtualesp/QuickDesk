@@ -38,6 +38,16 @@ set(CONTROLLER_HEADERS
     src/controller/MainController.h
 )
 
+set(API_SOURCES
+    src/api/WebSocketServer.cpp
+    src/api/ApiHandler.cpp
+)
+
+set(API_HEADERS
+    src/api/WebSocketServer.h
+    src/api/ApiHandler.h
+)
+
 set(COMMON_HEADERS
     src/common/ProcessStatus.h
 )
@@ -85,12 +95,14 @@ set(ALL_SOURCES
     main.cpp
     ${MANAGER_SOURCES}
     ${CONTROLLER_SOURCES}
+    ${API_SOURCES}
     ${COMPONENT_SOURCES}
 )
 
 set(ALL_HEADERS
     ${MANAGER_HEADERS}
     ${CONTROLLER_HEADERS}
+    ${API_HEADERS}
     ${COMMON_HEADERS}
     ${COMPONENT_HEADERS}
 )
@@ -242,6 +254,7 @@ target_link_libraries(QuickDesk
     Qt6::QuickControls2
     Qt6::Core
     Qt6::Multimedia
+    Qt6::WebSockets
     base
     infra
 )

@@ -134,7 +134,10 @@ Window {
     }
     
     // Close connection and remove tab (unified function for both scenarios)
-    function closeConnection(index) {
+    // needDisconnect=true when user initiates close; false when reacting to an already-disconnected signal
+    function closeConnection(index, needDisconnect) {
+        if (needDisconnect === undefined) needDisconnect = true
+
         if (index < 0 || index >= connectionModel.count) {
             return
         }
@@ -147,13 +150,14 @@ Window {
         }
         closingConnections[connId] = true
         
-        console.log("Closing connection:", connId, "at index:", index)
+        console.log("Closing connection:", connId, "at index:", index, "needDisconnect:", needDisconnect)
         
         // 1. Remove the tab first (before disconnect to avoid re-entrant state change handler)
         removeConnection(index)
         
-        // 2. Disconnect from host
-        if (clientManager) {
+        // 2. Only call disconnectFromHost when the caller is initiating the disconnect
+        //    (skip if we're reacting to a connectionStateChanged/connectionRemoved signal)
+        if (needDisconnect && clientManager) {
             clientManager.disconnectFromHost(connId)
         }
         
@@ -470,16 +474,38 @@ Window {
             remoteWindow.updateConnectionState(connectionId, state, 0)
             
             // Auto-close tab when connection is disconnected or failed
+            // needDisconnect=false: the connection is already gone, just remove the tab
             if (state === "disconnected" || state === "failed") {
                 var connIdCopy = connectionId
                 Qt.callLater(function() {
                     var idx = connectionModel.indexOf(connIdCopy)
                     if (idx >= 0) {
                         console.log("Auto-closing tab for", state, "connection:", connIdCopy, "at index:", idx)
-                        remoteWindow.closeConnection(idx)
+                        remoteWindow.closeConnection(idx, false)
                     }
                 })
             }
+        }
+    }
+    
+    // Fallback: clean up tab when connection is removed from ClientManager
+    // This catches cases where connectionStateChanged might not fire (e.g. disconnectAll, process crash)
+    Connections {
+        target: remoteWindow.clientManager
+        
+        function onConnectionRemoved(connectionId) {
+            if (remoteWindow.closingConnections[connectionId]) {
+                return
+            }
+            
+            var connIdCopy = connectionId
+            Qt.callLater(function() {
+                var idx = connectionModel.indexOf(connIdCopy)
+                if (idx >= 0) {
+                    console.log("Fallback: removing orphan tab for removed connection:", connIdCopy)
+                    remoteWindow.closeConnection(idx, false)
+                }
+            })
         }
     }
     

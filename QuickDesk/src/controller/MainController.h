@@ -19,6 +19,7 @@
 namespace quickdesk {
 
 class ProcessManager;
+class WebSocketApiServer;
 
 /**
  * @brief Main controller that coordinates all managers
@@ -135,6 +136,8 @@ public:
     // Access code auto-refresh info
     QString nextAccessCodeRefreshTime() const;
 
+    Q_INVOKABLE void showRemoteWindowForConnection(const QString& connectionId, const QString& deviceId);
+
 signals:
     void initializationFailed(const QString& error);
     void deviceIdChanged();
@@ -148,6 +151,7 @@ signals:
     void nextAccessCodeRefreshTimeChanged();
     void presetLoadFailed(const QString& error);
     void forceUpgradeRequired(const QString& minVersion);
+    void requestShowRemoteWindow(const QString& connectionId, const QString& deviceId);
 
 private slots:
     void onHostProcessStarted();
@@ -175,6 +179,7 @@ private:
     std::unique_ptr<ClientManager> m_clientManager;
     std::unique_ptr<RemoteDeviceManager> m_remoteDeviceManager;
     std::unique_ptr<PresetManager> m_presetManager;
+    std::unique_ptr<WebSocketApiServer> m_wsApiServer;
 
     QString m_deviceId;
     QString m_accessCode;
@@ -192,6 +197,7 @@ private:
     void onAccessCodeRefreshTimer();
     void updateAccessCodeRefreshTimer(int remainingSeconds = -1);
     QString getDefaultServerUrl() const;
+    void setupWebSocketApiEvents();
 };
 
 } // namespace quickdesk

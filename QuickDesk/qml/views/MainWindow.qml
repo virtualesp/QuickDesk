@@ -65,6 +65,16 @@ ApplicationWindow {
         }
     }
     
+    // Listen to API requests to show remote window (e.g. from WebSocket API with showWindow=true)
+    Connections {
+        target: mainController
+
+        function onRequestShowRemoteWindow(connectionId, deviceId) {
+            console.log("API requested showRemoteWindow:", connectionId, deviceId)
+            root.showRemoteWindow(connectionId, deviceId)
+        }
+    }
+
     // Listen to connection state changes to save device credentials
     Connections {
         target: mainController.clientManager

@@ -3,6 +3,7 @@
 #include "MainController.h"
 #include "../manager/ProcessManager.h"
 #include "../manager/NativeMessaging.h"
+#include "../api/WebSocketServer.h"
 #include "infra/env/applicationcontext.h"
 #include "infra/log/log.h"
 #include "core/localconfigcenter.h"
@@ -135,6 +136,10 @@ MainController::MainController(QObject* parent)
     connect(m_presetManager.get(), &PresetManager::forceUpgradeRequired,
             this, &MainController::forceUpgradeRequired);
 
+    // WebSocket API Server
+    m_wsApiServer = std::make_unique<WebSocketApiServer>(this, this);
+    setupWebSocketApiEvents();
+
     // Setup access code auto-refresh timer
     connect(&m_accessCodeRefreshTimer, &QTimer::timeout,
             this, &MainController::onAccessCodeRefreshTimer);
@@ -186,11 +191,20 @@ void MainController::initialize()
     if (!m_processManager->startClientProcess()) {
         emit initializationFailed("Failed to start Client process");
     }
+
+    // Start WebSocket API server
+    if (!m_wsApiServer->start()) {
+        LOG_WARN("WebSocket API server failed to start, MCP bridge will not work");
+    }
 }
 
 void MainController::shutdown()
 {
     LOG_INFO("MainController::shutdown()");
+
+    if (m_wsApiServer) {
+        m_wsApiServer->stop();
+    }
     
     m_presetManager->stop();
     m_hostManager->disconnectFromServer();
@@ -211,6 +225,11 @@ QString MainController::connectToRemoteHost(const QString& deviceId,
 void MainController::disconnectFromRemoteHost(const QString& connectionId)
 {
     m_clientManager->disconnectFromHost(connectionId);
+}
+
+void MainController::showRemoteWindowForConnection(const QString& connectionId, const QString& deviceId)
+{
+    emit requestShowRemoteWindow(connectionId, deviceId);
 }
 
 void MainController::refreshAccessCode()
@@ -654,6 +673,111 @@ void MainController::updateAccessCodeRefreshTimer(int remainingSeconds)
     
     LOG_INFO("Access code auto-refresh timer started: {} ms, next at {}", 
              timerMs, m_nextRefreshTime.toString("MM-dd HH:mm:ss").toStdString());
+}
+
+void MainController::setupWebSocketApiEvents() {
+    // Host events → WebSocket broadcast
+    connect(m_hostManager.get(), &HostManager::hostReady,
+            this, [this](const QString& deviceId, const QString& accessCode) {
+        m_wsApiServer->broadcastEvent("hostReady", {
+            {"deviceId", deviceId}, {"accessCode", accessCode}
+        });
+    });
+    connect(m_hostManager.get(), &HostManager::accessCodeChanged,
+            this, [this]() {
+        m_wsApiServer->broadcastEvent("accessCodeChanged", {
+            {"accessCode", m_hostManager->accessCode()}
+        });
+    });
+    connect(m_hostManager.get(), &HostManager::clientConnected,
+            this, [this](const QString& connectionId, const QJsonObject& info) {
+        QJsonObject data = info;
+        data["connectionId"] = connectionId;
+        m_wsApiServer->broadcastEvent("hostClientConnected", data);
+    });
+    connect(m_hostManager.get(), &HostManager::clientDisconnected,
+            this, [this](const QString& connectionId, const QString& reason) {
+        m_wsApiServer->broadcastEvent("hostClientDisconnected", {
+            {"connectionId", connectionId}, {"reason", reason}
+        });
+    });
+    connect(m_hostManager.get(), &HostManager::signalingStateChanged,
+            this, [this]() {
+        m_wsApiServer->broadcastEvent("hostSignalingStateChanged", {
+            {"state", m_hostManager->signalingState()},
+            {"retryCount", m_hostManager->signalingRetryCount()},
+            {"nextRetryIn", m_hostManager->signalingNextRetryIn()},
+            {"error", m_hostManager->signalingError()}
+        });
+    });
+
+    // Client events → WebSocket broadcast
+    connect(m_clientManager.get(), &ClientManager::connectionAdded,
+            this, [this](const QString& connectionId) {
+        auto info = m_clientManager->getConnection(connectionId);
+        m_wsApiServer->broadcastEvent("connectionAdded", {
+            {"connectionId", connectionId},
+            {"deviceId", info.deviceId}
+        });
+    });
+    connect(m_clientManager.get(), &ClientManager::connectionRemoved,
+            this, [this](const QString& connectionId) {
+        m_wsApiServer->broadcastEvent("connectionRemoved", {
+            {"connectionId", connectionId}
+        });
+    });
+    connect(m_clientManager.get(), &ClientManager::connectionStateChanged,
+            this, [this](const QString& connectionId, const QString& state,
+                         const QJsonObject& hostInfo) {
+        QJsonObject data;
+        data["connectionId"] = connectionId;
+        data["state"] = state;
+        data["hostInfo"] = hostInfo;
+        m_wsApiServer->broadcastEvent("connectionStateChanged", data);
+    });
+    connect(m_clientManager.get(), &ClientManager::clipboardReceived,
+            this, [this](const QString& connectionId, const QString& text) {
+        m_wsApiServer->broadcastEvent("clipboardReceived", {
+            {"connectionId", connectionId}, {"text", text}
+        });
+    });
+    connect(m_clientManager.get(), &ClientManager::videoLayoutChanged,
+            this, [this](const QString& connectionId, int w, int h) {
+        m_wsApiServer->broadcastEvent("videoLayoutChanged", {
+            {"connectionId", connectionId},
+            {"width", w}, {"height", h}
+        });
+    });
+
+    // Process events → WebSocket broadcast
+    connect(m_processManager.get(), &ProcessManager::hostProcessStatusChanged,
+            this, [this]() {
+        QString status;
+        switch (m_processManager->hostProcessStatus()) {
+        case ProcessStatus::NotStarted: status = "notStarted"; break;
+        case ProcessStatus::Starting:   status = "starting"; break;
+        case ProcessStatus::Running:    status = "running"; break;
+        case ProcessStatus::Failed:     status = "failed"; break;
+        case ProcessStatus::Restarting: status = "restarting"; break;
+        }
+        m_wsApiServer->broadcastEvent("hostProcessStatusChanged", {
+            {"status", status}
+        });
+    });
+    connect(m_processManager.get(), &ProcessManager::clientProcessStatusChanged,
+            this, [this]() {
+        QString status;
+        switch (m_processManager->clientProcessStatus()) {
+        case ProcessStatus::NotStarted: status = "notStarted"; break;
+        case ProcessStatus::Starting:   status = "starting"; break;
+        case ProcessStatus::Running:    status = "running"; break;
+        case ProcessStatus::Failed:     status = "failed"; break;
+        case ProcessStatus::Restarting: status = "restarting"; break;
+        }
+        m_wsApiServer->broadcastEvent("clientProcessStatusChanged", {
+            {"status", status}
+        });
+    });
 }
 
 } // namespace quickdesk
