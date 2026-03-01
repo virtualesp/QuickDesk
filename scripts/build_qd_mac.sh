@@ -80,6 +80,14 @@ fi
 cd "$temp_path"
 
 cmake_params="-DCMAKE_PREFIX_PATH=$qt_cmake_path -DCMAKE_BUILD_TYPE=$build_mode -DCMAKE_OSX_ARCHITECTURES=arm64"
+
+if [ -n "$ENV_QUICKDESK_API_KEY" ]; then
+    cmake_params="$cmake_params -DQUICKDESK_API_KEY=$ENV_QUICKDESK_API_KEY"
+    echo "[*] QUICKDESK_API_KEY: configured"
+else
+    echo "[*] QUICKDESK_API_KEY: not set (open-source build)"
+fi
+
 echo "[*] CMake params: $cmake_params"
 echo
 

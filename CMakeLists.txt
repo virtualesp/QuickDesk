@@ -24,6 +24,16 @@ add_compile_definitions(
     APP_VERSION_TWEAK=${PROJECT_VERSION_TWEAK}
     APP_VERSION_STR="${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.${PROJECT_VERSION_TWEAK}"
 )
+
+# API Key for official signaling server authentication.
+# Official CI builds set this via: cmake -DQUICKDESK_API_KEY="your-secret-key"
+# Open-source / self-hosted builds leave this empty (default).
+if(DEFINED QUICKDESK_API_KEY AND NOT QUICKDESK_API_KEY STREQUAL "")
+    add_compile_definitions(QUICKDESK_API_KEY="${QUICKDESK_API_KEY}")
+    message(STATUS "QUICKDESK_API_KEY: configured")
+else()
+    message(STATUS "QUICKDESK_API_KEY: not set (open-source build)")
+endif()
 message(STATUS "APP_VERSION_MAJOR:${PROJECT_VERSION_MAJOR}, APP_VERSION_MINOR:${PROJECT_VERSION_MINOR}, APP_VERSION_PATCH:${PROJECT_VERSION_PATCH}, APP_VERSION_TWEAK:${PROJECT_VERSION_TWEAK}")
 message(STATUS "APP_VERSION_STR:${APP_VERSION_STR}")
 # CMAKE_PROJECT_NAME和PROJECT_NAME都表示最近的project的名称

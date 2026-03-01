@@ -11,6 +11,10 @@
 #include <QJsonArray>
 #include <QUrl>
 
+#ifndef QUICKDESK_API_KEY
+#define QUICKDESK_API_KEY ""
+#endif
+
 namespace quickdesk {
 
 namespace {
@@ -67,6 +71,10 @@ void PresetManager::fetchPreset()
 
     QUrl url(httpUrl);
     QList<QPair<QString, QString>> headers;
+    constexpr const char* kApiKey = QUICKDESK_API_KEY;
+    if (kApiKey[0] != '\0') {
+        headers.append(qMakePair(QStringLiteral("X-API-Key"), QString::fromLatin1(kApiKey)));
+    }
 
     LOG_INFO("Fetching preset from: {}", httpUrl.toStdString());
 

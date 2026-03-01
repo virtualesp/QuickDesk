@@ -124,6 +124,19 @@ DB_NAME=quickdesk
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
+
+# API Key for client authentication (optional)
+# When set, only clients with the correct API Key can connect to this server.
+# Leave empty to disable API Key verification (any client can connect).
+# Clients pass this value via the X-API-Key header.
+API_KEY=
+
+# WebClient allowed origins (optional, comma-separated)
+# Browsers automatically send the Origin header which cannot be spoofed by JS.
+# When set, only WebClient pages loaded from these origins can access the server.
+# Native clients (Qt/Host/Client) use API Key; WebClient uses Origin whitelist.
+# Example: https://web.quickdesk.cc,https://quickdesk.example.com
+ALLOWED_ORIGINS=
 EOF
 
 # Create systemd service
@@ -372,6 +385,7 @@ docker logs quickdesk-postgres
 4. **Regular backups**: Set up scheduled database backups
 5. **Log monitoring**: Configure log collection and alerting
 6. **Rate limiting**: Configure request rate limiting in Nginx
+7. **Client authentication**: Set `API_KEY` to restrict native client access, set `ALLOWED_ORIGINS` to restrict WebClient access
 
 ```nginx
 # Nginx rate limiting example

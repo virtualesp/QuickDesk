@@ -242,6 +242,25 @@ bash scripts/publish_qd_mac.sh Release
 bash scripts/package_qd_mac.sh Release
 ```
 
+### API Key（可选）
+
+如果你部署了自己的信令服务器并启用了 API Key，可以在编译时注入 API Key 使客户端能够通过认证：
+
+```bash
+# Windows
+set ENV_QUICKDESK_API_KEY=your-secret-key
+scripts\build_qd_win.bat Release
+
+# macOS
+ENV_QUICKDESK_API_KEY=your-secret-key bash scripts/build_qd_mac.sh Release
+```
+
+不设置 `ENV_QUICKDESK_API_KEY` 时，编译出的客户端只能连接未开启 API Key 保护的信令服务器。
+
+> **WebClient 说明：** WebClient 是运行在浏览器中的静态网页，嵌入到 JS 中的 API Key 可通过 DevTools 看到，因此 WebClient 采用 **Origin 域名白名单** 验证而非 API Key。在信令服务器配置 `ALLOWED_ORIGINS` 来限制允许访问的域名。浏览器会自动发送 `Origin` 请求头且 JavaScript 无法伪造，只有从官方域名加载的 WebClient 才能通过验证。
+
+详情参见[信令服务器部署文档](docs/信令服务器部署.md)。
+
 ## 私有化部署
 
 QuickDesk 支持完整的私有化部署，你可以将所有服务部署在自己的服务器上，确保数据安全。

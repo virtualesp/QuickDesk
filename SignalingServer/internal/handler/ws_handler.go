@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"quickdesk/signaling/internal/middleware"
 	"quickdesk/signaling/internal/service"
 	"sync"
 
@@ -41,6 +42,7 @@ type WSHandler struct {
 	mu            sync.RWMutex
 	deviceService *service.DeviceService
 	authService   *service.AuthService
+	apiKeyAuth    *middleware.APIKeyAuth
 }
 
 func NewWSHandler(deviceService *service.DeviceService, authService *service.AuthService) *WSHandler {
@@ -50,6 +52,10 @@ func NewWSHandler(deviceService *service.DeviceService, authService *service.Aut
 		deviceService: deviceService,
 		authService:   authService,
 	}
+}
+
+func (h *WSHandler) SetAPIKeyAuth(auth *middleware.APIKeyAuth) {
+	h.apiKeyAuth = auth
 }
 
 // generateRandomHex generates a random hex string
@@ -63,6 +69,14 @@ func generateRandomHex(n int) string {
 // Route: /signal/:device_id?access_code=xxx (Host)
 // Route: /client/:device_id/:access_code (Client)
 func (h *WSHandler) HandleWebSocket(c *gin.Context) {
+	if h.apiKeyAuth != nil && !h.apiKeyAuth.ValidateRequest(c) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":   "INVALID_API_KEY",
+			"message": "Invalid or missing API key",
+		})
+		return
+	}
+
 	deviceID := c.Param("device_id")
 	accessCode := c.Query("access_code")
 	

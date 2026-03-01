@@ -20,12 +20,18 @@ type AdminConfig struct {
 	Password string
 }
 
+type SecurityConfig struct {
+	APIKey         string   // API Key for client authentication; empty means disabled
+	AllowedOrigins []string // Allowed Origin domains for WebClient; empty means disabled
+}
+
 type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
 	Database DatabaseConfig `mapstructure:"database"`
 	Redis    RedisConfig    `mapstructure:"redis"`
 	Ice      IceConfig
 	Admin    AdminConfig
+	Security SecurityConfig
 }
 
 type ServerConfig struct {
@@ -73,6 +79,9 @@ func Load() *Config {
 	viper.SetDefault("ADMIN_USER", "admin")
 	viper.SetDefault("ADMIN_PASSWORD", "admin")
 
+	viper.SetDefault("API_KEY", "")
+	viper.SetDefault("ALLOWED_ORIGINS", "")
+
 	// Read config file (optional, will use defaults if not exists)
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
@@ -106,11 +115,24 @@ func Load() *Config {
 		User:     viper.GetString("ADMIN_USER"),
 		Password: viper.GetString("ADMIN_PASSWORD"),
 	}
+	var allowedOrigins []string
+	if origins := viper.GetString("ALLOWED_ORIGINS"); origins != "" {
+		allowedOrigins = splitAndTrim(origins)
+	}
+	cfg.Security = SecurityConfig{
+		APIKey:         viper.GetString("API_KEY"),
+		AllowedOrigins: allowedOrigins,
+	}
 
-	log.Printf("Loaded config: Server=%s:%d, DB=%s:%d/%s, ICE TURN=%d STUN=%d TTL=%ds",
+	apiKeyStatus := "disabled"
+	if cfg.Security.APIKey != "" {
+		apiKeyStatus = "enabled"
+	}
+	log.Printf("Loaded config: Server=%s:%d, DB=%s:%d/%s, ICE TURN=%d STUN=%d TTL=%ds, APIKey=%s, AllowedOrigins=%d",
 		cfg.Server.Host, cfg.Server.Port,
 		cfg.Database.Host, cfg.Database.Port, cfg.Database.DBName,
-		len(cfg.Ice.TurnURLs), len(cfg.Ice.StunURLs), cfg.Ice.CredentialTTL)
+		len(cfg.Ice.TurnURLs), len(cfg.Ice.StunURLs), cfg.Ice.CredentialTTL,
+		apiKeyStatus, len(cfg.Security.AllowedOrigins))
 
 	return cfg
 }

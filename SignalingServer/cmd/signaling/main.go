@@ -55,31 +55,35 @@ func main() {
 	router.Use(gin.Recovery())
 	router.Use(middleware.LoggerMiddleware())
 
-	// Health check endpoint
+	// API Key authentication middleware
+	apiKeyAuth := middleware.NewAPIKeyAuth(cfg.Security.APIKey, cfg.Security.AllowedOrigins)
+
+	// Health check endpoint (no API key required)
 	router.GET("/health", apiHandler.HealthCheck)
 
 	// API routes
 	v1 := router.Group("/api/v1")
 	{
-		// Device management
-		v1.POST("/devices/register", apiHandler.RegisterDevice)
-		v1.GET("/devices/:device_id", apiHandler.GetDevice)
-		v1.GET("/devices/:device_id/status", apiHandler.GetDeviceStatus)
-		
-		// Authentication
-		v1.POST("/auth/verify", apiHandler.VerifyPassword)
-
-		// ICE server configuration (time-limited TURN credentials)
-		v1.GET("/ice-config", apiHandler.GetIceConfig)
-
-		// Preset configuration (client pull, no auth)
+		// Preset is public so old clients (without API key) can still
+		// fetch min_version and show the force-upgrade prompt.
 		v1.GET("/preset", apiHandler.GetPreset)
+
+		// Client-facing APIs require API key
+		clientAPI := v1.Group("")
+		clientAPI.Use(apiKeyAuth.Required())
+		{
+			clientAPI.POST("/devices/register", apiHandler.RegisterDevice)
+			clientAPI.GET("/devices/:device_id", apiHandler.GetDevice)
+			clientAPI.GET("/devices/:device_id/status", apiHandler.GetDeviceStatus)
+			clientAPI.POST("/auth/verify", apiHandler.VerifyPassword)
+			clientAPI.GET("/ice-config", apiHandler.GetIceConfig)
+		}
 
 		// Admin authentication
 		adminAuth := middleware.NewAdminAuth(&cfg.Admin)
 		v1.POST("/admin/login", adminAuth.Login)
 
-		// Admin API (requires token)
+		// Admin API (requires admin token, no API key needed)
 		admin := v1.Group("/admin")
 		admin.Use(adminAuth.AuthRequired())
 		{
@@ -88,7 +92,8 @@ func main() {
 		}
 	}
 
-	// WebSocket routes
+	// WebSocket routes (API key checked inside handler before upgrade)
+	wsHandler.SetAPIKeyAuth(apiKeyAuth)
 	router.GET("/signal/:device_id", wsHandler.HandleWebSocket)
 
 	// Legacy route for backward compatibility with existing tests

@@ -40,6 +40,8 @@ jobs:
         run: echo "ENV_QT_PATH=$(dirname "$QT_ROOT_DIR")" >> $GITHUB_ENV
 
       - name: Build
+        env:
+          ENV_QUICKDESK_API_KEY: ${{ secrets.QUICKDESK_API_KEY }}
         run: bash scripts/build_qd_mac.sh Release
 
       - name: Publish

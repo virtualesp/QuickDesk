@@ -242,6 +242,25 @@ bash scripts/publish_qd_mac.sh Release
 bash scripts/package_qd_mac.sh Release
 ```
 
+### API Key (Optional)
+
+If you deploy your own signaling server with API Key enabled, you can inject the API Key at build time so your clients can authenticate:
+
+```bash
+# Windows
+set ENV_QUICKDESK_API_KEY=your-secret-key
+scripts\build_qd_win.bat Release
+
+# macOS
+ENV_QUICKDESK_API_KEY=your-secret-key bash scripts/build_qd_mac.sh Release
+```
+
+Without `ENV_QUICKDESK_API_KEY`, the build produces an open-source client that can only connect to signaling servers without API Key protection.
+
+> **WebClient note:** The WebClient is a static web page running in the browser. Since API keys embedded in JavaScript are visible via DevTools, the WebClient uses **Origin whitelist** validation instead of API Key. Configure `ALLOWED_ORIGINS` on the signaling server to restrict which domains can access it. Browsers automatically send the `Origin` header and JavaScript cannot forge it, so only the WebClient served from your official domain will be allowed.
+
+See [Signaling Server Deployment](docs/signaling-server-deployment.md) for details.
+
 ## Self-Hosted Deployment
 
 QuickDesk supports full self-hosted deployment. You can deploy all services on your own servers to ensure data security.

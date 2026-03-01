@@ -94,6 +94,18 @@ if not exist "%temp_path%" (
 cd /d "%temp_path%"
 
 set cmake_params=-DCMAKE_PREFIX_PATH=%qt_cmake_path% -DCMAKE_BUILD_TYPE=%build_mode% -G "Visual Studio 17 2022" -A %cmake_vs_build_mode%
+
+if defined ENV_QUICKDESK_API_KEY (
+    if not "%ENV_QUICKDESK_API_KEY%"=="" (
+        set cmake_params=%cmake_params% -DQUICKDESK_API_KEY=%ENV_QUICKDESK_API_KEY%
+        echo [*] QUICKDESK_API_KEY: configured
+    ) else (
+        echo [*] QUICKDESK_API_KEY: not set ^(open-source build^)
+    )
+) else (
+    echo [*] QUICKDESK_API_KEY: not set ^(open-source build^)
+)
+
 echo [*] CMake params: %cmake_params%
 echo=
 
