@@ -19,9 +19,10 @@ ApplicationWindow {
     visible: true
     title: qsTr("QuickDesk")
     
-    // 关闭窗口时退出程序
     onClosing: function(close) {
-        Qt.quit()
+        close.accepted = false
+        root.hide()
+        SystemTrayManager.minimizeToTray()
     }
 
     // Example {}
@@ -114,6 +115,15 @@ ApplicationWindow {
             if (state === "failed" && root.pendingDeviceCredentials[connectionId]) {
                 delete root.pendingDeviceCredentials[connectionId]
             }
+        }
+    }
+    
+    Connections {
+        target: SystemTrayManager
+        function onShowWindowRequested() {
+            root.show()
+            root.raise()
+            root.requestActivate()
         }
     }
     

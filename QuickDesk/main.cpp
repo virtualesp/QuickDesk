@@ -1,8 +1,8 @@
 // Copyright 2026 QuickDesk Authors
 // QuickDesk Qt Application Entry Point
 
+#include <QApplication>
 #include <QFontDatabase>
-#include <QGuiApplication>
 #include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -22,6 +22,7 @@
 #include "component/VideoFrameProvider.h"
 #include "component/KeycodeMapper.h"
 #include "component/CursorImageProvider.h"
+#include "component/SystemTrayManager.h"
 #include "viewmodel/configviewmodel.h"
 #include "viewmodel/connectionlistmodel.h"
 #include "language/languagemanage.h"
@@ -29,12 +30,10 @@
 
 int main(int argc, char *argv[])
 {
-    // Ensure high DPI scaling uses accurate rounding policy
-    // This prevents blurriness on displays with fractional DPI scaling (e.g. 125%, 150%)
-    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(
+    QApplication::setHighDpiScaleFactorRoundingPolicy(
         Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
 
-    QGuiApplication app(argc, argv);
+    QApplication app(argc, argv);
     
     // 设置应用图标
     app.setWindowIcon(QIcon(":/QuickDesk.ico"));
@@ -93,6 +92,14 @@ int main(int argc, char *argv[])
     qmlRegisterSingletonType<LanguageManage>("QuickDesk", 1, 0, "LanguageManage",
         [](QQmlEngine*, QJSEngine*) -> QObject* {
             return &LanguageManage::instance();
+        });
+
+    // Register SystemTrayManager as singleton
+    qmlRegisterSingletonType<quickdesk::SystemTrayManager>("QuickDesk", 1, 0, "SystemTrayManager",
+        [](QQmlEngine*, QJSEngine*) -> QObject* {
+            auto* mgr = &quickdesk::SystemTrayManager::instance();
+            QJSEngine::setObjectOwnership(mgr, QJSEngine::CppOwnership);
+            return mgr;
         });
 
     QQmlApplicationEngine engine;

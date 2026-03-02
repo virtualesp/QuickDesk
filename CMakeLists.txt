@@ -141,8 +141,8 @@ set(QD_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/output/${QD_CPU_ARCH}/${CMA
 message(STATUS "[${PROJECT_NAME}] QD_OUTPUT_DIRECTORY:${QD_OUTPUT_DIRECTORY}")
 # Qt
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Quick QuickControls2 Multimedia Sql WebSockets)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Quick QuickControls2 Multimedia Sql WebSockets)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Quick QuickControls2 Widgets Multimedia Sql WebSockets)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Quick QuickControls2 Widgets Multimedia Sql WebSockets)
 message(STATUS "[${PROJECT_NAME}] Qt version is: ${QT_VERSION_MAJOR}.${QT_VERSION_MINOR}")
 
 # 在配置阶段生成qm

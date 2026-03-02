@@ -38,6 +38,8 @@ public:
     LCC_FUNCTION_DEC_STRING(signalingServerUrl, SignalingServerUrl, "ws://qdsignaling.quickcoder.cc:8000") // Signaling server URL
     LCC_FUNCTION_DEC_STRING(turnServersJson, TurnServersJson, "") // TURN/STUN servers configuration in JSON format
 
+    LCC_FUNCTION_DEC_BOOL(trayMessageShown, TrayMessageShown, false) // Whether the tray minimize hint has been shown
+
 private:
     AppConfigDataBase* m_configDatabase = nullptr;
 };

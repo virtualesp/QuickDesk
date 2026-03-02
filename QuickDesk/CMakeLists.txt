@@ -58,12 +58,14 @@ set(COMPONENT_SOURCES
     src/component/VideoFrameProvider.cpp
     src/component/KeycodeMapper.cpp
     src/component/CursorImageProvider.cpp
+    src/component/SystemTrayManager.cpp
 )
 
 set(COMPONENT_HEADERS
     src/component/VideoFrameProvider.h
     src/component/KeycodeMapper.h
     src/component/CursorImageProvider.h
+    src/component/SystemTrayManager.h
 )
 
 set(CORE_SOURCES
@@ -256,6 +258,7 @@ target_link_libraries(QuickDesk
     Qt6::Quick 
     Qt6::QuickControls2
     Qt6::Core
+    Qt6::Widgets
     Qt6::Multimedia
     Qt6::WebSockets
     base

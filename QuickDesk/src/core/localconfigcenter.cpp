@@ -113,4 +113,6 @@ LCC_FUNCTION_IMP_STRING(accessCodeNextRefreshTime, AccessCodeNextRefreshTime);
 LCC_FUNCTION_IMP_STRING(signalingServerUrl, SignalingServerUrl);
 LCC_FUNCTION_IMP_STRING(turnServersJson, TurnServersJson);
 
+LCC_FUNCTION_IMP_BOOL(trayMessageShown, TrayMessageShown);
+
 }
