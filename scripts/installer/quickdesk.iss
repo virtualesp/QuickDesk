@@ -43,47 +43,98 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 VersionInfoVersion={#MyAppVersion}
+ShowLanguageDialog=auto
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 [Messages]
-WelcomeLabel2=This will install [name/ver] on your computer.%n%nPlease read the following important information before continuing.
+english.WelcomeLabel2=This will install [name/ver] on your computer.%n%nPlease read the following important information before continuing.
+chinesesimplified.WelcomeLabel2=即将在您的计算机上安装 [name/ver]。%n%n请在继续之前阅读以下重要信息。
+
+[CustomMessages]
+english.CreateStartMenuShortcut=Create a Start Menu shortcut
+chinesesimplified.CreateStartMenuShortcut=创建开始菜单快捷方式
 
 [Code]
-// Disclaimer page
 var
   DisclaimerPage: TOutputMsgMemoWizardPage;
+
+function GetDisclaimerTitle: String;
+begin
+  if ActiveLanguage = 'chinesesimplified' then
+    Result := '免责声明'
+  else
+    Result := 'Disclaimer';
+end;
+
+function GetDisclaimerDescription: String;
+begin
+  if ActiveLanguage = 'chinesesimplified' then
+    Result := '请在继续之前仔细阅读以下免责声明。'
+  else
+    Result := 'Please read the following disclaimer carefully before proceeding.';
+end;
+
+function GetDisclaimerSubCaption: String;
+begin
+  if ActiveLanguage = 'chinesesimplified' then
+    Result := '点击"下一步"即表示您已阅读并同意以下内容：'
+  else
+    Result := 'By clicking "Next", you acknowledge that you have read and agree to the following:';
+end;
+
+function GetDisclaimerBody: String;
+begin
+  if ActiveLanguage = 'chinesesimplified' then
+    Result :=
+      '免责声明'#13#10 +
+      '========'#13#10#13#10 +
+      '1. 本软件是一款远程桌面工具，仅供合法用途使用，'#13#10 +
+      '   包括但不限于远程技术支持、远程办公和个人设备管理。'#13#10#13#10 +
+      '2. 在发起远程连接之前，您必须获得设备所有者的明确授权。'#13#10 +
+      '   未经授权访问计算机系统可能违反相关法律法规。'#13#10#13#10 +
+      '3. 开发者不对本软件的任何滥用行为承担任何责任，'#13#10 +
+      '   包括但不限于未经授权的访问、数据窃取、隐私侵犯'#13#10 +
+      '   或使用本软件进行的任何违法活动。'#13#10#13#10 +
+      '4. 您同意在使用本软件时遵守所有适用的地方、国家'#13#10 +
+      '   和国际法律法规。'#13#10#13#10 +
+      '5. 本软件按"原样"提供，不提供任何明示或暗示的保证。'#13#10 +
+      '   使用风险由您自行承担。'#13#10#13#10 +
+      '6. 继续安装即表示您已阅读、理解并同意本免责声明。'
+  else
+    Result :=
+      'DISCLAIMER'#13#10 +
+      '=========='#13#10#13#10 +
+      '1. This software is a remote desktop tool designed for lawful purposes only, '#13#10 +
+      '   including but not limited to remote technical support, remote work, and '#13#10 +
+      '   personal device management.'#13#10#13#10 +
+      '2. You must obtain explicit authorization from the owner of any device before '#13#10 +
+      '   initiating a remote connection. Unauthorized access to computer systems '#13#10 +
+      '   may violate applicable laws and regulations.'#13#10#13#10 +
+      '3. The developer assumes no responsibility or liability for any misuse of '#13#10 +
+      '   this software, including but not limited to unauthorized access, data '#13#10 +
+      '   theft, privacy violations, or any illegal activities conducted using '#13#10 +
+      '   this software.'#13#10#13#10 +
+      '4. You agree to comply with all applicable local, national, and international '#13#10 +
+      '   laws and regulations when using this software.'#13#10#13#10 +
+      '5. This software is provided "AS IS" without warranty of any kind, express '#13#10 +
+      '   or implied. Use at your own risk.'#13#10#13#10 +
+      '6. By proceeding with the installation, you acknowledge that you have read, '#13#10 +
+      '   understood, and agreed to this disclaimer.';
+end;
 
 procedure InitializeWizard;
 begin
   DisclaimerPage := CreateOutputMsgMemoPage(wpWelcome,
-    'Disclaimer', 'Please read the following disclaimer carefully before proceeding.',
-    'By clicking "Next", you acknowledge that you have read and agree to the following:',
-    'DISCLAIMER'#13#10 +
-    '=========='#13#10#13#10 +
-    '1. This software is a remote desktop tool designed for lawful purposes only, '#13#10 +
-    '   including but not limited to remote technical support, remote work, and '#13#10 +
-    '   personal device management.'#13#10#13#10 +
-    '2. You must obtain explicit authorization from the owner of any device before '#13#10 +
-    '   initiating a remote connection. Unauthorized access to computer systems '#13#10 +
-    '   may violate applicable laws and regulations.'#13#10#13#10 +
-    '3. The developer assumes no responsibility or liability for any misuse of '#13#10 +
-    '   this software, including but not limited to unauthorized access, data '#13#10 +
-    '   theft, privacy violations, or any illegal activities conducted using '#13#10 +
-    '   this software.'#13#10#13#10 +
-    '4. You agree to comply with all applicable local, national, and international '#13#10 +
-    '   laws and regulations when using this software.'#13#10#13#10 +
-    '5. This software is provided "AS IS" without warranty of any kind, express '#13#10 +
-    '   or implied. Use at your own risk.'#13#10#13#10 +
-    '6. By proceeding with the installation, you acknowledge that you have read, '#13#10 +
-    '   understood, and agreed to this disclaimer.'
-  );
+    GetDisclaimerTitle, GetDisclaimerDescription,
+    GetDisclaimerSubCaption, GetDisclaimerBody);
 end;
 
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "startmenuicon"; Description: "Create a Start Menu shortcut"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
+Name: "startmenuicon"; Description: "{cm:CreateStartMenuShortcut}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
 
 [Files]
 Source: "{#MyPublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
