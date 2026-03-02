@@ -4,10 +4,13 @@
 #ifndef QUICKDESK_API_WEBSOCKETSERVER_H
 #define QUICKDESK_API_WEBSOCKETSERVER_H
 
+#include "SecurityManager.h"
+
 #include <QObject>
 #include <QWebSocketServer>
 #include <QWebSocket>
 #include <QJsonObject>
+#include <QMap>
 #include <QSet>
 
 namespace quickdesk {
@@ -31,21 +34,35 @@ public:
 
     void setAuthToken(const QString& token);
 
+    SecurityManager* security() const { return m_security; }
+
     void broadcastEvent(const QString& event, const QJsonObject& data);
 
 private slots:
     void onNewConnection();
     void onTextMessageReceived(const QString& message);
     void onClientDisconnected();
+    void onSessionExpired(const QString& clientId);
 
 private:
+    struct ClientInfo {
+        SecurityManager::PermissionLevel permission =
+            SecurityManager::FullControl;
+        QString id;
+    };
+
     bool authenticateClient(QWebSocket* client, const QJsonObject& msg);
+    QString clientId(QWebSocket* client) const;
 
     QWebSocketServer* m_server = nullptr;
     ApiHandler* m_handler = nullptr;
+    SecurityManager* m_security = nullptr;
     QSet<QWebSocket*> m_clients;
     QSet<QWebSocket*> m_authenticatedClients;
+    QMap<QWebSocket*, ClientInfo> m_clientInfo;
+    QMap<QString, QWebSocket*> m_clientIdMap;
     QString m_authToken;
+    int m_nextClientId = 1;
 };
 
 } // namespace quickdesk

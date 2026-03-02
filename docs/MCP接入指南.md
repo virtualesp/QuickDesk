@@ -72,7 +72,13 @@ quickdesk-mcp [--ws-url ws://127.0.0.1:9800] [--token YOUR_TOKEN]
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `--ws-url` | `ws://127.0.0.1:9800` | QuickDesk WebSocket API 地址 |
-| `--token` | （空） | WebSocket 服务器认证 Token |
+| `--token` | （空） | 完全控制权限的认证 Token |
+| `--readonly-token` | （空） | 只读权限的认证 Token（仅截图+状态查询，不能输入） |
+| `--allowed-devices` | （空） | 允许连接的设备 ID 白名单（逗号分隔） |
+| `--rate-limit` | `0` | 每分钟最大 API 请求数（0 = 不限制） |
+| `--session-timeout` | `0` | 会话空闲超时（秒，0 = 不超时） |
+
+所有参数也可通过环境变量设置：`QUICKDESK_TOKEN`、`QUICKDESK_READONLY_TOKEN`、`QUICKDESK_ALLOWED_DEVICES`、`QUICKDESK_RATE_LIMIT`、`QUICKDESK_SESSION_TIMEOUT`。
 
 ### 3. 开始使用
 
@@ -329,3 +335,85 @@ RUST_LOG=debug quickdesk-mcp
 ```
 
 日志输出到 stderr，不会干扰 stdio MCP 传输。
+
+## 安全
+
+QuickDesk MCP 包含完整的安全体系。
+
+### 权限分级
+
+| 级别 | Token 参数 | 允许的操作 |
+|------|------------|-----------|
+| **完全控制** | `--token` | 所有操作（截图、点击、输入、连接等） |
+| **只读** | `--readonly-token` | 仅 `screenshot`、`getScreenSize`、`getHostInfo`、`getStatus`、`listConnections`、`getConnectionInfo`、`getClipboard`、`getHostClients`、`getSignalingStatus` |
+
+### 设备白名单
+
+限制 AI 可连接的设备：
+
+```bash
+quickdesk-mcp --token SECRET --allowed-devices "111222333,444555666,777888999"
+```
+
+连接白名单外的设备将返回 403 错误。
+
+### 频率限制
+
+防止 AI 失控高频操作：
+
+```bash
+quickdesk-mcp --token SECRET --rate-limit 60
+```
+
+超出限制返回 429 错误。使用滑动 1 分钟窗口计算。
+
+### 会话超时
+
+空闲自动断开：
+
+```bash
+quickdesk-mcp --token SECRET --session-timeout 3600
+```
+
+指定秒数内无活动的会话将被自动断开。
+
+### 危险操作拦截
+
+以下操作通过 API 自动拦截：
+
+- `disconnectAll`（批量断开连接）
+- `Alt+F4` 快捷键（关闭应用）
+- `Ctrl+Alt+Delete` 快捷键
+- 输入包含以下内容的文本：`shutdown`、`reboot`、`format`、`rm -rf`、`del /f /s /q`、`mkfs`
+
+这些操作返回 403 错误并附带描述信息。
+
+### 审计日志
+
+所有 API 操作记录到 `logs/quickdesk_audit.log`（轮转文件，10MB × 5 个）：
+
+```
+[2026-03-01 23:45:12.345] [ALLOW] client_1 method=screenshot params={"connectionId":"abc123"}
+[2026-03-01 23:45:13.456] [DENY] client_2 method=mouseClick params={"x":100,"y":200} reason=permission_denied
+[2026-03-01 23:45:14.567] [DENY] client_1 method=keyboardType params={"text":"shutdown /s"} reason=dangerous_operation
+```
+
+### 安全配置示例
+
+```json
+{
+  "mcpServers": {
+    "quickdesk": {
+      "command": "quickdesk-mcp",
+      "args": [
+        "--rate-limit", "120",
+        "--session-timeout", "7200",
+        "--allowed-devices", "111222333,444555666"
+      ],
+      "env": {
+        "QUICKDESK_TOKEN": "your-secret-token"
+      }
+    }
+  }
+}
+```

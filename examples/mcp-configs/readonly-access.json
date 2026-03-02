@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "quickdesk": {
+      "command": "quickdesk-mcp",
+      "args": [],
+      "env": {
+        "QUICKDESK_READONLY_TOKEN": "your-readonly-token"
+      }
+    }
+  }
+}

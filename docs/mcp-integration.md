@@ -72,7 +72,13 @@ quickdesk-mcp [--ws-url ws://127.0.0.1:9800] [--token YOUR_TOKEN]
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `--ws-url` | `ws://127.0.0.1:9800` | QuickDesk WebSocket API URL |
-| `--token` | (none) | Auth token for WebSocket server |
+| `--token` | (none) | Full-control auth token |
+| `--readonly-token` | (none) | Read-only auth token (screenshot + status only, no input) |
+| `--allowed-devices` | (none) | Comma-separated device ID whitelist |
+| `--rate-limit` | `0` | Max API requests per minute (0 = unlimited) |
+| `--session-timeout` | `0` | Session timeout in seconds (0 = no timeout) |
+
+All arguments can also be set via environment variables: `QUICKDESK_TOKEN`, `QUICKDESK_READONLY_TOKEN`, `QUICKDESK_ALLOWED_DEVICES`, `QUICKDESK_RATE_LIMIT`, `QUICKDESK_SESSION_TIMEOUT`.
 
 ### 3. Use It
 
@@ -329,3 +335,85 @@ RUST_LOG=debug quickdesk-mcp
 ```
 
 Logs are written to stderr and won't interfere with the stdio MCP transport.
+
+## Security
+
+QuickDesk MCP includes a comprehensive security system.
+
+### Permission Levels
+
+| Level | Token Flag | Allowed Operations |
+|-------|------------|-------------------|
+| **Full Control** | `--token` | All operations (screenshot, click, type, connect, etc.) |
+| **Read-Only** | `--readonly-token` | `screenshot`, `getScreenSize`, `getHostInfo`, `getStatus`, `listConnections`, `getConnectionInfo`, `getClipboard`, `getHostClients`, `getSignalingStatus` |
+
+### Device Whitelist
+
+Restrict which devices the AI can connect to:
+
+```bash
+quickdesk-mcp --token SECRET --allowed-devices "111222333,444555666,777888999"
+```
+
+Connection attempts to unlisted devices will be rejected with a 403 error.
+
+### Rate Limiting
+
+Prevent runaway AI operations:
+
+```bash
+quickdesk-mcp --token SECRET --rate-limit 60
+```
+
+Exceeding the limit returns HTTP 429. The limit uses a sliding 1-minute window.
+
+### Session Timeout
+
+Auto-disconnect idle sessions:
+
+```bash
+quickdesk-mcp --token SECRET --session-timeout 3600
+```
+
+Sessions with no activity for the specified seconds are disconnected.
+
+### Dangerous Operation Blocking
+
+The following operations are automatically blocked via the API:
+
+- `disconnectAll` (mass disconnection)
+- `Alt+F4` hotkey (close application)
+- `Ctrl+Alt+Delete` hotkey
+- Typing text containing: `shutdown`, `reboot`, `format`, `rm -rf`, `del /f /s /q`, `mkfs`
+
+These return a 403 error with a descriptive message.
+
+### Audit Logging
+
+All API operations are logged to `logs/quickdesk_audit.log` (rotating, 10MB x 5 files):
+
+```
+[2026-03-01 23:45:12.345] [ALLOW] client_1 method=screenshot params={"connectionId":"abc123"}
+[2026-03-01 23:45:13.456] [DENY] client_2 method=mouseClick params={"x":100,"y":200} reason=permission_denied
+[2026-03-01 23:45:14.567] [DENY] client_1 method=keyboardType params={"text":"shutdown /s"} reason=dangerous_operation
+```
+
+### Security Configuration Example
+
+```json
+{
+  "mcpServers": {
+    "quickdesk": {
+      "command": "quickdesk-mcp",
+      "args": [
+        "--rate-limit", "120",
+        "--session-timeout", "7200",
+        "--allowed-devices", "111222333,444555666"
+      ],
+      "env": {
+        "QUICKDESK_TOKEN": "your-secret-token"
+      }
+    }
+  }
+}
+```

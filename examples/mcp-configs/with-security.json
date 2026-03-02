@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "quickdesk": {
+      "command": "quickdesk-mcp",
+      "args": [
+        "--rate-limit", "120",
+        "--session-timeout", "7200",
+        "--allowed-devices", "111222333,444555666,777888999"
+      ],
+      "env": {
+        "QUICKDESK_TOKEN": "your-full-access-token"
+      }
+    }
+  }
+}

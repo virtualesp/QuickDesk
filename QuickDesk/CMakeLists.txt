@@ -41,11 +41,13 @@ set(CONTROLLER_HEADERS
 set(API_SOURCES
     src/api/WebSocketServer.cpp
     src/api/ApiHandler.cpp
+    src/api/SecurityManager.cpp
 )
 
 set(API_HEADERS
     src/api/WebSocketServer.h
     src/api/ApiHandler.h
+    src/api/SecurityManager.h
 )
 
 set(COMMON_HEADERS

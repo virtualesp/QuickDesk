@@ -198,14 +198,30 @@ pub struct QuickDeskMcpServer {
     tool_router: ToolRouter<Self>,
     prompt_router: PromptRouter<Self>,
     ws: WsClient,
+    allowed_devices: Vec<String>,
 }
 
 impl QuickDeskMcpServer {
-    pub fn new(ws: WsClient) -> Self {
+    pub fn new(ws: WsClient, allowed_devices: Vec<String>) -> Self {
         Self {
             tool_router: Self::tool_router(),
             prompt_router: Self::prompt_router(),
             ws,
+            allowed_devices,
+        }
+    }
+
+    fn check_device_allowed(&self, device_id: &str) -> Result<(), String> {
+        if self.allowed_devices.is_empty() {
+            return Ok(());
+        }
+        if self.allowed_devices.iter().any(|d| d == device_id) {
+            Ok(())
+        } else {
+            Err(format!(
+                "Device '{}' is not in the allowed device list. Allowed: {:?}",
+                device_id, self.allowed_devices
+            ))
         }
     }
 }
@@ -275,6 +291,9 @@ impl QuickDeskMcpServer {
     #[tool(description = "Connect to a remote device. Returns a connection ID. By default, a remote desktop viewer window is shown so the user can observe your operations. Set show_window=false for silent background automation. To control the current computer, first call get_host_info to get the device ID and access code, then pass them here.")]
     async fn connect_device(&self, params: Parameters<ConnectDeviceParam>) -> String {
         let p = params.0;
+        if let Err(e) = self.check_device_allowed(&p.device_id) {
+            return format!("Error: {e}");
+        }
         let mut req = json!({
             "deviceId": p.device_id,
             "accessCode": p.access_code,
