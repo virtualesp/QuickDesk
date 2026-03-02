@@ -161,11 +161,15 @@ func (h *APIHandler) GetIceConfig(c *gin.Context) {
 		mac.Write([]byte(username))
 		credential := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
-		iceServers = append(iceServers, gin.H{
+		turnEntry := gin.H{
 			"urls":       ice.TurnURLs,
 			"username":   username,
 			"credential": credential,
-		})
+		}
+		if ice.MaxRateKbps > 0 {
+			turnEntry["maxRateKbps"] = ice.MaxRateKbps
+		}
+		iceServers = append(iceServers, turnEntry)
 	}
 
 	if len(ice.StunURLs) > 0 {

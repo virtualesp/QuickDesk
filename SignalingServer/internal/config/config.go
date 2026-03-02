@@ -13,6 +13,7 @@ type IceConfig struct {
 	AuthSecret    string // shared secret with coturn (use-auth-secret mode)
 	CredentialTTL int    // TURN credential TTL in seconds
 	StunURLs      []string
+	MaxRateKbps   int    // max bitrate (kbps) for TURN relayed connections; 0 means no cap
 }
 
 type AdminConfig struct {
@@ -75,6 +76,7 @@ func Load() *Config {
 	viper.SetDefault("TURN_AUTH_SECRET", "")
 	viper.SetDefault("TURN_CREDENTIAL_TTL", 86400)
 	viper.SetDefault("STUN_URLS", "")
+	viper.SetDefault("TURN_MAX_RATE_KBPS", 0)
 
 	viper.SetDefault("ADMIN_USER", "admin")
 	viper.SetDefault("ADMIN_PASSWORD", "admin")
@@ -128,10 +130,10 @@ func Load() *Config {
 	if cfg.Security.APIKey != "" {
 		apiKeyStatus = "enabled"
 	}
-	log.Printf("Loaded config: Server=%s:%d, DB=%s:%d/%s, ICE TURN=%d STUN=%d TTL=%ds, APIKey=%s, AllowedOrigins=%d",
+	log.Printf("Loaded config: Server=%s:%d, DB=%s:%d/%s, ICE TURN=%d STUN=%d TTL=%ds MaxRate=%dkbps, APIKey=%s, AllowedOrigins=%d",
 		cfg.Server.Host, cfg.Server.Port,
 		cfg.Database.Host, cfg.Database.Port, cfg.Database.DBName,
-		len(cfg.Ice.TurnURLs), len(cfg.Ice.StunURLs), cfg.Ice.CredentialTTL,
+		len(cfg.Ice.TurnURLs), len(cfg.Ice.StunURLs), cfg.Ice.CredentialTTL, cfg.Ice.MaxRateKbps,
 		apiKeyStatus, len(cfg.Security.AllowedOrigins))
 
 	return cfg
@@ -150,6 +152,7 @@ func parseIceConfig() IceConfig {
 	ice := IceConfig{
 		CredentialTTL: viper.GetInt("TURN_CREDENTIAL_TTL"),
 		AuthSecret:    viper.GetString("TURN_AUTH_SECRET"),
+		MaxRateKbps:   viper.GetInt("TURN_MAX_RATE_KBPS"),
 	}
 	if urls := viper.GetString("TURN_URLS"); urls != "" {
 		ice.TurnURLs = splitAndTrim(urls)
