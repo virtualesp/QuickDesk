@@ -155,6 +155,10 @@ signals:
     void videoLayoutChanged(const QString& connectionId,
                             int widthDips, int heightDips);
 
+    // ICE route changed (P2P direct/stun/relay)
+    void routeChanged(const QString& connectionId,
+                      const QVariantMap& routeInfo);
+
 private slots:
     void onMessageReceived(const QJsonObject& message);
     void onMessagingError(const QString& error);
@@ -187,6 +191,7 @@ private:
     void handleCursorShapeChanged(const QJsonObject& message);
     void handlePerformanceStatsUpdate(const QJsonObject& message);
     void handleVideoLayoutChanged(const QJsonObject& message);
+    void handleRouteChanged(const QJsonObject& message);
     
     void sendMouseEvent(const QString& connectionId, const QString& eventType,
                         int x, int y, int button,

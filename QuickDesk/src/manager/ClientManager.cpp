@@ -428,7 +428,7 @@ void ClientManager::onMessageReceived(const QJsonObject& message)
 {
     QString type = message["type"].toString();
 
-    if (type != "videoFrameReady" && type != "performanceStatsUpdate" && type != "videoLayoutChanged") {
+    if (type != "videoFrameReady" && type != "performanceStatsUpdate" && type != "videoLayoutChanged" && type != "routeChanged") {
         LOG_DEBUG("Client received message: {}", type.toStdString());
     }
 
@@ -466,6 +466,8 @@ void ClientManager::onMessageReceived(const QJsonObject& message)
         handlePerformanceStatsUpdate(message);
     } else if (type == "videoLayoutChanged") {
         handleVideoLayoutChanged(message);
+    } else if (type == "routeChanged") {
+        handleRouteChanged(message);
     } else if (type == "setFramerateResponse" || type == "setResolutionResponse" || type == "setFramerateBoostResponse" || type == "setBitrateResponse") {
         // Acknowledgement responses - just log success/failure
         bool success = message["success"].toBool();
@@ -847,6 +849,53 @@ void ClientManager::handleVideoLayoutChanged(const QJsonObject& message)
               connectionId.toStdString(), widthDips, heightDips);
 
     emit videoLayoutChanged(connectionId, widthDips, heightDips);
+}
+
+void ClientManager::handleRouteChanged(const QJsonObject& message)
+{
+    QString connectionId = message["connectionId"].toString();
+
+    QVariantMap routeInfo;
+    routeInfo["routeType"] = message["routeType"].toString();
+    routeInfo["transportProtocol"] = message["transportProtocol"].toString();
+    routeInfo["localCandidateType"] = message["localCandidateType"].toString();
+    routeInfo["remoteCandidateType"] = message["remoteCandidateType"].toString();
+    routeInfo["localAddress"] = message["localAddress"].toString();
+    routeInfo["remoteAddress"] = message["remoteAddress"].toString();
+
+    QVariantList localCandidates;
+    for (const auto& val : message["localCandidates"].toArray()) {
+        QJsonObject obj = val.toObject();
+        QVariantMap c;
+        c["address"] = obj["address"].toString();
+        c["type"] = obj["type"].toString();
+        c["protocol"] = obj["protocol"].toString();
+        c["isIpv6"] = obj["isIpv6"].toBool();
+        c["priority"] = obj["priority"].toInt();
+        localCandidates.append(c);
+    }
+    routeInfo["localCandidates"] = localCandidates;
+
+    QVariantList remoteCandidates;
+    for (const auto& val : message["remoteCandidates"].toArray()) {
+        QJsonObject obj = val.toObject();
+        QVariantMap c;
+        c["address"] = obj["address"].toString();
+        c["type"] = obj["type"].toString();
+        c["protocol"] = obj["protocol"].toString();
+        c["isIpv6"] = obj["isIpv6"].toBool();
+        c["priority"] = obj["priority"].toInt();
+        remoteCandidates.append(c);
+    }
+    routeInfo["remoteCandidates"] = remoteCandidates;
+
+    LOG_INFO("Route changed: connection={}, type={}, local={}, remote={}",
+             connectionId.toStdString(),
+             routeInfo["routeType"].toString().toStdString(),
+             routeInfo["localCandidateType"].toString().toStdString(),
+             routeInfo["remoteCandidateType"].toString().toStdString());
+
+    emit routeChanged(connectionId, routeInfo);
 }
 
 void ClientManager::sendMouseEvent(const QString& connectionId, const QString& eventType,

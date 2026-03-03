@@ -16,6 +16,7 @@ Rectangle {
     property int frameWidth: 0
     property int frameHeight: 0
     property int frameRate: 0
+    property string routeType: ""  // "direct", "stun", "relay"
     
     // Signals
     signal clicked()
@@ -58,36 +59,57 @@ Rectangle {
             Layout.fillWidth: true
             spacing: 2
             
-            Text {
-                text: deviceName || connectionId
-                font.pixelSize: Theme.fontSizeSmall
-                font.weight: isActive ? Font.DemiBold : Font.Normal
-                color: Theme.text
-                elide: Text.ElideRight
-                Layout.fillWidth: true
-            }
-            
+            // Row 1: Device name + ● P2P + ● 21ms
             RowLayout {
+                Layout.fillWidth: true
                 spacing: Theme.spacingXSmall
-                
-                // Status Indicator
+
+                Text {
+                    text: deviceName || connectionId
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: isActive ? Font.DemiBold : Font.Normal
+                    color: Theme.text
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
+                }
+
                 Rectangle {
                     width: 8
                     height: 8
                     radius: 4
+                    visible: connectionState === "connected" && routeType !== ""
+                    color: (routeType === "direct" || routeType === "stun")
+                           ? "#66BB6A" : routeType === "relay" ? "#FFA726"
+                           : Theme.textDisabled
+                }
+
+                Text {
+                    text: routeType === "direct" ? "P2P"
+                        : routeType === "stun" ? "STUN"
+                        : routeType === "relay" ? "Relay" : ""
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: Theme.fontFamilyMono
+                    color: Theme.textSecondary
+                    visible: connectionState === "connected" && routeType !== ""
+                }
+
+                Rectangle {
+                    width: 8
+                    height: 8
+                    radius: 4
+                    visible: connectionState === "connected"
                     color: {
                         if (connectionState !== "connected") return Theme.textDisabled
                         if (ping < 50) return Theme.success
                         if (ping < 100) return Theme.warning
                         return Theme.error
                     }
-                    
+
                     Behavior on color {
                         ColorAnimation { duration: Theme.animationDurationFast }
                     }
                 }
-                
-                // Ping Display
+
                 Text {
                     text: ping + " ms"
                     font.pixelSize: Theme.fontSizeSmall
@@ -95,17 +117,23 @@ Rectangle {
                     color: Theme.textSecondary
                     visible: connectionState === "connected"
                 }
-                
-                // Resolution and FPS Display
+            }
+            
+            // Row 2: Resolution + FPS (or Connecting...)
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingXSmall
+
                 Text {
                     text: frameWidth + "x" + frameHeight + " " + frameRate + "fps"
                     font.pixelSize: Theme.fontSizeSmall
                     font.family: Theme.fontFamilyMono
                     color: Theme.textSecondary
                     visible: connectionState === "connected" && frameWidth > 0
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
                 }
-                
-                // Connecting Text
+
                 Text {
                     text: qsTr("Connecting...")
                     font.pixelSize: Theme.fontSizeSmall
@@ -117,6 +145,8 @@ Rectangle {
         
         // Close Button
         Rectangle {
+            Layout.minimumWidth: 20
+            Layout.minimumHeight: 20
             width: 20
             height: 20
             radius: 10
@@ -151,7 +181,7 @@ Rectangle {
     MouseArea {
         id: mouseArea
         anchors.fill: parent
-        anchors.rightMargin: 24 // Exclude close button
+        anchors.rightMargin: 24
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         

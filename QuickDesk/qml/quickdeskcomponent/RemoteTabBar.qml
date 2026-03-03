@@ -56,18 +56,14 @@ Rectangle {
                 
                 // Get performance stats from map
                 property var stats: {
-                    var _ = control.statsVersion  // Trigger update when version changes
-                    return control.performanceStatsMap[connectionId] || {
-                        frameWidth: 0, 
-                        frameHeight: 0, 
-                        frameRate: 0,
-                        ping: 0
-                    }
+                    var _ = control.statsVersion
+                    return control.performanceStatsMap[connectionId] || { ping: 0 }
                 }
-                frameWidth: stats.frameWidth
-                frameHeight: stats.frameHeight
-                frameRate: stats.frameRate
                 ping: stats.ping
+                routeType: stats.routeType || ""
+                frameWidth: stats.frameWidth || 0
+                frameHeight: stats.frameHeight || 0
+                frameRate: stats.frameRate || 0
                 
                 onClicked: {
                     control.tabClicked(index)

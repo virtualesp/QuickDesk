@@ -10,7 +10,7 @@ Rectangle {
     // Input: performance stats object from RemoteWindow.performanceStatsMap
     property var stats: null
 
-    width: 280
+    width: 320
     height: contentColumn.implicitHeight + Theme.spacingMedium * 2
     radius: Theme.radiusMedium
     color: Qt.rgba(0, 0, 0, 0.78)
@@ -28,6 +28,32 @@ Rectangle {
         if (kbps === undefined || kbps === null || kbps <= 0) return "—"
         if (kbps >= 1024) return (kbps / 1024).toFixed(1) + " Mbps"
         return kbps.toFixed(0) + " Kbps"
+    }
+
+    function routeTypeLabel(type) {
+        if (type === "direct") return "P2P (Direct)"
+        if (type === "stun")   return "P2P (STUN)"
+        if (type === "relay")  return "Relay (TURN)"
+        return "—"
+    }
+
+    function routeTypeColor(type) {
+        if (type === "direct" || type === "stun") return "#66BB6A"
+        if (type === "relay") return "#FFA726"
+        return root._overlayValue
+    }
+
+    function ipVersionTag(isIpv6) {
+        return isIpv6 ? "IPv6" : "IPv4"
+    }
+
+    function formatAddress(addr) {
+        if (!addr) return "—"
+        if (addr.indexOf("redacted-ip.invalid") >= 0) {
+            var port = addr.split(":").pop()
+            return "hidden:" + port
+        }
+        return addr
     }
 
     readonly property double maxBarMs: {
@@ -218,5 +244,197 @@ Rectangle {
                 labelColor: root._overlayLabel; valueColor: root._overlayValue; monoValue: true
             }
         }
-    }
+
+        // ── ICE / Route section ──
+        QDSeparator {
+            orientation: QDSeparator.Orientation.Horizontal
+            Layout.fillWidth: true
+            separatorColor: Qt.rgba(1, 1, 1, 0.15)
+        }
+
+        QDText {
+            text: "ICE / ROUTE"
+            type: QDText.Type.Caption
+            font.weight: Font.Bold
+            font.letterSpacing: 1.5
+            colorRole: QDText.ColorRole.Custom
+            customColor: root._overlaySection
+        }
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 2
+
+            QDLabel {
+                Layout.fillWidth: true
+                label: "Type"
+                value: root.stats ? root.routeTypeLabel(root.stats.routeType) : "—"
+                labelColor: root._overlayLabel
+                valueColor: root.stats ? root.routeTypeColor(root.stats.routeType)
+                                       : root._overlayValue
+                monoValue: true
+                valueWeight: Font.DemiBold
+            }
+
+            QDLabel {
+                Layout.fillWidth: true
+                label: "Protocol"
+                value: root.stats && root.stats.transportProtocol
+                       ? root.stats.transportProtocol : "—"
+                labelColor: root._overlayLabel; valueColor: root._overlayValue; monoValue: true
+            }
+
+            QDLabel {
+                Layout.fillWidth: true
+                label: "Local"
+                value: {
+                    if (!root.stats || !root.stats.localAddress) return "—"
+                    var t = root.stats.localCandidateType || ""
+                    return root.stats.localAddress + " (" + t + ")"
+                }
+                labelColor: root._overlayLabel; valueColor: root._overlayValue; monoValue: true
+            }
+
+            QDLabel {
+                Layout.fillWidth: true
+                label: "Remote"
+                value: {
+                    if (!root.stats || !root.stats.remoteAddress) return "—"
+                    var t = root.stats.remoteCandidateType || ""
+                    return root.formatAddress(root.stats.remoteAddress) + " (" + t + ")"
+                }
+                labelColor: root._overlayLabel; valueColor: root._overlayValue; monoValue: true
+            }
+        }
+
+        // ── Client Candidates ──
+        QDText {
+            text: "CLIENT CANDIDATES"
+            type: QDText.Type.Caption
+            font.weight: Font.Bold
+            font.letterSpacing: 1.5
+            colorRole: QDText.ColorRole.Custom
+            customColor: root._overlaySection
+            visible: !!(root.stats && root.stats.localCandidates
+                       && root.stats.localCandidates.length > 0)
+        }
+
+        Repeater {
+            model: root.stats && root.stats.localCandidates
+                   ? root.stats.localCandidates : []
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 4
+
+                QDText {
+                    Layout.preferredWidth: 38
+                    text: modelData.type || ""
+                    type: QDText.Type.Caption
+                    mono: true
+                    colorRole: QDText.ColorRole.Custom
+                    customColor: {
+                        var t = modelData.type
+                        if (t === "host") return "#66BB6A"
+                        if (t === "srflx" || t === "prflx") return "#4FC3F7"
+                        if (t === "relay") return "#FFA726"
+                        return root._overlayLabel
+                    }
+                }
+
+                QDText {
+                    Layout.preferredWidth: 22
+                    text: modelData.protocol || ""
+                    type: QDText.Type.Caption
+                    mono: true
+                    colorRole: QDText.ColorRole.Custom
+                    customColor: root._overlayLabel
+                }
+
+                QDText {
+                    Layout.preferredWidth: 28
+                    text: root.ipVersionTag(modelData.isIpv6)
+                    type: QDText.Type.Caption
+                    mono: true
+                    colorRole: QDText.ColorRole.Custom
+                    customColor: modelData.isIpv6 ? "#CE93D8" : "#90CAF9"
+                }
+
+                QDText {
+                    Layout.fillWidth: true
+                    text: root.formatAddress(modelData.address)
+                    type: QDText.Type.Caption
+                    mono: true
+                    colorRole: QDText.ColorRole.Custom
+                    customColor: root._overlayValue
+                    elide: Text.ElideRight
+                }
+            }
+        }
+
+        // ── Host Candidates ──
+        QDText {
+            text: "HOST CANDIDATES"
+            type: QDText.Type.Caption
+            font.weight: Font.Bold
+            font.letterSpacing: 1.5
+            colorRole: QDText.ColorRole.Custom
+            customColor: root._overlaySection
+            visible: !!(root.stats && root.stats.remoteCandidates
+                       && root.stats.remoteCandidates.length > 0)
+        }
+
+        Repeater {
+            model: root.stats && root.stats.remoteCandidates
+                   ? root.stats.remoteCandidates : []
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 4
+
+                QDText {
+                    Layout.preferredWidth: 38
+                    text: modelData.type || ""
+                    type: QDText.Type.Caption
+                    mono: true
+                    colorRole: QDText.ColorRole.Custom
+                    customColor: {
+                        var t = modelData.type
+                        if (t === "host") return "#66BB6A"
+                        if (t === "srflx" || t === "prflx") return "#4FC3F7"
+                        if (t === "relay") return "#FFA726"
+                        return root._overlayLabel
+                    }
+                }
+
+                QDText {
+                    Layout.preferredWidth: 22
+                    text: modelData.protocol || ""
+                    type: QDText.Type.Caption
+                    mono: true
+                    colorRole: QDText.ColorRole.Custom
+                    customColor: root._overlayLabel
+                }
+
+                QDText {
+                    Layout.preferredWidth: 28
+                    text: root.ipVersionTag(modelData.isIpv6)
+                    type: QDText.Type.Caption
+                    mono: true
+                    colorRole: QDText.ColorRole.Custom
+                    customColor: modelData.isIpv6 ? "#CE93D8" : "#90CAF9"
+                }
+
+                QDText {
+                    Layout.fillWidth: true
+                    text: root.formatAddress(modelData.address)
+                    type: QDText.Type.Caption
+                    mono: true
+                    colorRole: QDText.ColorRole.Custom
+                    customColor: root._overlayValue
+                    elide: Text.ElideRight
+                }
+            }
+        }
+    } // ColumnLayout
 }

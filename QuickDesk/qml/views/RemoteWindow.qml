@@ -80,16 +80,16 @@ Window {
                 console.log("✓ Recorded original resolution for", connectionId, ":", width + "x" + height)
             }
             
-            // Create new stats object
+            // Merge into existing stats to preserve route data etc.
             var newStatsMap = Object.assign({}, performanceStatsMap)
-            newStatsMap[connectionId] = {
+            newStatsMap[connectionId] = Object.assign({}, stats || {}, {
                 frameWidth: width,
                 frameHeight: height,
                 frameRate: fps !== undefined ? fps : (stats ? stats.frameRate : 0),
                 ping: ping !== undefined ? ping : (stats ? stats.ping : 0),
                 originalWidth: originalWidth,
                 originalHeight: originalHeight
-            }
+            })
             performanceStatsMap = newStatsMap
             
             // Only increment version if width or height changed (affects layout)
@@ -464,7 +464,9 @@ Window {
         
         function onConnectionStateChanged(connectionId, state, hostInfo) {
             console.log("Remote window: connection state changed:", connectionId, state)
-            
+
+            if (!remoteWindow || !remoteWindow.closingConnections) return
+
             // Skip if this connection is already being closed
             if (remoteWindow.closingConnections[connectionId]) {
                 return
@@ -494,6 +496,7 @@ Window {
         target: remoteWindow.clientManager
         
         function onConnectionRemoved(connectionId) {
+            if (!remoteWindow || !remoteWindow.closingConnections) return
             if (remoteWindow.closingConnections[connectionId]) {
                 return
             }
@@ -550,7 +553,30 @@ Window {
             }
         }
     }
-    
+
+    // Monitor ICE route changes
+    Connections {
+        target: remoteWindow.clientManager
+
+        function onRouteChanged(connectionId, routeInfo) {
+            var current = remoteWindow.performanceStatsMap[connectionId]
+            if (current) {
+                var newStatsMap = Object.assign({}, remoteWindow.performanceStatsMap)
+                newStatsMap[connectionId] = Object.assign({}, current, {
+                    routeType: routeInfo.routeType || "",
+                    transportProtocol: routeInfo.transportProtocol || "",
+                    localCandidateType: routeInfo.localCandidateType || "",
+                    remoteCandidateType: routeInfo.remoteCandidateType || "",
+                    localAddress: routeInfo.localAddress || "",
+                    remoteAddress: routeInfo.remoteAddress || "",
+                    localCandidates: routeInfo.localCandidates || [],
+                    remoteCandidates: routeInfo.remoteCandidates || []
+                })
+                remoteWindow.performanceStatsMap = newStatsMap
+            }
+        }
+    }
+
     // Toast for notifications
     QDToast {
         id: toast
