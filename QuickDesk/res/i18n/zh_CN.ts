@@ -294,43 +294,33 @@
     </message>
     <message>
         <location filename="../../qml/views/MainWindow.qml" line="530"/>
-        <location filename="../../qml/views/MainWindow.qml" line="535"/>
-        <location filename="../../qml/views/MainWindow.qml" line="536"/>
-        <location filename="../../qml/views/MainWindow.qml" line="537"/>
-        <location filename="../../qml/views/MainWindow.qml" line="538"/>
-        <location filename="../../qml/views/MainWindow.qml" line="539"/>
-        <location filename="../../qml/views/MainWindow.qml" line="540"/>
-        <location filename="../../qml/views/MainWindow.qml" line="543"/>
-        <location filename="../../qml/views/MainWindow.qml" line="544"/>
-        <location filename="../../qml/views/MainWindow.qml" line="545"/>
-        <location filename="../../qml/views/MainWindow.qml" line="546"/>
-        <location filename="../../qml/views/MainWindow.qml" line="547"/>
+        <location filename="../../qml/views/MainWindow.qml" line="561"/>
         <source>Host</source>
         <translation>主机</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="584"/>
-        <location filename="../../qml/views/MainWindow.qml" line="589"/>
-        <location filename="../../qml/views/MainWindow.qml" line="590"/>
-        <location filename="../../qml/views/MainWindow.qml" line="591"/>
-        <location filename="../../qml/views/MainWindow.qml" line="592"/>
-        <location filename="../../qml/views/MainWindow.qml" line="593"/>
-        <location filename="../../qml/views/MainWindow.qml" line="594"/>
-        <location filename="../../qml/views/MainWindow.qml" line="597"/>
         <location filename="../../qml/views/MainWindow.qml" line="598"/>
-        <location filename="../../qml/views/MainWindow.qml" line="599"/>
-        <location filename="../../qml/views/MainWindow.qml" line="600"/>
-        <location filename="../../qml/views/MainWindow.qml" line="601"/>
+        <location filename="../../qml/views/MainWindow.qml" line="603"/>
+        <location filename="../../qml/views/MainWindow.qml" line="604"/>
+        <location filename="../../qml/views/MainWindow.qml" line="605"/>
+        <location filename="../../qml/views/MainWindow.qml" line="606"/>
+        <location filename="../../qml/views/MainWindow.qml" line="607"/>
+        <location filename="../../qml/views/MainWindow.qml" line="608"/>
+        <location filename="../../qml/views/MainWindow.qml" line="611"/>
+        <location filename="../../qml/views/MainWindow.qml" line="612"/>
+        <location filename="../../qml/views/MainWindow.qml" line="613"/>
+        <location filename="../../qml/views/MainWindow.qml" line="614"/>
+        <location filename="../../qml/views/MainWindow.qml" line="615"/>
         <source>Client</source>
         <translation>客户端</translation>
     </message>
     <message>
         <location filename="../../qml/views/MainWindow.qml" line="530"/>
-        <location filename="../../qml/views/MainWindow.qml" line="540"/>
-        <location filename="../../qml/views/MainWindow.qml" line="547"/>
-        <location filename="../../qml/views/MainWindow.qml" line="584"/>
-        <location filename="../../qml/views/MainWindow.qml" line="594"/>
-        <location filename="../../qml/views/MainWindow.qml" line="601"/>
+        <location filename="../../qml/views/MainWindow.qml" line="541"/>
+        <location filename="../../qml/views/MainWindow.qml" line="551"/>
+        <location filename="../../qml/views/MainWindow.qml" line="598"/>
+        <location filename="../../qml/views/MainWindow.qml" line="608"/>
+        <location filename="../../qml/views/MainWindow.qml" line="615"/>
         <source>Unknown</source>
         <translation>未知</translation>
     </message>
@@ -377,85 +367,85 @@
     </message>
     <message>
         <location filename="../../qml/views/MainWindow.qml" line="543"/>
-        <location filename="../../qml/views/MainWindow.qml" line="597"/>
+        <location filename="../../qml/views/MainWindow.qml" line="611"/>
         <source>Not Started</source>
         <translation>未启动</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="544"/>
-        <location filename="../../qml/views/MainWindow.qml" line="598"/>
+        <location filename="../../qml/views/MainWindow.qml" line="545"/>
+        <location filename="../../qml/views/MainWindow.qml" line="612"/>
         <source>Starting</source>
         <translation>启动中</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="545"/>
-        <location filename="../../qml/views/MainWindow.qml" line="599"/>
+        <location filename="../../qml/views/MainWindow.qml" line="547"/>
+        <location filename="../../qml/views/MainWindow.qml" line="613"/>
         <source>Start Failed</source>
         <translation>启动失败</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="546"/>
-        <location filename="../../qml/views/MainWindow.qml" line="600"/>
+        <location filename="../../qml/views/MainWindow.qml" line="549"/>
+        <location filename="../../qml/views/MainWindow.qml" line="614"/>
         <source>Restarting</source>
         <translation>重启中</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="648"/>
+        <location filename="../../qml/views/MainWindow.qml" line="662"/>
         <source>AI: Off</source>
         <translation>AI: 关闭</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="650"/>
+        <location filename="../../qml/views/MainWindow.qml" line="664"/>
         <source>AI: %1 agent(s)</source>
         <translation>AI: %1 agent(s)</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="651"/>
+        <location filename="../../qml/views/MainWindow.qml" line="665"/>
         <source>AI: Ready</source>
         <translation>AI: 就绪</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="672"/>
+        <location filename="../../qml/views/MainWindow.qml" line="686"/>
         <source>Click to configure AI integration</source>
         <translation>点击配置AI集成</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="723"/>
+        <location filename="../../qml/views/MainWindow.qml" line="737"/>
         <source>Server Connection Error</source>
         <translation>服务器连接错误</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="731"/>
+        <location filename="../../qml/views/MainWindow.qml" line="745"/>
         <source>Upgrade Required</source>
         <translation>要求升级</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="535"/>
-        <location filename="../../qml/views/MainWindow.qml" line="589"/>
+        <location filename="../../qml/views/MainWindow.qml" line="536"/>
+        <location filename="../../qml/views/MainWindow.qml" line="603"/>
         <source>Disconnected</source>
         <translation>未连接</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="536"/>
-        <location filename="../../qml/views/MainWindow.qml" line="590"/>
+        <location filename="../../qml/views/MainWindow.qml" line="537"/>
+        <location filename="../../qml/views/MainWindow.qml" line="604"/>
         <source>Connecting</source>
         <translation>连接中</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="537"/>
-        <location filename="../../qml/views/MainWindow.qml" line="591"/>
+        <location filename="../../qml/views/MainWindow.qml" line="538"/>
+        <location filename="../../qml/views/MainWindow.qml" line="605"/>
         <source>Connected</source>
         <translation>已连接</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="538"/>
-        <location filename="../../qml/views/MainWindow.qml" line="592"/>
+        <location filename="../../qml/views/MainWindow.qml" line="539"/>
+        <location filename="../../qml/views/MainWindow.qml" line="606"/>
         <source>Connection Failed</source>
         <translation>连接失败</translation>
     </message>
     <message>
-        <location filename="../../qml/views/MainWindow.qml" line="539"/>
-        <location filename="../../qml/views/MainWindow.qml" line="593"/>
+        <location filename="../../qml/views/MainWindow.qml" line="540"/>
+        <location filename="../../qml/views/MainWindow.qml" line="607"/>
         <source>Reconnecting</source>
         <translation>重连中</translation>
     </message>
@@ -749,7 +739,7 @@
 <context>
     <name>RemoteTab</name>
     <message>
-        <location filename="../../qml/quickdeskcomponent/RemoteTab.qml" line="110"/>
+        <location filename="../../qml/quickdeskcomponent/RemoteTab.qml" line="138"/>
         <source>Connecting...</source>
         <translation>连接中...</translation>
     </message>
@@ -865,143 +855,153 @@
         <translation>服务器URL已更新。重启后生效。</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="312"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="317"/>
         <source>TURN/STUN Servers</source>
         <translation>TURN/STUN 服务器</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="348"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="352"/>
         <source>TURN Server</source>
         <translation>TURN 服务器</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="348"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="352"/>
         <source>STUN Server</source>
         <translation>STUN 服务器</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="368"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="372"/>
         <source>No custom servers configured</source>
         <translation>未配置自定义服务器</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="384"/>
-        <location filename="../../qml/pages/SettingsPage.qml" line="415"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="387"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="418"/>
         <source>Add TURN Server</source>
         <translation>添加 TURN 服务器</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="393"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="396"/>
         <source>turn:your-server.com:3478</source>
         <translation>turn:your-server.com:3478</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="403"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="406"/>
         <source>Username</source>
         <translation>用户名</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="409"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="412"/>
         <source>Password</source>
         <translation>密码</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="431"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="434"/>
         <source>TURN server added. Restart to apply changes.</source>
         <translation>TURN 服务器已添加。重启后生效。</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="433"/>
-        <location filename="../../qml/pages/SettingsPage.qml" line="471"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="436"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="473"/>
         <source>Invalid server URL format</source>
         <translation>服务器URL格式无效</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="447"/>
-        <location filename="../../qml/pages/SettingsPage.qml" line="460"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="449"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="462"/>
         <source>Add STUN Server</source>
         <translation>添加 STUN 服务器</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="456"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="458"/>
         <source>stun:stun.l.google.com:19302</source>
         <translation>stun:stun.l.google.com:19302</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="469"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="471"/>
         <source>STUN server added. Restart to apply changes.</source>
         <translation>STUN 服务器已添加。重启后生效。</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="483"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="486"/>
         <source>Application</source>
         <translation>应用</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="501"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="504"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="529"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="532"/>
         <source>Language updated. Restart to apply changes.</source>
         <translation>语言已更新。请重新启动以应用更改。</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="555"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="558"/>
         <source>Video Codec</source>
         <translation>视频编码</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="561"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="564"/>
         <source>Preferred video codec for remote connections</source>
         <translation>远程连接的首选视频编解码器</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="587"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="590"/>
         <source>Video codec updated. Effective on next connection.</source>
         <translation>视频编解码器已更新，下次连接时生效。</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="609"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="612"/>
         <source>Theme</source>
         <translation>主题</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="617"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="620"/>
         <source>Light</source>
         <translation>浅色</translation>
     </message>
     <message>
-        <location filename="../../qml/pages/SettingsPage.qml" line="617"/>
+        <location filename="../../qml/pages/SettingsPage.qml" line="620"/>
         <source>Dark</source>
         <translation>深色</translation>
+    </message>
+    <message>
+        <location filename="../../qml/pages/SettingsPage.qml" line="647"/>
+        <source>Launch at Startup</source>
+        <translation>开机自启</translation>
+    </message>
+    <message>
+        <location filename="../../qml/pages/SettingsPage.qml" line="653"/>
+        <source>Automatically start the application when you log in</source>
+        <translation>当你登录的时候自动启动软件</translation>
     </message>
 </context>
 <context>
     <name>quickdesk::ClientManager</name>
     <message>
-        <location filename="../../src/manager/ClientManager.cpp" line="757"/>
+        <location filename="../../src/manager/ClientManager.cpp" line="759"/>
         <source>Authentication failed</source>
         <translation>认证失败</translation>
     </message>
     <message>
-        <location filename="../../src/manager/ClientManager.cpp" line="758"/>
+        <location filename="../../src/manager/ClientManager.cpp" line="760"/>
         <source>Channel error</source>
         <translation>通道错误</translation>
     </message>
     <message>
-        <location filename="../../src/manager/ClientManager.cpp" line="759"/>
+        <location filename="../../src/manager/ClientManager.cpp" line="761"/>
         <source>Connection timeout</source>
         <translation>连接超时</translation>
     </message>
     <message>
-        <location filename="../../src/manager/ClientManager.cpp" line="760"/>
+        <location filename="../../src/manager/ClientManager.cpp" line="762"/>
         <source>Network error</source>
         <translation>网络错误</translation>
     </message>
     <message>
-        <location filename="../../src/manager/ClientManager.cpp" line="761"/>
+        <location filename="../../src/manager/ClientManager.cpp" line="763"/>
         <source>Connection failed (error code: %1)</source>
         <translation>连接失败（错误代码：%1）</translation>
     </message>
@@ -1022,45 +1022,45 @@
 <context>
     <name>quickdesk::MainController</name>
     <message>
-        <location filename="../../src/controller/MainController.cpp" line="286"/>
+        <location filename="../../src/controller/MainController.cpp" line="301"/>
         <source>Device ID: %1
 Access Code: %2</source>
         <translation>设备ID：%1
 访问码：%2</translation>
     </message>
     <message>
-        <location filename="../../src/controller/MainController.cpp" line="363"/>
+        <location filename="../../src/controller/MainController.cpp" line="378"/>
         <source>Connected</source>
         <translation>已连接</translation>
     </message>
     <message>
-        <location filename="../../src/controller/MainController.cpp" line="365"/>
+        <location filename="../../src/controller/MainController.cpp" line="380"/>
         <source>Connecting...</source>
         <translation>连接中...</translation>
     </message>
     <message>
-        <location filename="../../src/controller/MainController.cpp" line="367"/>
+        <location filename="../../src/controller/MainController.cpp" line="382"/>
         <source>Disconnected</source>
         <translation>未连接</translation>
     </message>
     <message>
-        <location filename="../../src/controller/MainController.cpp" line="369"/>
+        <location filename="../../src/controller/MainController.cpp" line="384"/>
         <source>Connection failed</source>
         <translation>连接失败</translation>
     </message>
     <message>
-        <location filename="../../src/controller/MainController.cpp" line="375"/>
+        <location filename="../../src/controller/MainController.cpp" line="390"/>
         <source>Reconnecting (attempt %1)</source>
         <translation>重连中（第 %1 次尝试）</translation>
     </message>
     <message>
-        <location filename="../../src/controller/MainController.cpp" line="377"/>
+        <location filename="../../src/controller/MainController.cpp" line="392"/>
         <source>, retry in %1s</source>
         <translation>，%1秒后重试</translation>
     </message>
     <message>
-        <location filename="../../src/controller/MainController.cpp" line="407"/>
-        <location filename="../../src/controller/MainController.cpp" line="411"/>
+        <location filename="../../src/controller/MainController.cpp" line="427"/>
+        <location filename="../../src/controller/MainController.cpp" line="431"/>
         <source>Never</source>
         <translation>从不</translation>
     </message>
@@ -1083,15 +1083,15 @@ Access Code: %2</source>
     <message>
         <location filename="../../src/component/SystemTrayManager.cpp" line="38"/>
         <source>Quit</source>
-        <translation>Quit</translation>
+        <translation>退出</translation>
     </message>
     <message>
-        <location filename="../../src/component/SystemTrayManager.cpp" line="67"/>
+        <location filename="../../src/component/SystemTrayManager.cpp" line="66"/>
         <source>QuickDesk</source>
         <translation>QuickDesk</translation>
     </message>
     <message>
-        <location filename="../../src/component/SystemTrayManager.cpp" line="68"/>
+        <location filename="../../src/component/SystemTrayManager.cpp" line="67"/>
         <source>QuickDesk is still running in the background.</source>
         <translation>QuickDesk始终在后台运行。</translation>
     </message>
