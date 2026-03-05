@@ -787,8 +787,8 @@ void ProcessManager::connectToHostServiceAsync()
         [this]() {
             if (m_serviceConnecting) return;
             LOG_INFO("Disconnected from host service pipe");
-            cleanupServiceConnection();
             emit hostProcessStopped(0);
+            cleanupServiceConnection();
 
             if (m_hostStoppingIntentionally) {
                 m_hostStoppingIntentionally = false;

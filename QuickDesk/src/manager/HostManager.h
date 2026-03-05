@@ -5,6 +5,7 @@
 #define QUICKDESK_MANAGER_HOSTMANAGER_H
 
 #include <QObject>
+#include <QPointer>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QList>
@@ -109,7 +110,7 @@ private slots:
     void onMessagingError(const QString& error);
 
 private:
-    NativeMessaging* m_messaging = nullptr;
+    QPointer<NativeMessaging> m_messaging;
     QString m_deviceId;
     QString m_accessCode;
     bool m_isConnected = false;
