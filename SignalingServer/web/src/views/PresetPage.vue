@@ -14,7 +14,7 @@
           <el-input
             v-model="form.minVersion"
             placeholder="留空表示不限制，例如 1.0.0"
-            style="max-width: 300px"
+            style="width: 100%; max-width: 300px"
             clearable
           />
           <div class="form-tip">低于此版本的客户端将被强制要求升级</div>
@@ -37,6 +37,7 @@
                 type="textarea"
                 :rows="3"
                 placeholder="支持 HTML，如：维护通知 <a href='https://...'>查看详情</a>"
+                style="width: 100%"
               />
             </el-form-item>
           </el-tab-pane>
@@ -47,6 +48,7 @@
                 type="textarea"
                 :rows="3"
                 placeholder="Supports HTML, e.g.: Maintenance <a href='https://...'>Details</a>"
+                style="width: 100%"
               />
             </el-form-item>
           </el-tab-pane>
@@ -174,11 +176,14 @@ onMounted(loadPreset)
 
 <style scoped>
 .preset-page {
-  max-width: 900px;
+  width: 100%;
+  padding: 0 16px;
+  box-sizing: border-box;
 }
 
 .section-card {
   margin-bottom: 20px;
+  width: 100%;
 }
 
 .card-header {
@@ -186,6 +191,7 @@ onMounted(loadPreset)
   align-items: center;
   gap: 8px;
   font-weight: 600;
+  flex-wrap: wrap;
 }
 
 .form-tip {
@@ -199,11 +205,29 @@ onMounted(loadPreset)
   align-items: center;
   gap: 12px;
   padding: 16px 0;
+  flex-wrap: wrap;
 }
 
 .last-updated {
   color: #909399;
   font-size: 13px;
   margin-left: auto;
+}
+
+@media (max-width: 768px) {
+  .preset-page {
+    padding: 0 12px;
+  }
+
+  .action-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .last-updated {
+    margin-left: 0;
+    font-size: 12px;
+  }
 }
 </style>
