@@ -148,6 +148,7 @@ class RemoteDesktopApp {
 
         switch (newState) {
             case SessionState.CONNECTED:
+                this._connectedAt = Date.now();
                 this._setConnectionState('connected', '已连接');
                 if (this.floatingToolbar) this.floatingToolbar.setVisible(true);
                 if (this.videoStats) this.videoStats.setPeerConnection(this.session.pc);
@@ -164,11 +165,28 @@ class RemoteDesktopApp {
                 break;
             case SessionState.FAILED:
                 this._setConnectionState('failed', '连接失败');
+                this._recordConnection('failed');
                 break;
             case SessionState.CLOSED:
                 this._setConnectionState('failed', '连接已关闭');
+                this._recordConnection('success');
                 break;
         }
+    }
+
+    async _recordConnection(status) {
+        const token = localStorage.getItem('quickdesk_token');
+        const deviceId = this.session?.deviceId;
+        if (!token || !deviceId) return;
+        const duration = this._connectedAt ? Math.floor((Date.now() - this._connectedAt) / 1000) : 0;
+        this._connectedAt = null;
+        try {
+            await fetch('/api/v1/user/devices/record', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ device_id: deviceId, duration, status }),
+            });
+        } catch (e) { /* best-effort, do not disrupt session UI */ }
     }
 
     _onTrack(detail) {

@@ -102,8 +102,7 @@ func main() {
 		v1.GET("/settings", settingsHandler.GetSettings)
 
 		// User authentication (public, no API key required)
-		userAuth := handler.NewUserAuth(db)
-		go userAuth.CleanupLoop()
+		userAuth := handler.NewUserAuth(db, redisClient)
 		v1.POST("/user/register", userAuth.Register)
 		v1.POST("/user/login", userAuth.Login)
 
@@ -133,7 +132,7 @@ func main() {
 		}
 
 		// Admin authentication
-		adminAuth := middleware.NewAdminAuth(adminUserService)
+		adminAuth := middleware.NewAdminAuth(adminUserService, redisClient)
 		v1.POST("/admin/login", adminAuth.Login)
 
 		// Admin API (requires admin token, no API key needed)

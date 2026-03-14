@@ -4,31 +4,30 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"quickdesk/signaling/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
+
+const adminTokenTTL = 24 * time.Hour
 
 type AdminAuth struct {
 	service *service.AdminUserService
-	mu      sync.RWMutex
-	tokens  map[string]time.Time // token -> expiry
+	rdb     *redis.Client
 }
 
-const tokenTTL = 24 * time.Hour
+func NewAdminAuth(adminUserService *service.AdminUserService, rdb *redis.Client) *AdminAuth {
+	return &AdminAuth{service: adminUserService, rdb: rdb}
+}
 
-func NewAdminAuth(adminUserService *service.AdminUserService) *AdminAuth {
-	a := &AdminAuth{
-		service: adminUserService,
-		tokens:  make(map[string]time.Time),
-	}
-	go a.cleanupLoop()
-	return a
+func (a *AdminAuth) redisKey(token string) string {
+	return fmt.Sprintf("admin_token:%s", token)
 }
 
 func (a *AdminAuth) Login(c *gin.Context) {
@@ -48,9 +47,10 @@ func (a *AdminAuth) Login(c *gin.Context) {
 	}
 
 	token := generateToken()
-	a.mu.Lock()
-	a.tokens[token] = time.Now().Add(tokenTTL)
-	a.mu.Unlock()
+	if err := a.rdb.Set(context.Background(), a.redisKey(token), user.Username, adminTokenTTL).Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "session 存储失败"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
@@ -75,31 +75,12 @@ func (a *AdminAuth) AuthRequired() gin.HandlerFunc {
 			return
 		}
 
-		a.mu.RLock()
-		expiry, ok := a.tokens[token]
-		a.mu.RUnlock()
-
-		if !ok || time.Now().After(expiry) {
+		if err := a.rdb.Exists(context.Background(), a.redisKey(token)).Err(); err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token expired"})
 			return
 		}
 
 		c.Next()
-	}
-}
-
-func (a *AdminAuth) cleanupLoop() {
-	ticker := time.NewTicker(time.Hour)
-	defer ticker.Stop()
-	for range ticker.C {
-		a.mu.Lock()
-		now := time.Now()
-		for t, exp := range a.tokens {
-			if now.After(exp) {
-				delete(a.tokens, t)
-			}
-		}
-		a.mu.Unlock()
 	}
 }
 

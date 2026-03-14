@@ -80,7 +80,7 @@ func (h *UserDeviceHandler) BindDevice(c *gin.Context) {
 		return
 	}
 
-	h.db.Model(&models.User{}).Where("id = ?", authedUserID).Update("device_count", gorm.Expr("device_count + 1"))
+	recomputeDeviceCount(h.db, authedUserID)
 	h.logConnection(authedUserID, req.DeviceID, deviceName, "success", "", c.ClientIP())
 
 	c.JSON(http.StatusOK, gin.H{"message": "设备绑定成功", "binding": binding})
@@ -106,7 +106,7 @@ func (h *UserDeviceHandler) UnbindDevice(c *gin.Context) {
 
 	binding.Status = false
 	h.db.Save(&binding)
-	h.db.Model(&models.User{}).Where("id = ?", authedUserID).Update("device_count", gorm.Expr("device_count - 1"))
+	recomputeDeviceCount(h.db, authedUserID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "设备解绑成功"})
 }
@@ -218,7 +218,15 @@ func (h *UserDeviceHandler) RecordConnection(c *gin.Context) {
 	userIDVal, _ := c.Get("authed_user_id")
 	authedUserID := userIDVal.(uint)
 
-	h.logConnection(authedUserID, req.DeviceID, "", req.Status, req.ErrorMsg, c.ClientIP())
+	entry := models.ConnectionHistory{
+		UserID:    authedUserID,
+		DeviceID:  req.DeviceID,
+		ConnectIP: c.ClientIP(),
+		Status:    req.Status,
+		ErrorMsg:  req.ErrorMsg,
+		Duration:  req.Duration,
+	}
+	h.db.Create(&entry)
 
 	if req.Status == "success" {
 		h.db.Model(&models.UserDevice{}).
@@ -240,6 +248,13 @@ func (h *UserDeviceHandler) GetAllBindings(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"bindings": bindings, "count": len(bindings)})
+}
+
+// recomputeDeviceCount recalculates the user's device_count from the actual user_devices table.
+func recomputeDeviceCount(db *gorm.DB, userID uint) {
+	var count int64
+	db.Model(&models.UserDevice{}).Where("user_id = ? AND status = ?", userID, true).Count(&count)
+	db.Model(&models.User{}).Where("id = ?", userID).Update("device_count", count)
 }
 
 // logConnection persists a connection event to connection_histories.

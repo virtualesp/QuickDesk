@@ -1,14 +1,17 @@
 package handler
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"quickdesk/signaling/internal/models"
-	"sync"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -204,49 +207,33 @@ func (h *UserHandler) UpdateUserDeviceCount(c *gin.Context) {
 }
 
 // ---------------------------------------------------------------------------
-// UserAuth: in-memory token-based authentication for end-users (7-day TTL).
+// UserAuth: Redis-backed token authentication for end-users (7-day TTL).
 // ---------------------------------------------------------------------------
 
 const userTokenTTL = 7 * 24 * time.Hour
 
-// UserAuth manages user session tokens in memory.
+// UserAuth manages user session tokens in Redis.
 type UserAuth struct {
-	db         *gorm.DB
-	mu         sync.RWMutex
-	tokens     map[string]time.Time // token -> expiry
-	tokenUsers map[string]uint      // token -> user_id
+	db  *gorm.DB
+	rdb *redis.Client
 }
 
 // NewUserAuth creates a new UserAuth instance.
-func NewUserAuth(db *gorm.DB) *UserAuth {
-	return &UserAuth{
-		db:         db,
-		tokens:     make(map[string]time.Time),
-		tokenUsers: make(map[string]uint),
-	}
+func NewUserAuth(db *gorm.DB, rdb *redis.Client) *UserAuth {
+	return &UserAuth{db: db, rdb: rdb}
 }
 
-// CleanupLoop removes expired tokens every hour. Run as a goroutine.
-func (a *UserAuth) CleanupLoop() {
-	ticker := time.NewTicker(time.Hour)
-	defer ticker.Stop()
-	for range ticker.C {
-		a.mu.Lock()
-		now := time.Now()
-		for t, exp := range a.tokens {
-			if now.After(exp) {
-				delete(a.tokens, t)
-				delete(a.tokenUsers, t)
-			}
-		}
-		a.mu.Unlock()
-	}
-}
+// CleanupLoop is a no-op kept for API compatibility. Redis TTL handles expiry automatically.
+func (a *UserAuth) CleanupLoop() {}
 
 func (a *UserAuth) generateToken() string {
 	b := make([]byte, 32)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+func (a *UserAuth) redisKey(token string) string {
+	return fmt.Sprintf("user_token:%s", token)
 }
 
 // Register handles POST /api/v1/user/register
@@ -345,10 +332,11 @@ func (a *UserAuth) Login(c *gin.Context) {
 	}
 
 	token := a.generateToken()
-	a.mu.Lock()
-	a.tokens[token] = time.Now().Add(userTokenTTL)
-	a.tokenUsers[token] = user.ID
-	a.mu.Unlock()
+	ctx := context.Background()
+	if err := a.rdb.Set(ctx, a.redisKey(token), user.ID, userTokenTTL).Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "session 存储失败"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
@@ -384,17 +372,15 @@ func (a *UserAuth) AuthRequired() gin.HandlerFunc {
 			return
 		}
 
-		a.mu.RLock()
-		expiry, ok := a.tokens[token]
-		userID := a.tokenUsers[token]
-		a.mu.RUnlock()
-
-		if !ok || time.Now().After(expiry) {
+		ctx := context.Background()
+		val, err := a.rdb.Get(ctx, a.redisKey(token)).Result()
+		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token已过期"})
 			return
 		}
 
-		c.Set("authed_user_id", userID)
+		userID, _ := strconv.ParseUint(val, 10, 64)
+		c.Set("authed_user_id", uint(userID))
 		c.Next()
 	}
 }
@@ -415,12 +401,10 @@ func (a *UserAuth) GetUserIDFromToken(c *gin.Context) uint {
 		return 0
 	}
 
-	a.mu.RLock()
-	userID, ok := a.tokenUsers[token]
-	a.mu.RUnlock()
-
-	if ok {
-		return userID
+	val, err := a.rdb.Get(context.Background(), a.redisKey(token)).Result()
+	if err != nil {
+		return 0
 	}
-	return 0
+	userID, _ := strconv.ParseUint(val, 10, 64)
+	return uint(userID)
 }
