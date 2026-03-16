@@ -6,6 +6,7 @@
 
 #include "OcrEngine.h"
 #include "OcrCache.h"
+#include "UiStateService.h"
 
 #include <QObject>
 #include <QJsonObject>
@@ -65,6 +66,9 @@ private:
     QJsonObject handleGetScreenText(const QJsonObject& params);
     QJsonObject handleFindElement(const QJsonObject& params);
     QJsonObject handleClickText(const QJsonObject& params);
+    QJsonObject handleGetUiState(const QJsonObject& params);
+    QJsonObject handleWaitForText(const QJsonObject& params);
+    QJsonObject handleAssertTextPresent(const QJsonObject& params);
 
     static int keyNameToScanCode(const QString& keyName);
 
@@ -75,6 +79,7 @@ private:
     MainController* m_controller;
     QMap<QString, Handler> m_handlers;
     QMap<QString, QString> m_clipboardCache;  // connectionId -> last received text
+    UiStateService m_uiState;
 };
 
 } // namespace quickdesk

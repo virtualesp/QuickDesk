@@ -46,6 +46,7 @@ set(API_SOURCES
     src/api/SecurityManager.cpp
     src/api/OcrEngine.cpp
     src/api/OcrCache.cpp
+    src/api/UiStateService.cpp
 )
 
 set(API_HEADERS
@@ -54,6 +55,7 @@ set(API_HEADERS
     src/api/SecurityManager.h
     src/api/OcrEngine.h
     src/api/OcrCache.h
+    src/api/UiStateService.h
 )
 
 set(COMMON_HEADERS

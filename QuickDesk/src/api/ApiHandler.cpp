@@ -43,7 +43,8 @@ QString rtcStatusToString(RtcStatus::Status s) {
 
 ApiHandler::ApiHandler(MainController* controller, QObject* parent)
     : QObject(parent)
-    , m_controller(controller) {
+    , m_controller(controller)
+    , m_uiState(controller) {
     registerHandlers();
 
     connect(m_controller->clientManager(), &ClientManager::clipboardReceived,
@@ -155,6 +156,15 @@ void ApiHandler::registerHandlers() {
     };
     m_handlers["clickText"] = [this](const QJsonObject& p) {
         return handleClickText(p);
+    };
+    m_handlers["getUiState"] = [this](const QJsonObject& p) {
+        return handleGetUiState(p);
+    };
+    m_handlers["waitForText"] = [this](const QJsonObject& p) {
+        return handleWaitForText(p);
+    };
+    m_handlers["assertTextPresent"] = [this](const QJsonObject& p) {
+        return handleAssertTextPresent(p);
     };
 }
 
@@ -909,6 +919,81 @@ QJsonObject ApiHandler::handleClickText(const QJsonObject& params) {
     data["x"]            = x;
     data["y"]            = y;
     data["confidence"]   = first["confidence"];
+    return makeResult(data);
+}
+
+// --- UI 状态 ---
+
+QJsonObject ApiHandler::handleGetUiState(const QJsonObject& params) {
+    auto connectionId = params["connectionId"].toString();
+    if (connectionId.isEmpty())
+        return makeError(400, "Missing 'connectionId'");
+
+    UiState state;
+    QString err;
+    if (!m_uiState.getUiState(connectionId, state, err))
+        return makeError(404, err);
+
+    return makeResult(uiStateToJson(state));
+}
+
+QJsonObject ApiHandler::handleWaitForText(const QJsonObject& params) {
+    auto connectionId = params["connectionId"].toString();
+    if (connectionId.isEmpty())
+        return makeError(400, "Missing 'connectionId'");
+
+    auto text = params["text"].toString().trimmed();
+    if (text.isEmpty())
+        return makeError(400, "Missing 'text'");
+
+    bool exact      = params["exact"].toBool(false);
+    bool ignoreCase = params["ignoreCase"].toBool(true);
+    int  timeoutMs  = params["timeoutMs"].toInt(5000);
+
+    OcrTextBlock found;
+    QString err;
+    bool ok = m_uiState.waitForText(connectionId, text, exact, ignoreCase,
+                                    timeoutMs, found, err);
+
+    QJsonObject data;
+    data["connectionId"] = connectionId;
+    data["query"]        = text;
+    data["found"]        = ok;
+    if (ok) {
+        data["match"] = ocrBlockToJson(found);
+    } else if (!err.isEmpty()) {
+        return makeError(500, err);
+    }
+    return makeResult(data);
+}
+
+QJsonObject ApiHandler::handleAssertTextPresent(const QJsonObject& params) {
+    auto connectionId = params["connectionId"].toString();
+    if (connectionId.isEmpty())
+        return makeError(400, "Missing 'connectionId'");
+
+    auto text = params["text"].toString().trimmed();
+    if (text.isEmpty())
+        return makeError(400, "Missing 'text'");
+
+    bool exact      = params["exact"].toBool(false);
+    bool ignoreCase = params["ignoreCase"].toBool(true);
+
+    OcrTextBlock found;
+    QString err;
+    bool ok = m_uiState.assertTextPresent(connectionId, text, exact, ignoreCase,
+                                          found, err);
+
+    if (!err.isEmpty())
+        return makeError(503, err);  // OCR/frame error
+
+    QJsonObject data;
+    data["connectionId"] = connectionId;
+    data["query"]        = text;
+    data["present"]      = ok;
+    if (ok) {
+        data["match"] = ocrBlockToJson(found);
+    }
     return makeResult(data);
 }
 

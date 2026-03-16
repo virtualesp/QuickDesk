@@ -198,6 +198,9 @@ quickdesk-mcp [--ws-url ws://127.0.0.1:9600] [--token YOUR_TOKEN]
 | `get_screen_text` | 对当前远程桌面帧执行 OCR（PP-OCRv4）。返回所有识别到的文字块，含边界框、中心坐标和置信度。结果按帧哈希缓存——对同一帧多次调用无额外开销。 |
 | `find_element` | 通过可见文字查找 UI 元素。返回所有匹配的文字块及其边界框和中心坐标。支持部分匹配（默认）和精确匹配。 |
 | `click_text` | 在远程桌面上查找文字并一步点击。等价于 `find_element` + 在文字中心执行 `mouse_click`。若有多个匹配，点击第一个。 |
+| `get_ui_state` | 获取聚合 UI 状态快照：屏幕分辨率 + OCR 文本块 + 活动窗口标题，一次调用全部返回。相比截图大幅减少 Token 消耗，适合文字导航场景。 |
+| `wait_for_text` | 阻塞等待指定文字出现在屏幕上，或直到超时。内部自动轮询 OCR，无需循环截图。 |
+| `assert_text_present` | 立即断言指定文字是否在屏幕上。不等待，直接返回当前状态。若需等待请使用 `wait_for_text`。 |
 
 #### `get_screen_text`
 
@@ -239,6 +242,58 @@ quickdesk-mcp [--ws-url ws://127.0.0.1:9600] [--token YOUR_TOKEN]
 
 **返回：** `{ success, clickedText, x, y, confidence }`，文字未找到时返回 `{ success: false, error }`。
 
+#### `get_ui_state`
+
+一次调用返回屏幕分辨率、OCR 文本块和活动窗口标题的聚合快照。比 `screenshot` 更高效——无图像编码和视觉模型推理开销。
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `connection_id` | string | ✅ | — | 远程桌面的连接 ID |
+
+**返回：**
+
+```json
+{
+  "connectionId": "conn_1",
+  "screen": { "width": 1920, "height": 1080 },
+  "ocr": {
+    "blocks": [ ... ],
+    "frameHash": "...",
+    "fromCache": true
+  },
+  "activeWindow": { "title": "无标题 - 记事本" }
+}
+```
+
+`ocr.blocks` 包含所有识别到的文字块（结构与 `get_screen_text` 相同）。`fromCache` 为 true 表示命中帧缓存，无额外计算开销。
+
+#### `wait_for_text`
+
+阻塞等待指定文字出现在屏幕上，或超时返回。内部自动轮询 OCR，无需外部循环截图。
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `connection_id` | string | ✅ | — | 远程桌面的连接 ID |
+| `text` | string | ✅ | — | 要等待的文字（默认支持部分匹配） |
+| `exact` | boolean | — | `false` | 为 true 时要求精确匹配 |
+| `ignore_case` | boolean | — | `true` | 是否忽略大小写 |
+| `timeout_ms` | integer | — | `5000` | 最大等待时间（毫秒） |
+
+**返回：** 找到时返回 `{ found: true, match: { text, bbox, center, confidence }, query, connectionId }`，超时则返回错误字符串。
+
+#### `assert_text_present`
+
+立即断言指定文字是否在屏幕上，不等待，直接返回当前状态。
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `connection_id` | string | ✅ | — | 远程桌面的连接 ID |
+| `text` | string | ✅ | — | 要断言的文字（默认支持部分匹配） |
+| `exact` | boolean | — | `false` | 为 true 时要求精确匹配 |
+| `ignore_case` | boolean | — | `true` | 是否忽略大小写 |
+
+**返回：** 找到时返回 `{ present: true, match: { text, bbox, center, confidence }, query, connectionId }`，未找到时返回 `{ present: false, query, connectionId }`。
+
 ### 基于 OCR 的屏幕理解
 
 相比截图后交给视觉模型分析，这些工具在本地直接对原始视频帧执行 OCR（PP-OCRv4）——无 JPEG 压缩损耗、响应即时，且按帧哈希自动缓存。
@@ -251,7 +306,9 @@ quickdesk-mcp [--ws-url ws://127.0.0.1:9600] [--token YOUR_TOKEN]
 | 通过标签点击按钮 | `click_text` |
 | 理解整体 UI 布局 | `screenshot` → 视觉模型 |
 | 在屏幕上查找特定词语 | `find_element` |
-| 验证操作后文字是否出现 | `get_screen_text`（缓存，极快） |
+| 验证操作后文字是否出现 | `assert_text_present`（立即） |
+| 等待某个结果出现 | `wait_for_text`（阻塞等待） |
+| 获取屏幕状态（无需截图） | `get_ui_state`（分辨率 + OCR + 窗口标题） |
 
 #### 使用模式：通过标签点击按钮
 
@@ -281,6 +338,33 @@ keyboard_hotkey(keys=["ctrl", "s"])            → 保存文件
 elements = find_element(connection_id=conn_id, text="已保存")
 if elements.found:
     → 文件保存成功
+```
+
+#### 使用模式：获取 UI 状态（无需截图）
+
+```
+state = get_ui_state(connection_id=conn_id)
+    → state.screen.width / state.screen.height  — 屏幕分辨率
+    → state.ocr.blocks                          — 所有可见文字 + 坐标
+    → state.activeWindow.title                  — 当前前台窗口标题
+```
+
+#### 使用模式：等待操作结果出现
+
+```
+keyboard_type(text="apt install nginx")
+keyboard_hotkey(keys=["enter"])
+wait_for_text(connection_id=conn_id, text="done", timeout_ms=60000)
+    → 阻塞，直到终端出现 "done"，或 60 秒超时
+```
+
+#### 使用模式：前置条件检查
+
+```
+// 点击"删除"前，先断言确认对话框已显示
+assert_text_present(connection_id=conn_id, text="确认删除")
+    → present=true：安全，继续点击"确定"
+    → present=false：异常状态，终止操作
 ```
 
 | 工具 | 说明 |

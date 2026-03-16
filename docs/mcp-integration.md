@@ -198,6 +198,9 @@ Once configured, your AI agent can use QuickDesk tools directly. Example convers
 | `get_screen_text` | Run OCR (PP-OCRv4) on the current remote desktop frame. Returns all recognized text blocks with bounding boxes, center coordinates, and confidence scores. Results are cached by frame hash — calling this multiple times on the same frame is free. |
 | `find_element` | Find a UI element by its visible text using OCR. Returns all matching text blocks with bounding boxes and center coordinates. Supports partial match (default) and exact match. |
 | `click_text` | Find text on the remote desktop and click it in one step. Equivalent to `find_element` + `mouse_click` at the text center. If multiple matches exist, clicks the first one. |
+| `get_ui_state` | Get a unified UI state snapshot: screen resolution, OCR text blocks, and active window title. Returns structured data instead of a raw image, reducing token cost and enabling reliable text-based navigation. Use this as a lightweight alternative to `screenshot` when you need to understand what is on screen without visual analysis. |
+| `wait_for_text` | Block until the specified text appears on the remote desktop screen, or until the timeout expires. Returns `found=true` with the matching text block when the text appears. Prefer this over polling with `screenshot` in a loop. |
+| `assert_text_present` | Assert that the specified text is currently visible on the remote desktop screen. Returns `present=true` with the matching text block if found, or `present=false` if not found. Returns immediately without polling — use `wait_for_text` if you need to wait. |
 
 #### `get_screen_text`
 
@@ -239,6 +242,58 @@ Each block in `blocks`:
 
 **Returns:** `{ success, clickedText, x, y, confidence }` or `{ success: false, error }` if text not found.
 
+#### `get_ui_state`
+
+Get a unified UI state snapshot combining screen resolution, OCR text blocks, and active window title in a single call. More efficient than `screenshot` for text-based navigation since it avoids image encoding and AI vision processing overhead.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `connection_id` | string | ✅ | — | Connection ID of the remote desktop |
+
+**Returns:**
+
+```json
+{
+  "connectionId": "conn_1",
+  "screen": { "width": 1920, "height": 1080 },
+  "ocr": {
+    "blocks": [ ... ],
+    "frameHash": "...",
+    "fromCache": true
+  },
+  "activeWindow": { "title": "Untitled - Notepad" }
+}
+```
+
+The `ocr.blocks` array contains every recognised text block with its coordinates (same structure as `get_screen_text`). `fromCache` indicates whether the OCR result came from the frame cache (no extra compute cost).
+
+#### `wait_for_text`
+
+Block until the specified text appears on screen or the timeout elapses. Polls OCR internally — no need to call `screenshot` in a loop.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `connection_id` | string | ✅ | — | Connection ID of the remote desktop |
+| `text` | string | ✅ | — | Text to wait for (supports partial match by default) |
+| `exact` | boolean | — | `false` | If true, require exact text match |
+| `ignore_case` | boolean | — | `true` | Case-insensitive matching |
+| `timeout_ms` | integer | — | `5000` | Maximum wait time in milliseconds |
+
+**Returns:** `{ found: true, match: { text, bbox, center, confidence }, query, connectionId }` on success, or an error string on timeout.
+
+#### `assert_text_present`
+
+Immediately check if the specified text is currently visible on screen. Does not wait — returns the current state at call time.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `connection_id` | string | ✅ | — | Connection ID of the remote desktop |
+| `text` | string | ✅ | — | Text to assert is present (supports partial match by default) |
+| `exact` | boolean | — | `false` | If true, require exact text match |
+| `ignore_case` | boolean | — | `true` | Case-insensitive matching |
+
+**Returns:** `{ present: true, match: { text, bbox, center, confidence }, query, connectionId }` if found, or `{ present: false, query, connectionId }` if not found.
+
 ### OCR-Based Screen Intelligence
 
 Instead of analyzing screenshots with a vision model, these tools run on-device OCR (PP-OCRv4) directly on the raw video frame — no JPEG degradation, instant results, and cached by frame hash.
@@ -251,7 +306,9 @@ Instead of analyzing screenshots with a vision model, these tools run on-device 
 | Clicking a button by its label | `click_text` |
 | Understanding overall UI layout | `screenshot` → vision model |
 | Finding a specific word on screen | `find_element` |
-| Verifying text appeared after an action | `get_screen_text` (cached, fast re-check) |
+| Verifying text appeared after an action | `assert_text_present` (instant) |
+| Waiting for a result to appear | `wait_for_text` (blocks until found) |
+| Getting screen state without a screenshot | `get_ui_state` (resolution + OCR + window title) |
 
 #### Usage Pattern: Click a Button by Label
 
@@ -281,6 +338,33 @@ keyboard_hotkey(keys=["ctrl", "s"])          → save the file
 elements = find_element(connection_id=conn_id, text="Saved")
 if elements.found:
     → file was saved successfully
+```
+
+#### Usage Pattern: Get UI State Without Screenshot
+
+```
+state = get_ui_state(connection_id=conn_id)
+    → state.screen.width / state.screen.height  — resolution
+    → state.ocr.blocks                          — all visible text + coordinates
+    → state.activeWindow.title                  — current foreground window
+```
+
+#### Usage Pattern: Wait for a Result to Appear
+
+```
+keyboard_type(text="apt install nginx")
+keyboard_hotkey(keys=["enter"])
+wait_for_text(connection_id=conn_id, text="done", timeout_ms=60000)
+    → blocks until "done" appears in terminal, or 60s elapses
+```
+
+#### Usage Pattern: Pre-condition Check
+
+```
+// Before clicking "Delete", assert the confirm dialog is showing
+assert_text_present(connection_id=conn_id, text="Are you sure")
+    → present=true: safe to click "OK"
+    → present=false: unexpected state, abort
 ```
 
 | Tool | Description |

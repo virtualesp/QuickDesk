@@ -264,6 +264,40 @@ struct DocumentProcedureArgs {
     connection_id: String,
 }
 
+// ---- UI state param structs ----
+
+#[derive(Deserialize, JsonSchema)]
+struct GetUiStateParam {
+    /// Connection ID of the remote desktop
+    connection_id: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct WaitForTextParam {
+    /// Connection ID of the remote desktop
+    connection_id: String,
+    /// Text to wait for on screen (supports partial match by default)
+    text: String,
+    /// If true, require exact text match. Default: false
+    exact: Option<bool>,
+    /// If true, ignore letter case. Default: true
+    ignore_case: Option<bool>,
+    /// Maximum time to wait in milliseconds (default: 5000)
+    timeout_ms: Option<i64>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct AssertTextPresentParam {
+    /// Connection ID of the remote desktop
+    connection_id: String,
+    /// Text to assert is present on screen (supports partial match by default)
+    text: String,
+    /// If true, require exact text match. Default: false
+    exact: Option<bool>,
+    /// If true, ignore letter case. Default: true
+    ignore_case: Option<bool>,
+}
+
 // ---- MCP Server ----
 
 #[derive(Clone)]
@@ -779,6 +813,66 @@ Prefer this over screenshot→find coordinates→click for text-based UI interac
             req["button"] = json!(btn);
         }
         match self.ws.request("clickText", req).await {
+            Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
+            Err(e) => format!("Error: {e}"),
+        }
+    }
+
+    #[tool(description = "Get a unified UI state snapshot: screen resolution, OCR text blocks, and active window title. \
+Returns structured data instead of a raw image, reducing token cost and enabling reliable text-based navigation. \
+Use this as a lightweight alternative to screenshot when you need to understand what is on screen without visual analysis. \
+The `ocr.blocks` array contains every recognised text block with its coordinates.")]
+    async fn get_ui_state(&self, params: Parameters<GetUiStateParam>) -> String {
+        match self
+            .ws
+            .request("getUiState", json!({ "connectionId": params.0.connection_id }))
+            .await
+        {
+            Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
+            Err(e) => format!("Error: {e}"),
+        }
+    }
+
+    #[tool(description = "Block until the specified text appears on the remote desktop screen, or until the timeout expires. \
+Returns found=true with the matching text block coordinates when the text appears. \
+Use this after performing an action to wait for the expected result (e.g. wait for 'Save successful' after saving a file). \
+Prefer this over polling with screenshot in a loop.")]
+    async fn wait_for_text(&self, params: Parameters<WaitForTextParam>) -> String {
+        let p = params.0;
+        let mut req = json!({
+            "connectionId": p.connection_id,
+            "text": p.text,
+            "timeoutMs": p.timeout_ms.unwrap_or(5000),
+        });
+        if let Some(exact) = p.exact {
+            req["exact"] = json!(exact);
+        }
+        if let Some(ic) = p.ignore_case {
+            req["ignoreCase"] = json!(ic);
+        }
+        match self.ws.request("waitForText", req).await {
+            Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
+            Err(e) => format!("Error: {e}"),
+        }
+    }
+
+    #[tool(description = "Assert that the specified text is currently visible on the remote desktop screen. \
+Returns present=true with the matching text block if found, or present=false if not found. \
+Use this to validate the current screen state before proceeding with the next step. \
+Unlike wait_for_text, this returns immediately without polling.")]
+    async fn assert_text_present(&self, params: Parameters<AssertTextPresentParam>) -> String {
+        let p = params.0;
+        let mut req = json!({
+            "connectionId": p.connection_id,
+            "text": p.text,
+        });
+        if let Some(exact) = p.exact {
+            req["exact"] = json!(exact);
+        }
+        if let Some(ic) = p.ignore_case {
+            req["ignoreCase"] = json!(ic);
+        }
+        match self.ws.request("assertTextPresent", req).await {
             Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
             Err(e) => format!("Error: {e}"),
         }
