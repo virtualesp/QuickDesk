@@ -5,6 +5,8 @@
 #include "infra/log/log.h"
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QPointer>
+#include <QThreadPool>
 #include "infra/env/applicationcontext.h"
 
 namespace quickdesk {
@@ -253,6 +255,51 @@ void WebSocketApiServer::onTextMessageReceived(const QString& message) {
     }
 
     m_security->logAudit(cid, method, params, true);
+
+    // OCR-heavy methods block for 100–300 ms (single recognize) or up to 5 s
+    // (polling loops in waitForText / verifyActionResult).  Running them on the
+    // UI thread would stall the event loop and delay all other WebSocket
+    // messages and screenChanged broadcasts.  Dispatch to the global thread
+    // pool; the underlying services are thread-safe:
+    //   - OcrEngine::recognize()        — mutex-protected singleton
+    //   - OcrCache::get / put           — mutex-protected
+    //   - SharedMemoryManager::readVideoFrame — QSharedMemory::lock() guard
+    //   - getActiveWindowTitle()        — Win32 API, callable from any thread
+    static const QSet<QString> kOcrMethods{
+        "getUiState", "getScreenText", "findElement", "clickText",
+        "assertTextPresent", "assertScreenState", "screenDiffSummary",
+        "waitForText", "verifyActionResult"
+    };
+
+    if (kOcrMethods.contains(method)) {
+        QPointer<WebSocketApiServer> self(this);
+        ApiHandler* handlerPtr = m_handler;   // owned by this, stable for app lifetime
+        QWebSocket* clientPtr  = client;
+        QJsonObject reqCopy    = request;
+
+        QThreadPool::globalInstance()->start([self, handlerPtr, clientPtr, reqCopy]() mutable {
+            auto response = handlerPtr->handleRequest(reqCopy);
+            // self.data() check: QPointer's null test is lock-free and safe to call
+            // from non-UI threads.  If the server was destroyed, skip posting.
+            // If it's alive now, invokeMethod queues the lambda; the inner check
+            // (on the UI thread) handles any intervening destruction.
+            auto* srv = self.data();
+            if (!srv) return;
+            QMetaObject::invokeMethod(srv, [self, clientPtr, reqCopy,
+                                            response = std::move(response)]() mutable {
+                if (!self) return;
+                // Verify client is still connected before sending
+                if (!self->m_clients.contains(clientPtr) &&
+                    !self->m_authenticatedClients.contains(clientPtr)) {
+                    return;
+                }
+                if (reqCopy.contains("id")) response["id"] = reqCopy["id"];
+                clientPtr->sendTextMessage(
+                    QString::fromUtf8(QJsonDocument(response).toJson(QJsonDocument::Compact)));
+            }, Qt::QueuedConnection);
+        });
+        return;
+    }
 
     auto response = m_handler->handleRequest(request);
     if (request.contains("id")) {
