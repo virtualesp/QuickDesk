@@ -7,6 +7,7 @@ use rmcp::transport::streamable_http_server::{
 };
 use tokio::io::AsyncReadExt;
 use tokio_util::sync::CancellationToken;
+use tower_http::cors::{AllowHeaders, AllowMethods, CorsLayer};
 
 use crate::config::AppConfig;
 use crate::server::QuickDeskMcpServer;
@@ -49,6 +50,24 @@ pub async fn start_http(
             axum::routing::get(|| async { "ok" }),
         )
         .nest_service("/mcp", mcp_service);
+
+    // Apply CORS layer when cors_origin is configured
+    let app = if let Some(origins) = &config.cors_origin {
+        let allowed_origins: Vec<axum::http::HeaderValue> = origins
+            .iter()
+            .filter_map(|o| o.parse().ok())
+            .collect();
+
+        let cors = CorsLayer::new()
+            .allow_origin(allowed_origins)
+            .allow_methods(AllowMethods::any())
+            .allow_headers(AllowHeaders::any());
+
+        tracing::info!("CORS enabled for origins: {:?}", origins);
+        app.layer(cors)
+    } else {
+        app.layer(CorsLayer::permissive())
+    };
 
     let bind_addr = format!("{}:{}", config.host, config.port);
     let listener = tokio::net::TcpListener::bind(&bind_addr).await?;

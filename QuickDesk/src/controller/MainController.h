@@ -5,6 +5,7 @@
 #define QUICKDESK_CONTROLLER_MAINCONTROLLER_H
 
 #include <QJsonObject>
+#include <QMutex>
 #include <QObject>
 #include <QProcess>
 #include <QTimer>
@@ -246,6 +247,14 @@ private:
     QString m_mcpTransportMode = QStringLiteral("stdio");
     int m_mcpHttpPort = 18080;
     bool m_isShutdown = false;
+
+    // screenChanged event: per-connection throttle state
+    struct ScreenChangeState {
+        QString lastBroadcastHash;
+        qint64  lastBroadcastMs = 0;
+    };
+    QHash<QString, ScreenChangeState> m_screenChangeState;
+    QMutex m_screenChangeMutex;
 };
 
 } // namespace quickdesk

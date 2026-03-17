@@ -216,7 +216,36 @@ struct GetRecentEventsParam {
     limit: Option<usize>,
 }
 
-// ---- OCR / UI state param structs ----
+#[derive(Deserialize, JsonSchema)]
+struct WaitForScreenChangeParam {
+    /// Connection ID to monitor
+    connection_id: String,
+    /// Maximum time to wait in milliseconds (default: 5000)
+    timeout_ms: Option<u64>,
+}
+
+// ---- Retry param structs ----
+
+#[derive(Deserialize, JsonSchema)]
+struct RetryAttempt {
+    /// Qt WebSocket API method name, e.g. "clickText", "mouseClick"
+    method: String,
+    /// Parameters to pass to the method
+    params: serde_json::Value,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct RetryWithAlternativeParam {
+    /// Connection ID of the remote desktop
+    connection_id: String,
+    /// Ordered list of attempts to try. The first one that passes success_conditions wins.
+    attempts: Vec<RetryAttempt>,
+    /// Conditions checked after each attempt (same format as verify_action_result).
+    /// If omitted, the first attempt that doesn't return an error is considered successful.
+    success_conditions: Option<Vec<VerificationCondition>>,
+    /// Time to poll per attempt in milliseconds (default: 2000)
+    timeout_ms: Option<i32>,
+}
 
 #[derive(Deserialize, JsonSchema)]
 struct GetScreenTextParam {
@@ -808,6 +837,27 @@ Use this instead of screenshot+vision for text-heavy tasks to reduce token cost 
         }
     }
 
+    #[tool(description = "Block until the remote desktop screen content visually changes, or until the timeout expires. \
+Subscribes to the screenChanged event which fires (at most 5×/s) when the frame hash differs from the previous broadcast. \
+Returns changed=true with the new frameHash when a change is detected. \
+Use this to wait for a UI reaction after an action (e.g. after pressing Enter in a terminal, wait for new output) \
+without having to poll with repeated screenshots.")]
+    async fn wait_for_screen_change(&self, params: Parameters<WaitForScreenChangeParam>) -> String {
+        let p = params.0;
+        let timeout = p.timeout_ms.unwrap_or(5000);
+        let filter = json!({ "connectionId": p.connection_id });
+
+        // check_history=false: we want a change AFTER this call, not a past event
+        match self
+            .event_bus
+            .wait_for("screenChanged", Some(&filter), timeout, false)
+            .await
+        {
+            Ok(event) => serde_json::to_string_pretty(&event).unwrap_or_default(),
+            Err(e) => format!("Error: {e}"),
+        }
+    }
+
     #[tool(description = "Find a UI element on the remote desktop by its visible text. \
 Runs OCR on the current screen and returns all blocks that match the search text. \
 Each match includes the bounding box and center coordinates. \
@@ -976,6 +1026,108 @@ before clicking OK). For post-action verification with retries, use verify_actio
         }
     }
 
+    #[tool(description = "Try a list of alternative actions in order, returning the result of the first one \
+that satisfies the success conditions. Use this when an action might fail (e.g. OCR misrecognises a button \
+label) and you want to provide fallback strategies rather than failing the whole task. \
+Each attempt specifies a Qt API method and its params. After each attempt, success_conditions are checked \
+with verify_action_result. The tool stops and returns as soon as one attempt passes. \
+If no attempt succeeds, returns a summary of all failures.")]
+    async fn retry_with_alternative(
+        &self,
+        params: Parameters<RetryWithAlternativeParam>,
+    ) -> String {
+        let p = params.0;
+        let timeout_ms = p.timeout_ms.unwrap_or(2000);
+        let mut results = Vec::new();
+
+        for (i, attempt) in p.attempts.iter().enumerate() {
+            // Inject connectionId into params if not already present
+            let mut req_params = attempt.params.clone();
+            if let Some(obj) = req_params.as_object_mut() {
+                obj.entry("connectionId")
+                    .or_insert_with(|| json!(p.connection_id));
+            }
+
+            // Execute the attempt
+            let action_result = self.ws.request(&attempt.method, req_params).await;
+            let action_ok = action_result.is_ok();
+            let action_value = match action_result {
+                Ok(v) => v,
+                Err(e) => json!({ "error": e }),
+            };
+
+            // If no success_conditions, an error-free response means success
+            if p.success_conditions.is_none() || p.success_conditions.as_ref().unwrap().is_empty() {
+                if action_ok {
+                    return serde_json::to_string_pretty(&json!({
+                        "success": true,
+                        "attemptIndex": i,
+                        "method": attempt.method,
+                        "result": action_value,
+                        "triedAttempts": i + 1,
+                    }))
+                    .unwrap_or_default();
+                }
+                results.push(json!({
+                    "attemptIndex": i,
+                    "method": attempt.method,
+                    "success": false,
+                    "result": action_value,
+                }));
+                continue;
+            }
+
+            // Verify conditions
+            let conditions = p.success_conditions.as_ref().unwrap();
+            let expectations: Vec<serde_json::Value> = conditions.iter().map(|c| {
+                json!({ "type": c.condition_type, "value": c.value })
+            }).collect();
+            let verify_req = json!({
+                "connectionId": p.connection_id,
+                "expectations": expectations,
+                "timeoutMs": timeout_ms,
+            });
+            match self.ws.request("verifyActionResult", verify_req).await {
+                Ok(v) => {
+                    let passed = v.get("allPassed").and_then(|b| b.as_bool()).unwrap_or(false);
+                    results.push(json!({
+                        "attemptIndex": i,
+                        "method": attempt.method,
+                        "success": passed,
+                        "result": action_value,
+                        "verification": v,
+                    }));
+                    if passed {
+                        return serde_json::to_string_pretty(&json!({
+                            "success": true,
+                            "attemptIndex": i,
+                            "method": attempt.method,
+                            "triedAttempts": i + 1,
+                            "attempts": results,
+                        }))
+                        .unwrap_or_default();
+                    }
+                }
+                Err(e) => {
+                    results.push(json!({
+                        "attemptIndex": i,
+                        "method": attempt.method,
+                        "success": false,
+                        "result": action_value,
+                        "verificationError": e,
+                    }));
+                }
+            }
+        }
+
+        serde_json::to_string_pretty(&json!({
+            "success": false,
+            "triedAttempts": p.attempts.len(),
+            "attempts": results,
+        }))
+        .unwrap_or_default()
+    }
+
     #[tool(description = "List all supported event types that can be waited on with wait_for_event. Returns the event type names and their descriptions.")]
     async fn list_event_types(&self) -> String {
         let types = json!([
@@ -1003,6 +1155,11 @@ before clicking OK). For post-action verification with retries, use verify_actio
                 "event": "videoLayoutChanged",
                 "description": "Fired when the remote desktop video resolution changes",
                 "data_fields": ["connectionId", "width", "height"]
+            },
+            {
+                "event": "screenChanged",
+                "description": "Fired when the remote desktop screen content visually changes (at most 5×/s per connection, based on frame hash diff). Use wait_for_screen_change to wait for this event.",
+                "data_fields": ["connectionId", "frameHash", "timestamp"]
             },
             {
                 "event": "hostReady",

@@ -4,6 +4,7 @@
 #include "../manager/ProcessManager.h"
 #include "../manager/NativeMessaging.h"
 #include "../api/WebSocketServer.h"
+#include "../api/OcrEngine.h"
 #include "infra/env/applicationcontext.h"
 #include "infra/log/log.h"
 #include "core/localconfigcenter.h"
@@ -17,6 +18,9 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QMutexLocker>
+#include <QPointer>
+#include <QThreadPool>
 
 namespace quickdesk {
 
@@ -780,6 +784,60 @@ void MainController::setupWebSocketApiEvents() {
             {"connectionId", connectionId},
             {"width", w}, {"height", h}
         });
+    });
+
+    // screenChanged: throttle videoFrameReady → hash-based event.
+    // Strategy: rate-limit check + QImage read on UI thread (fast),
+    // then MD5 hash computation offloaded to Qt global thread pool.
+    connect(m_clientManager.get(), &ClientManager::videoFrameReady,
+            this, [this](const QString& connectionId, int /*frameIndex*/) {
+        // ① Rate-limit: skip if last broadcast for this connection was < 200ms ago
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        {
+            QMutexLocker locker(&m_screenChangeMutex);
+            if (now - m_screenChangeState[connectionId].lastBroadcastMs < 200)
+                return;
+        }
+
+        // ② Read the current frame on UI thread (shared-memory copy, ~1ms)
+        auto* shm = m_clientManager->sharedMemoryManager();
+        if (!shm || !shm->isAttached(connectionId)) return;
+        QImage img = shm->readVideoFrame(connectionId).toImage();
+        if (img.isNull()) return;
+
+        // ③ Offload MD5 computation to thread pool; capture QImage by move
+        QPointer<MainController> self(this);
+        QThreadPool::globalInstance()->start([self, connectionId, img = std::move(img), now]() {
+            if (!self) return;
+
+            const QString hash = OcrEngine::computeFrameHash(img);
+
+            // ④ Back on UI thread: compare hash, broadcast if changed
+            QMetaObject::invokeMethod(self, [self, connectionId, hash, now]() {
+                if (!self) return;
+                QMutexLocker locker(&self->m_screenChangeMutex);
+                auto& state = self->m_screenChangeState[connectionId];
+
+                if (hash == state.lastBroadcastHash) return;   // no visual change
+                if (now - state.lastBroadcastMs < 200) return;  // lost race
+
+                state.lastBroadcastHash = hash;
+                state.lastBroadcastMs   = now;
+
+                self->m_wsApiServer->broadcastEvent("screenChanged", {
+                    {"connectionId", connectionId},
+                    {"frameHash",    hash},
+                    {"timestamp",    now}
+                });
+            }, Qt::QueuedConnection);
+        });
+    }, Qt::QueuedConnection);
+
+    // Clean up per-connection throttle state when a connection is removed
+    connect(m_clientManager.get(), &ClientManager::connectionRemoved,
+            this, [this](const QString& connectionId) {
+        QMutexLocker locker(&m_screenChangeMutex);
+        m_screenChangeState.remove(connectionId);
     });
 
     // Process events → WebSocket broadcast

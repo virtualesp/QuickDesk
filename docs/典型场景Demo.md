@@ -2,244 +2,342 @@
 
 本文档展示 AI Agent 使用 QuickDesk MCP 工具的典型工作流。每个场景展示完整的工具调用序列和预期行为。
 
-## 场景 1：远程服务器健康检查
-
-**目标**：AI Agent 连接远程服务器，执行全面的健康检查。
-
-**Prompt**：使用内置 `server_health_check` 提示词模板。
-
-### 对话示例
-
-> **用户**：检查一下我服务器的健康状态。设备 ID：123456789，访问码：888888。
-
-**AI Agent 工作流**：
-
-```
-步骤 1: connect_device
-  → device_id: "123456789"
-  → access_code: "888888"
-  → show_window: true
-  ← connection_id: "abc123"
-
-步骤 2: screenshot
-  → connection_id: "abc123", max_width: 1280
-  ← [图片：Windows Server 2022 桌面]
-
-步骤 3: get_screen_size
-  → connection_id: "abc123"
-  ← { width: 1920, height: 1080 }
-
-步骤 4: keyboard_hotkey → keys: ["win", "r"]
-  （打开运行对话框）
-
-步骤 5: screenshot → 确认运行对话框已打开
-
-步骤 6: keyboard_type → text: "powershell"
-
-步骤 7: keyboard_hotkey → keys: ["enter"]
-
-步骤 8: screenshot → 确认 PowerShell 已打开
-
-步骤 9-11: 执行 systeminfo，截图捕获输出
-  （AI 读取：Windows Server 2022, 32GB RAM, 28GB 使用中）
-
-步骤 12-14: 执行磁盘检查命令，截图
-  （AI 读取：C: 已用 95%, D: 已用 40%）
-
-步骤 15-17: 执行进程列表命令，截图
-
-步骤 18: disconnect_device → connection_id: "abc123"
-```
-
-**AI 报告**：
-> 服务器健康检查完成：
-> - **操作系统**：Windows Server 2022 Standard
-> - **CPU**：平均负载 45% — 正常
-> - **内存**：28/32 GB 已使用 (87%) — **警告**：内存使用偏高
-> - **磁盘 C:**：已用 95% — **严重**：需要立即清理
-> - **磁盘 D:**：已用 40% — 正常
-> - **最大进程**：sqlservr.exe 占用 12GB 内存
-> - **综合判定**：警告 — C 盘接近满载，建议清理临时文件和旧日志。
+> **模式升级说明**：本文档已更新为 Phase 5A 事件驱动写法，不再依赖重复截图轮询。核心替换规则：
+> - `connect_device` 后 → `wait_for_connection_state`，不截图
+> - 读取屏幕文字 → `get_ui_state` / `get_screen_text`，替代截图+视觉模型
+> - 找元素并点击 → `find_element` + `click_text`，替代截图→坐标→`mouse_click`
+> - 等待 UI 响应 → `wait_for_text` / `wait_for_screen_change`，替代截图轮询
+> - 验证操作结果 → `verify_action_result`，替代截图+人工判断
 
 ---
 
-## 场景 2：批量软件更新
+## 场景 1：AI 修电脑 — 远程故障诊断
 
-**目标**：AI Agent 在 3 台远程设备上安装最新版 Chrome。
+**目标**：连接到一台运行缓慢的 Windows 电脑，诊断根因并给出报告。
 
-**Prompt**：使用内置 `batch_operation` 提示词模板。
+**Prompt**：`diagnose_system_issue`
 
-### 对话示例
+> **用户**：我的工作电脑今天特别卡。设备 ID：999888777，访问码：123456。
 
-> **用户**：在下面 3 台机器上安装最新版 Chrome：
+### 工具调用序列
+
+```
+步骤 1: connect_device
+  → device_id: "999888777", access_code: "123456", show_window: true
+  ← { connectionId: "conn_1" }
+
+步骤 2: wait_for_connection_state          ← 事件驱动，无需截图
+  → connection_id: "conn_1", state: "connected", timeout_ms: 15000
+  ← { event: "connectionStateChanged", data: { state: "connected" } }
+
+步骤 3: get_ui_state                       ← 结构化状态，无需视觉模型
+  → connection_id: "conn_1"
+  ← { screen: {width:1920,height:1080}, activeWindow: {title:"桌面"},
+      ocr: { blocks: [...] } }
+
+步骤 4: keyboard_hotkey                    ← 打开任务管理器
+  → connection_id: "conn_1", keys: ["ctrl","shift","esc"]
+
+步骤 5: wait_for_text                      ← 等待任务管理器出现，不截图
+  → connection_id: "conn_1", text: "任务管理器", timeout_ms: 5000
+  ← { found: true, match: { text: "任务管理器", center: {x:960,y:20} } }
+
+步骤 6: get_ui_state                       ← 通过 OCR 读取 CPU/内存数值
+  ← { ocr: { blocks: [
+       {text:"CPU 92%", ...}, {text:"内存 15.2/16 GB", ...},
+       {text:"磁盘 100%", ...}
+     ]}}
+
+步骤 7: click_text                         ← 按内存排序，无需猜坐标
+  → connection_id: "conn_1", text: "内存"
+  ← { success: true, clickedText: "内存", x: 480, y: 340 }
+
+步骤 8: wait_for_screen_change             ← 等待列表重排完成
+  → connection_id: "conn_1", timeout_ms: 3000
+  ← { event: "screenChanged", data: { frameHash: "a1b2c3..." } }
+
+步骤 9: get_screen_text                    ← OCR 读取进程内存占用
+  ← { blocks: [
+       {text:"chrome.exe"}, {text:"8.3 GB"},
+       {text:"Teams.exe"},   {text:"2.1 GB"},
+       {text:"outlook.exe"}, {text:"1.8 GB"}
+     ]}
+
+步骤 10: click_text → text: "磁盘"
+
+步骤 11: wait_for_screen_change → timeout_ms: 3000
+
+步骤 12: get_screen_text                   ← 读取磁盘占用排行
+  ← { blocks: [
+       {text:"SearchIndexer.exe"}, {text:"100%"},
+       {text:"MsMpEng.exe"},       {text:"50%"}
+     ]}
+
+步骤 13: disconnect_device → connection_id: "conn_1"
+```
+
+**截图次数**：0（旧版工作流需 8 次）
+
+**AI 报告**：
+> 找到三个根本原因：
+> - **内存**：Chrome 占用 8.3 GB（总内存 52%），可能有 40+ 个标签页
+> - **磁盘**：Windows 搜索索引器占 100% 磁盘 I/O，正在爆发索引
+> - **CPU**：Chrome + Teams + Outlook 合计占用 92%
+>
+> 建议：关闭 Chrome 多余标签页、重启 SearchIndexer 服务、重启 Teams。
+
+---
+
+## 场景 2：AI 巡检服务器 — 批量磁盘检查（3 台）
+
+**目标**：依次连接 3 台服务器，检查磁盘用量，生成汇总报告。
+
+**Prompt**：`batch_operation`
+
+> **用户**：检查以下 3 台服务器的磁盘空间：
 > - 服务器 A：ID 111222333，访问码 111111
 > - 服务器 B：ID 444555666，访问码 222222
 > - 服务器 C：ID 777888999，访问码 333333
 
-**AI Agent 工作流**：
+### 工具调用序列（每台重复）
 
 ```
-对每台设备：
+── 服务器 A ──────────────────────────────────────────────
 
-  1. connect_device(show_window=false)  ← 后台模式，不弹窗
-  2. screenshot → 识别操作系统
-  3. 打开终端
-  4. 执行安装命令：
-     Windows: "winget install Google.Chrome --accept-package-agreements"
-     Linux:   "wget ... && sudo dpkg -i ..."
-  5. 等待安装完成，定期截图监控
-  6. 确认安装成功
-  7. disconnect_device
+步骤 1: connect_device
+  → device_id: "111222333", access_code: "111111", show_window: false
+  ← { connectionId: "conn_a" }
+
+步骤 2: wait_for_connection_state
+  → connection_id: "conn_a", state: "connected", timeout_ms: 20000
+  ← 已连接
+
+步骤 3: keyboard_hotkey → keys: ["win","r"]
+
+步骤 4: wait_for_text → text: "运行", timeout_ms: 3000
+
+步骤 5: keyboard_type → text: "powershell"
+
+步骤 6: keyboard_hotkey → keys: ["enter"]
+
+步骤 7: wait_for_text
+  → text: "PS C:\\", timeout_ms: 8000     ← 等待 PS 提示符，不截图轮询
+  ← { found: true }
+
+步骤 8: keyboard_type
+  → text: "Get-PSDrive C,D | Select Name,Used,Free | Format-Table -Auto"
+
+步骤 9: keyboard_hotkey → keys: ["enter"]
+
+步骤 10: wait_for_screen_change            ← 等待命令输出刷新
+  → connection_id: "conn_a", timeout_ms: 10000
+
+步骤 11: get_screen_text                   ← OCR 读取磁盘数值
+  ← { blocks: [
+       {text:"C"}, {text:"95.2 GB"}, {text:"4.1 GB"},
+       {text:"D"}, {text:"200 GB"},  {text:"120 GB"}
+     ]}
+
+步骤 12: verify_action_result              ← 验证确实拿到了数据
+  → expectations: [{"type":"text_present","value":"GB"}]
+  ← { allPassed: true }
+
+步骤 13: disconnect_device → connection_id: "conn_a"
+
+── 服务器 B、C 重复以上流程 ──────────────────────────────
 ```
+
+**每台截图次数**：0（旧版每台需 6+ 次）
 
 **AI 报告**：
 
-| 设备 | ID | 操作系统 | 结果 |
-|------|-----|---------|------|
-| 服务器 A | 111222333 | Windows 11 | ✅ Chrome 125 已安装 |
-| 服务器 B | 444555666 | Windows 10 | ✅ Chrome 125 已安装 |
-| 服务器 C | 777888999 | Ubuntu 22.04 | ✅ Chrome 125 已安装 |
+| 服务器 | ID | C: 剩余 | D: 剩余 | 状态 |
+|--------|-----|--------|--------|------|
+| 服务器 A | 111222333 | 4.1 GB / 99.3 GB | 120 GB / 320 GB | ⚠️ C 盘 96% 满 |
+| 服务器 B | 444555666 | 45 GB / 120 GB | — | ✅ 正常 |
+| 服务器 C | 777888999 | 12 GB / 120 GB | 80 GB / 200 GB | ⚠️ C 盘 90% 满 |
 
-> 批量操作完成：3/3 台设备更新成功。
-
----
-
-## 场景 3：远程故障诊断
-
-**目标**：AI Agent 诊断用户电脑运行缓慢的原因。
-
-**Prompt**：使用内置 `diagnose_system_issue` 提示词模板。
-
-### 对话示例
-
-> **用户**：我的工作电脑今天特别卡。设备 ID：999888777，访问码：123456。
-
-**AI Agent 工作流**：
-
-```
-步骤 1: connect_device → screenshot
-  （看到桌面打开了很多窗口）
-
-步骤 2: keyboard_hotkey(["ctrl", "shift", "esc"])
-  （打开任务管理器）
-
-步骤 3: screenshot
-  （AI 读取：内存 15.2/16 GB，CPU 92%，磁盘 100%）
-
-步骤 4: 点击"内存"列排序 → screenshot
-  （chrome.exe — 8.3 GB, Teams — 2.1 GB, outlook.exe — 1.8 GB）
-
-步骤 5: 点击"磁盘"列排序 → screenshot
-  （SearchIndexer.exe — 100% 磁盘, MsMpEng.exe — 50%）
-```
-
-**AI 响应**：
-> 我找到了问题原因。你的电脑卡顿是因为三个问题：
->
-> 1. **内存**：Chrome 占用 8.3 GB（总内存的 52%），你开了 47 个标签页
-> 2. **磁盘**：Windows 搜索索引器正在以 100% 的速度读写磁盘
-> 3. **CPU**：Chrome + Teams + Outlook 合计占用 92% CPU
->
-> 建议操作：
-> - 关闭不用的 Chrome 标签页（当前 47 个）
-> - 重启 Windows Search 服务，停止索引风暴
-> - 重启 Teams（已知存在内存泄漏问题）
->
-> 需要我执行这些修复操作吗？
+> **需要处理**：服务器 A 和 C 的 C 盘需要清理。
 
 ---
 
-## 场景 4：跨设备文件操作
+## 场景 3：AI 操作老旧 ERP — 无 API 的桌面软件自动化
 
-**目标**：AI 将设备 A 桌面上的报告复制到设备 B 的文档目录。
+**目标**：打开传统桌面 ERP，导航到导出页面，导出月度销售报表。没有开放 API，完全通过 GUI 操作。
 
-**Prompt**：使用内置 `multi_device_workflow` 提示词模板。
+**Prompt**：`operate_remote_desktop`
 
-### 对话示例
+> **用户**：帮我从 ERP 系统里导出 6 月的销售报表。设备 ID: 555444333，访问码: 999111。
 
-> **用户**：把办公电脑（ID: 111111111，访问码: 999999）桌面上的"Q4_Report.xlsx"复制到家里电脑（ID: 222222222，访问码: 888888）的文档目录。
-
-**AI Agent 工作流**：
+### 工具调用序列
 
 ```
-阶段 1：连接两台设备
-  conn_办公 = connect_device("111111111", "999999", show_window=true)
-  conn_家里 = connect_device("222222222", "888888", show_window=true)
+步骤 1: connect_device
+  → device_id: "555444333", access_code: "999111", show_window: true
+  ← { connectionId: "conn_erp" }
 
-阶段 2：在办公电脑上获取文件路径
-  screenshot(conn_办公) → 找到 Q4_Report.xlsx
-  右键 → "复制文件路径"
-  get_clipboard(conn_办公) → "C:\Users\user\Desktop\Q4_Report.xlsx"
+步骤 2: wait_for_connection_state → state: "connected"
 
-阶段 3：传输
-  如果两台电脑在同一网络：
-    PowerShell: Copy-Item '...' '\\home-pc\shared\'
-  如果不在同一网络：
-    利用剪贴板传输文本内容，或建议用户使用云存储中转
+步骤 3: get_ui_state                       ← 了解当前屏幕，不截图
+  ← { activeWindow: {title:"桌面"},
+      ocr: { blocks: [{text:"ERP System"}, ...] } }
 
-阶段 4：验证
-  screenshot(conn_家里) → 导航到文档目录
-  → 确认文件已到达
+步骤 4: find_element → text: "ERP"         ← 定位 ERP 图标
+  ← { found: true, matches: [{text:"ERP System", center:{x:320,y:480}}] }
 
-阶段 5：清理
-  disconnect_device(conn_办公)
-  disconnect_device(conn_家里)
+步骤 5: mouse_double_click → x: 320, y: 480
+
+步骤 6: wait_for_text → text: "登录", timeout_ms: 10000
+
+步骤 7: find_element → text: "用户名"
+  ← { found: true, matches: [{center:{x:460,y:310}}] }
+
+步骤 8: mouse_click → x: 560, y: 310
+
+步骤 9: keyboard_type → text: "admin"
+
+步骤 10: find_element → text: "密码"
+
+步骤 11: mouse_click → x: 560, y: 355
+
+步骤 12: keyboard_type → text: "password123"
+
+步骤 13: click_text → text: "登录", exact: true   ← 一步完成查找+点击
+  ← { success: true, clickedText: "登录", x: 520, y: 400 }
+
+步骤 14: wait_for_text → text: "主菜单", timeout_ms: 15000
+
+步骤 15: click_text → text: "报表"
+
+步骤 16: wait_for_text → text: "销售报表", timeout_ms: 5000
+
+步骤 17: click_text → text: "销售报表"
+
+步骤 18: wait_for_text → text: "导出", timeout_ms: 5000
+
+步骤 19: screen_diff_summary               ← 记录选择月份前的基准状态
+  → from_hash: ""
+  ← { frameHash: "baseline_hash_xxx" }
+
+步骤 20: find_element → text: "月份"
+  ← { found: true, matches: [{center:{x:350,y:280}}] }
+
+步骤 21: mouse_click → x: 430, y: 280     ← 点开月份下拉框
+
+步骤 22: wait_for_text → text: "六月", timeout_ms: 3000
+
+步骤 23: click_text → text: "六月"
+
+步骤 24: screen_diff_summary               ← 验证月份已切换
+  → from_hash: "baseline_hash_xxx"
+  ← { added: [{text:"六月"}], removed: [{text:"本月"}], changed: true }
+
+步骤 25: click_text → text: "导出"
+
+步骤 26: wait_for_text
+  → text: "导出成功", timeout_ms: 30000   ← 等最多 30s，不轮询截图
+  ← { found: true }
+
+步骤 27: verify_action_result              ← 结构化确认
+  → expectations: [{"type":"text_present","value":"导出成功"}]
+  ← { allPassed: true }
+
+步骤 28: get_clipboard → 获取导出文件路径
+  ← { text: "C:\\Reports\\Sales_June_2026.xlsx" }
+
+步骤 29: disconnect_device
+```
+
+**截图次数**：0（旧版需 20+ 次）
+**click_text 替代坐标猜测**：8 处
+
+**AI 总结**：
+> 导出完成。文件已保存至远程机器 `C:\Reports\Sales_June_2026.xlsx`。
+> 共 29 步，已完成登录→导航→月份选择→导出全流程验证。
+
+---
+
+## 场景 4：retry_with_alternative — OCR 识别失败兜底示例
+
+**目标**：演示当 OCR 误识别按钮文字时，用备选策略自动兜底。
+
+```
+# 主策略：精确匹配点击"保存"
+# 备选 1：模糊匹配（应对 OCR 将"保存"识别为"保 存"的情况）
+# 备选 2：键盘快捷键 Ctrl+S（与 UI 状态无关，总是有效）
+
+步骤: retry_with_alternative
+  → connection_id: "conn_1"
+  → attempts: [
+      { method: "clickText",      params: { text: "保存", exact: true } },
+      { method: "clickText",      params: { text: "保存", exact: false } },
+      { method: "keyboardHotkey", params: { keys: ["ctrl","s"] } }
+    ]
+  → success_conditions: [{ type: "text_absent", value: "未保存" }]
+  → timeout_ms: 2000
+  ← {
+      success: true,
+      attemptIndex: 2,           ← Ctrl+S 在前两次 OCR 尝试失败后成功
+      method: "keyboardHotkey",
+      triedAttempts: 3
+    }
 ```
 
 ---
 
-## 场景 5：自动化 SOP 文档生成
+## 场景 5：跨设备文件传输
 
-**目标**：AI 执行操作流程，同时记录每一步生成 SOP 文档。
+**目标**：将办公电脑桌面的报告复制到家里电脑的文档目录。
 
-**Prompt**：使用内置 `document_procedure` 提示词模板。
+**Prompt**：`multi_device_workflow`
 
-### 对话示例
+> **用户**：把办公电脑（111111111 / 999999）桌面的"Q4_Report.xlsx"复制到家里电脑（222222222 / 888888）。
 
-> **用户**：记录一下在生产服务器上重启 Web 服务的操作流程（ID: 333444555，访问码: 777777）。
+```
+步骤 1: connect_device("111111111", "999999", show_window=true) → conn_办公
+步骤 2: wait_for_connection_state → conn_办公, state: "connected"
 
-**AI 生成的 SOP**：
+步骤 3: connect_device("222222222", "888888", show_window=true) → conn_家里
+步骤 4: wait_for_connection_state → conn_家里, state: "connected"
 
-```markdown
-# 操作流程：重启生产服务器 Web 服务
+── 办公电脑 ──────────────────────────────────────────────
 
-## 前提条件
-- 具有生产服务器的远程访问权限
-- 管理员权限
+步骤 5: find_element → conn_办公, text: "Q4_Report"
+  ← { found: true, matches: [{center:{x:150,y:320}}] }
 
-## 操作步骤
+步骤 6: mouse_click → conn_办公, button: "right", x: 150, y: 320
 
-### 步骤 1：打开服务管理器
-**操作**：按 Win+R，输入 "services.msc"，按回车
-**预期结果**：Windows 服务管理控制台打开
-**耗时**：约 3 秒
+步骤 7: wait_for_text → text: "复制", timeout_ms: 2000
 
-### 步骤 2：定位 Web 服务
-**操作**：输入 "W3SVC" 跳转到 World Wide Web Publishing Service
-**预期结果**：服务在列表中高亮显示
+步骤 8: click_text → conn_办公, text: "复制为路径"
 
-### 步骤 3：重启服务
-**操作**：右键 → 重新启动
-**预期结果**：服务先停止后启动（状态变为"正在运行"）
-**⚠️ 注意**：重启期间网站将短暂不可用
+步骤 9: wait_for_clipboard_change → conn_办公, timeout_ms: 3000
+  ← { data: { text: "\"C:\\Users\\user\\Desktop\\Q4_Report.xlsx\"" } }
 
-### 步骤 4：验证服务状态
-**操作**：等待 10 秒，检查状态列
-**预期结果**：状态显示"正在运行"
-**如果失败**：查看事件查看器中的错误日志
+步骤 10: keyboard_hotkey → conn_办公, keys: ["win","r"]
+步骤 11: wait_for_text   → text: "运行", timeout_ms: 3000
+步骤 12: keyboard_type   → text: "powershell"
+步骤 13: keyboard_hotkey → keys: ["enter"]
+步骤 14: wait_for_text   → text: "PS C:\\", timeout_ms: 8000
 
-### 步骤 5：验证网站
-**操作**：打开浏览器 → 访问 https://localhost
-**预期结果**：网站正常加载
+步骤 15: keyboard_type
+  → "Copy-Item 'C:\\Users\\user\\Desktop\\Q4_Report.xlsx' '\\\\home-pc\\shared\\'"
+步骤 16: keyboard_hotkey → keys: ["enter"]
+步骤 17: wait_for_screen_change → conn_办公, timeout_ms: 15000
 
-## 故障排除
-- 服务启动失败：检查事件查看器 → Windows 日志 → 应用程序
-- 网站无法加载：检查 IIS 配置和端口绑定
+── 家里电脑 ──────────────────────────────────────────────
 
-## 总结
-- 总步骤数：5
-- 预计耗时：2 分钟
-- 难度：简单
+步骤 18: keyboard_hotkey → conn_家里, keys: ["win","e"]
+步骤 19: wait_for_text   → conn_家里, text: "文件资源管理器", timeout_ms: 5000
+步骤 20: find_element    → conn_家里, text: "Q4_Report"
+  ← { found: true }
+
+步骤 21: verify_action_result
+  → conn_家里, expectations: [{"type":"text_present","value":"Q4_Report"}]
+  ← { allPassed: true }
+
+步骤 22: disconnect_device(conn_办公)
+步骤 23: disconnect_device(conn_家里)
 ```
 
 ---
@@ -248,52 +346,78 @@
 
 **目标**：AI 分析远程桌面上是否有敏感信息暴露。
 
-**Prompt**：使用内置 `analyze_screen_content` 提示词模板。
-
-### 对话示例
+**Prompt**：`analyze_screen_content`
 
 > **用户**：审计一下开发工作站上是否有敏感信息暴露（ID: 555666777，访问码: 444444）。
 
+```
+步骤 1: connect_device → wait_for_connection_state
+
+步骤 2: screenshot（全分辨率，不加 max_width）
+  ← [图片：完整桌面截图，保留所有文字细节]
+
+步骤 3: get_screen_text                    ← OCR 提取全屏文字，便于精确检索
+  ← { blocks: [所有可见文字块] }
+
+  （AI 结合图片和文字块进行安全分析）
+```
+
 **AI 报告**：
 
-> ## 屏幕内容分析
+> ## 屏幕内容安全分析
 >
 > **操作系统**：Windows 11，深色主题
 > **打开的应用**：VS Code、Chrome（3 个标签页）、Slack、终端
 >
-> ### 安全发现
->
-> **⚠️ 警告 — 检测到敏感信息：**
+> ### ⚠️ 警告 — 检测到敏感信息
 >
 > 1. **VS Code**（活动窗口）：`.env` 文件已打开
 >    - 第 3 行：`DATABASE_URL=postgres://admin:P@ssw0rd123@prod-db.company.com:5432/main`
 >    - 第 5 行：`AWS_SECRET_KEY=AKIA...已脱敏...`
->    - **风险**：数据库凭据和 AWS 密钥以明文形式可见
+>    - **风险**：数据库凭据和 AWS 密钥以明文可见
 >
 > 2. **Chrome 标签页**："AWS Console" — 以 root 用户登录
 >    - **风险**：使用 root 账户违反最小权限原则
 >
-> 3. **终端**：`git log` 输出显示提交信息 "added api key"
->    - **风险**：密钥可能已提交到版本控制
+> 3. **终端**：`git log` 显示提交信息 "added api key"
+>    - **风险**：密钥可能已提交进版本控制
 >
-> **建议**：
-> - 立即轮换暴露的数据库密码和 AWS 密钥
-> - 使用密钥管理器（AWS Secrets Manager、HashiCorp Vault）
-> - 设置 pre-commit hook 防止密钥提交（如 git-secrets）
-> - 创建 IAM 用户，停止使用 root 账户
+> **建议**：立即轮换数据库密码和 AWS 密钥；使用密钥管理器；配置 pre-commit hook。
 
 ---
 
-## 快速参考：场景 → Prompt 对照表
+## 快速参考
 
-| 场景 | MCP Prompt | 主要使用的工具 |
-|------|------------|---------------|
-| 服务器健康检查 | `server_health_check` | `connect_device`, `screenshot`, `keyboard_type`, `keyboard_hotkey`, `get_clipboard` |
-| 批量操作 N 台设备 | `batch_operation` | `connect_device(show_window=false)`, `screenshot`, `keyboard_type`, `disconnect_device` |
-| 诊断电脑故障 | `diagnose_system_issue` | `connect_device`, `screenshot`, `keyboard_hotkey`, `mouse_click` |
-| 跨设备工作流 | `multi_device_workflow` | `connect_device` ×N, `get_clipboard`, `set_clipboard` |
-| 文档化操作流程 | `document_procedure` | `screenshot`（每步前后截图）, 所有输入工具 |
-| 屏幕安全审计 | `analyze_screen_content` | `screenshot`（全分辨率） |
-| 通用远程操作 | `operate_remote_desktop` | 所有工具 |
-| 查找并点击元素 | `find_and_click` | `screenshot`, `get_screen_size`, `mouse_click` |
-| 在终端运行命令 | `run_command` | `keyboard_hotkey`, `keyboard_type`, `screenshot` |
+### 工具选择指南
+
+| 场景 | 用这个工具 | 替代的旧做法 |
+|------|-----------|------------|
+| `connect_device` 之后 | `wait_for_connection_state` | 截图看桌面 |
+| 读取屏幕文字/布局 | `get_ui_state` | 截图+视觉模型 |
+| 查找 UI 元素 | `find_element` | 截图估坐标 |
+| 查找并点击 | `click_text` | 截图→找元素→`mouse_click` |
+| 等待 UI 响应 | `wait_for_text` | 循环截图 |
+| 等待任何视觉变化 | `wait_for_screen_change` | 循环截图 |
+| 验证操作是否成功 | `verify_action_result` | 截图+人工判断 |
+| 前后对比 | `screen_diff_summary` | 两次截图手动比对 |
+| 操作可能失败，有兜底 | `retry_with_alternative` | 手动 if/else 重试 |
+| 确实需要看图 | `screenshot` | —（AI 需要视觉判断时使用） |
+
+### Prompt → 场景对照
+
+| 场景 | Prompt | 核心新工具 |
+|------|--------|----------|
+| 服务器健康检查 / 修电脑 | `diagnose_system_issue` | `get_ui_state`, `wait_for_text`, `get_screen_text` |
+| 批量设备巡检 | `batch_operation` | `wait_for_connection_state`, `wait_for_screen_change` |
+| 老旧 GUI 软件操作 | `operate_remote_desktop` | `click_text`, `find_element`, `screen_diff_summary` |
+| 操作后验证 | 任意 | `verify_action_result`, `assert_screen_state` |
+| 剪贴板跨设备传输 | `multi_device_workflow` | `wait_for_clipboard_change` |
+
+### 截图使用量对比
+
+| 指标 | 旧模式 | Phase 5A 新模式 |
+|------|--------|----------------|
+| 10 步任务的截图次数 | 8–12 次 | 0–2 次 |
+| Token 消耗 | 高（图片 token） | 低（文字 token） |
+| 元素定位方式 | 视觉坐标 | `find_element` / `click_text` OCR |
+| 操作结果验证 | 人工看截图 | `verify_action_result` 结构化返回 |
