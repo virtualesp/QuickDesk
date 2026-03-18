@@ -89,6 +89,10 @@ public:
     // Clipboard
     Q_INVOKABLE void syncClipboard(const QString& connectionId, const QString& text);
 
+    // Agent bridge — send a JSON command to the remote host agent
+    Q_INVOKABLE void sendAgentCommand(const QString& connectionId,
+                                      const QString& jsonData);
+
     // Video control
     Q_INVOKABLE void setTargetFramerate(const QString& connectionId, int framerate);
     Q_INVOKABLE void setResolution(const QString& connectionId, int width, int height, int dpi = 96);
@@ -167,6 +171,10 @@ signals:
     void connectionListChanged();
     void videoFrameReady(const QString& connectionId, int frameIndex);
     void clipboardReceived(const QString& connectionId, const QString& text);
+
+    // Agent bridge response received from the remote host agent.
+    void agentBridgeResponseReceived(const QString& connectionId,
+                                     const QJsonObject& response);
     void errorOccurred(const QString& connectionId, 
                        const QString& code, 
                        const QString& message);
@@ -265,6 +273,7 @@ private:
     void handleFileDownloadProgress(const QJsonObject& message);
     void handleFileDownloadComplete(const QJsonObject& message);
     void handleFileDownloadError(const QJsonObject& message);
+    void handleAgentBridgeResponse(const QJsonObject& message);
     
     void sendMouseEvent(const QString& connectionId, const QString& eventType,
                         int x, int y, int button,

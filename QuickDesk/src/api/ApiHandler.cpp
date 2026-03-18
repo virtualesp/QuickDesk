@@ -45,7 +45,8 @@ ApiHandler::ApiHandler(MainController* controller, QObject* parent)
     : QObject(parent)
     , m_controller(controller)
     , m_uiState(controller)
-    , m_verification(controller) {
+    , m_verification(controller)
+    , m_agent(controller) {
     registerHandlers();
 
     connect(m_controller->clientManager(), &ClientManager::clipboardReceived,
@@ -176,6 +177,13 @@ void ApiHandler::registerHandlers() {
     };
     m_handlers["assertScreenState"] = [this](const QJsonObject& p) {
         return handleAssertScreenState(p);
+    };
+    // Agent bridge
+    m_handlers["agentExec"] = [this](const QJsonObject& p) {
+        return handleAgentExec(p);
+    };
+    m_handlers["agentListTools"] = [this](const QJsonObject& p) {
+        return handleAgentListTools(p);
     };
 }
 
@@ -1091,6 +1099,16 @@ QJsonObject ApiHandler::makeError(int code, const QString& message) {
         {"message", message}
     };
     return resp;
+}
+
+QJsonObject ApiHandler::handleAgentExec(const QJsonObject& params)
+{
+    return makeResult(m_agent.handleAgentExec(params));
+}
+
+QJsonObject ApiHandler::handleAgentListTools(const QJsonObject& params)
+{
+    return makeResult(m_agent.handleAgentListTools(params));
 }
 
 } // namespace quickdesk

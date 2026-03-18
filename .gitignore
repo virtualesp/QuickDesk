@@ -77,4 +77,5 @@ SignalingServer/signaling_server
 SignalingServer/*.pid
 
 quickdesk-mcp/target
+quickdesk-agent/target
 QuickDesk/3rdparty/rapidocr

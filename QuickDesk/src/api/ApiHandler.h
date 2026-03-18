@@ -8,6 +8,7 @@
 #include "OcrCache.h"
 #include "UiStateService.h"
 #include "VerificationService.h"
+#include "AgentHandler.h"
 
 #include <QObject>
 #include <QJsonObject>
@@ -76,6 +77,10 @@ private:
     QJsonObject handleScreenDiffSummary(const QJsonObject& params);
     QJsonObject handleAssertScreenState(const QJsonObject& params);
 
+    // Agent bridge
+    QJsonObject handleAgentExec(const QJsonObject& params);
+    QJsonObject handleAgentListTools(const QJsonObject& params);
+
     static int keyNameToScanCode(const QString& keyName);
 
     // Helpers
@@ -87,6 +92,7 @@ private:
     QMap<QString, QString> m_clipboardCache;  // connectionId -> last received text
     UiStateService       m_uiState;
     VerificationService  m_verification;
+    AgentHandler         m_agent;
 };
 
 } // namespace quickdesk

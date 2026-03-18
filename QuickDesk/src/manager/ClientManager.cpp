@@ -7,6 +7,7 @@
 #include "infra/log/log.h"
 #include <QUuid>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -236,6 +237,20 @@ void ClientManager::syncClipboard(const QString& connectionId, const QString& te
     message["type"] = "clipboardSync";
     message["connectionId"] = connectionId;
     message["text"] = text;
+    m_messaging->sendMessage(message);
+}
+
+void ClientManager::sendAgentCommand(const QString& connectionId,
+                                     const QString& jsonData)
+{
+    if (!m_messaging || !m_messaging->isReady()) {
+        return;
+    }
+
+    QJsonObject message;
+    message["type"] = "agentBridgeSend";
+    message["connectionId"] = connectionId;
+    message["data"] = jsonData;
     m_messaging->sendMessage(message);
 }
 
@@ -641,6 +656,8 @@ void ClientManager::onMessageReceived(const QJsonObject& message)
         handleFileDownloadComplete(message);
     } else if (type == "fileDownloadError") {
         handleFileDownloadError(message);
+    } else if (type == "agentBridgeResponse") {
+        handleAgentBridgeResponse(message);
     } else if (type == "setFramerateResponse" || type == "setResolutionResponse" || type == "setFramerateBoostResponse" || type == "setBitrateResponse") {
         // Acknowledgement responses - just log success/failure
         bool success = message["success"].toBool();
@@ -1269,6 +1286,18 @@ void ClientManager::handleFileDownloadError(const QJsonObject& message)
               errorMessage.toStdString(), transferId.toStdString());
 
     emit fileDownloadError(connectionId, transferId, errorMessage);
+}
+
+void ClientManager::handleAgentBridgeResponse(const QJsonObject& message)
+{
+    QString connectionId = message["connectionId"].toString();
+    QString data = message["data"].toString();
+
+    // Parse the JSON data string into an object for the AgentHandler
+    QJsonDocument doc = QJsonDocument::fromJson(data.toUtf8());
+    QJsonObject response = doc.isObject() ? doc.object() : QJsonObject{{"raw", data}};
+
+    emit agentBridgeResponseReceived(connectionId, response);
 }
 
 } // namespace quickdesk

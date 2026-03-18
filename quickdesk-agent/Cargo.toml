@@ -1,0 +1,20 @@
+[package]
+name = "quickdesk-agent"
+version = "0.1.0"
+edition = "2021"
+description = "QuickDesk host-side agent — manages skill MCP servers and bridges tool calls"
+
+[[bin]]
+name = "quickdesk-agent"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+futures-util = "0.3"
+anyhow = "1"

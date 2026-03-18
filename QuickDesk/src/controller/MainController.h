@@ -17,6 +17,7 @@
 #include "../manager/TurnServerManager.h"
 #include "../manager/RemoteDeviceManager.h"
 #include "../manager/PresetManager.h"
+#include "../manager/AgentManager.h"
 #include "../common/ProcessStatus.h"
 
 namespace quickdesk {
@@ -220,6 +221,7 @@ private:
     std::unique_ptr<RemoteDeviceManager> m_remoteDeviceManager;
     std::unique_ptr<PresetManager> m_presetManager;
     std::unique_ptr<WebSocketApiServer> m_wsApiServer;
+    std::unique_ptr<AgentManager> m_agentManager;
 
     QString m_deviceId;
     QString m_accessCode;
@@ -237,6 +239,7 @@ private:
     void onAccessCodeRefreshTimer();
     void updateAccessCodeRefreshTimer(int remainingSeconds = -1);
     QString getDefaultServerUrl() const;
+    QString getAgentBinaryPath() const;
     void setupWebSocketApiEvents();
 
     // MCP HTTP process management

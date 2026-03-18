@@ -18,6 +18,7 @@ set(MANAGER_SOURCES
     src/manager/SharedMemoryManager.cpp
     src/manager/RemoteDeviceManager.cpp
     src/manager/PresetManager.cpp
+    src/manager/AgentManager.cpp
 )
 
 set(MANAGER_HEADERS
@@ -30,6 +31,7 @@ set(MANAGER_HEADERS
     src/manager/SharedMemoryManager.h
     src/manager/RemoteDeviceManager.h
     src/manager/PresetManager.h
+    src/manager/AgentManager.h
 )
 
 set(CONTROLLER_SOURCES
@@ -48,6 +50,7 @@ set(API_SOURCES
     src/api/OcrCache.cpp
     src/api/UiStateService.cpp
     src/api/VerificationService.cpp
+    src/api/AgentHandler.cpp
 )
 
 set(API_HEADERS
@@ -58,6 +61,7 @@ set(API_HEADERS
     src/api/OcrCache.h
     src/api/UiStateService.h
     src/api/VerificationService.h
+    src/api/AgentHandler.h
 )
 
 set(COMMON_HEADERS

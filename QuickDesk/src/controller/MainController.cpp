@@ -3,6 +3,7 @@
 #include "MainController.h"
 #include "../manager/ProcessManager.h"
 #include "../manager/NativeMessaging.h"
+#include "../manager/AgentManager.h"
 #include "../api/WebSocketServer.h"
 #include "../api/OcrEngine.h"
 #include "infra/env/applicationcontext.h"
@@ -34,6 +35,10 @@ MainController::MainController(QObject* parent)
     , m_remoteDeviceManager(std::make_unique<RemoteDeviceManager>(this))
     , m_presetManager(std::make_unique<PresetManager>(m_serverManager.get(), this))
 {
+    // Create AgentManager and wire it to HostManager (host-side agent bridge)
+    m_agentManager = std::make_unique<AgentManager>(this);
+    m_agentManager->setHostManager(m_hostManager.get());
+
     // Connect ProcessManager signals
     connect(m_processManager.get(), &ProcessManager::hostProcessStarted,
             this, &MainController::onHostProcessStarted);
@@ -445,16 +450,26 @@ QString MainController::nextAccessCodeRefreshTime() const
 void MainController::onHostProcessStarted()
 {
     LOG_INFO("Host process started");
-    
+
     // Reset retry count on successful start
     m_processManager->resetHostRetryCount();
-    
+
     // Set up Native Messaging
     m_hostManager->setMessaging(m_processManager->hostMessaging());
-    
+
     // Set ICE config (may be STUN-only if server fetch hasn't completed yet)
     QJsonObject iceConfig = m_turnServerManager->getEffectiveIceConfig();
     m_hostManager->setIceConfig(iceConfig);
+
+    // Start quickdesk-agent (alongside quickdesk-mcp in the same directory)
+    QString agentPath = getAgentBinaryPath();
+    if (QFile::exists(agentPath)) {
+        QString skillsDir = QCoreApplication::applicationDirPath() + "/skills";
+        m_agentManager->startAgent(agentPath, skillsDir);
+    } else {
+        LOG_WARN("quickdesk-agent not found at {}, agent features disabled",
+                 agentPath.toStdString());
+    }
     
     // Send hello to verify communication and connect to signaling server
     QTimer::singleShot(500, this, [this]() {
@@ -499,7 +514,9 @@ void MainController::onHostProcessStarted()
 void MainController::onHostProcessStopped(int exitCode)
 {
     LOG_INFO("Host process stopped with exit code: {}", exitCode);
-    
+
+    m_agentManager->stopAgent();
+
     // Update server status
     m_hostServerStatus = ServerStatus::Disconnected;
     emit hostServerStatusChanged();
@@ -1021,6 +1038,18 @@ QString MainController::getMcpBinaryPath() const {
     auto mcpPath = appDir + "/quickdesk-mcp";
 #endif
     return QDir::toNativeSeparators(QDir::cleanPath(mcpPath));
+}
+
+QString MainController::getAgentBinaryPath() const {
+    auto appDir = QCoreApplication::applicationDirPath();
+#ifdef Q_OS_WIN
+    auto agentPath = appDir + "/quickdesk-agent.exe";
+#elif defined(Q_OS_MAC)
+    auto agentPath = appDir + "/../Frameworks/quickdesk-agent";
+#else
+    auto agentPath = appDir + "/quickdesk-agent";
+#endif
+    return QDir::toNativeSeparators(QDir::cleanPath(agentPath));
 }
 
 QJsonObject MainController::buildMcpServerConfig(const QString& transport) const {
