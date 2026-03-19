@@ -8,6 +8,7 @@
 #include <QMutex>
 #include <QObject>
 #include <QProcess>
+#include <QPointer>
 #include <QTimer>
 #include <memory>
 
@@ -260,7 +261,7 @@ private:
     void startMcpHttpProcess();
     void stopMcpHttpProcess();
 
-    QProcess* m_mcpHttpProcess = nullptr;
+    QPointer<QProcess> m_mcpHttpProcess;
     QString m_mcpTransportMode = QStringLiteral("stdio");
     int m_mcpHttpPort = 18080;
     bool m_isShutdown = false;

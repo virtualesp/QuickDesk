@@ -532,13 +532,17 @@ void MainController::onHostProcessStopped(int exitCode)
 {
     LOG_INFO("Host process stopped with exit code: {}", exitCode);
 
-    m_agentManager->stopAgent();
+    if (m_agentManager) {
+        m_agentManager->stopAgent();
+    }
 
     // Update server status
     m_hostServerStatus = ServerStatus::Disconnected;
     emit hostServerStatusChanged();
     
-    m_hostManager->setMessaging(nullptr);
+    if (m_hostManager) {
+        m_hostManager->setMessaging(nullptr);
+    }
     // Clear UI state (will be restored after restart)
     m_deviceId.clear();
     m_accessCode.clear();
@@ -604,7 +608,9 @@ void MainController::onClientProcessStopped(int exitCode)
     m_clientServerStatus = ServerStatus::Disconnected;
     emit clientServerStatusChanged();
     
-    m_clientManager->setMessaging(nullptr);
+    if (m_clientManager) {
+        m_clientManager->setMessaging(nullptr);
+    }
 }
 
 void MainController::onClientProcessError(const QString& error)
@@ -877,6 +883,9 @@ void MainController::setupWebSocketApiEvents() {
     // Process events → WebSocket broadcast
     connect(m_processManager.get(), &ProcessManager::hostProcessStatusChanged,
             this, [this]() {
+        if (m_processManager == nullptr) {
+            return;
+        }
         QString status;
         switch (m_processManager->hostProcessStatus()) {
         case ProcessStatus::NotStarted: status = "notStarted"; break;
@@ -891,6 +900,9 @@ void MainController::setupWebSocketApiEvents() {
     });
     connect(m_processManager.get(), &ProcessManager::clientProcessStatusChanged,
             this, [this]() {
+        if (m_processManager == nullptr) {
+            return;
+        }
         QString status;
         switch (m_processManager->clientProcessStatus()) {
         case ProcessStatus::NotStarted: status = "notStarted"; break;
@@ -996,12 +1008,18 @@ void MainController::startMcpHttpProcess() {
 
     if (!m_mcpHttpProcess) {
         m_mcpHttpProcess = new QProcess(this);
+        connect(m_mcpHttpProcess, &QProcess::started,
+                this, [this]() {
+            LOG_INFO("quickdesk-mcp HTTP process started");
+            emit mcpServiceRunningChanged();
+        });
         connect(m_mcpHttpProcess,
                 QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
                 this, [this](int exitCode, QProcess::ExitStatus status) {
             LOG_INFO("quickdesk-mcp HTTP process exited: code={}, status={}",
                      exitCode, static_cast<int>(status));
             emit mcpServiceRunningChanged();
+            sender()->deleteLater();
         });
         connect(m_mcpHttpProcess, &QProcess::errorOccurred,
                 this, [this](QProcess::ProcessError error) {
@@ -1031,13 +1049,17 @@ void MainController::stopMcpHttpProcess() {
     LOG_INFO("Stopping quickdesk-mcp HTTP process");
     m_mcpHttpProcess->closeWriteChannel();
 
-    QProcess* proc = m_mcpHttpProcess;
-    QTimer::singleShot(2000, proc, [proc]() {
+    auto proc = m_mcpHttpProcess;
+    m_mcpHttpProcess = nullptr;
+    QTimer::singleShot(1000, proc, [proc]() {
+        if (!proc) return;
         if (proc->state() == QProcess::NotRunning) return;
         LOG_WARN("quickdesk-mcp did not exit gracefully, terminating...");
         proc->terminate();
 
+        if (!proc) return;
         QTimer::singleShot(1000, proc, [proc]() {
+            if (!proc) return;
             if (proc->state() == QProcess::NotRunning) return;
             LOG_WARN("quickdesk-mcp did not terminate, killing...");
             proc->kill();
@@ -1050,8 +1072,15 @@ QString MainController::getMcpBinaryPath() const {
 #ifdef Q_OS_WIN
     auto mcpPath = appDir + "/quickdesk-mcp.exe";
 #elif defined(Q_OS_MAC)
-    // appDir = Contents/MacOS, mcp binary is in Contents/Frameworks
-    auto mcpPath = appDir + "/../Frameworks/quickdesk-mcp";
+    auto mcpPath = appDir + "/../../../quickdesk-mcp";
+    QFileInfo fileInfo(mcpPath);
+    if (!fileInfo.exists() || !fileInfo.isExecutable()) {
+        LOG_INFO("using Contents/Frameworks/quickdesk-mcp");   
+        // appDir = Contents/MacOS, mcp binary is in Contents/Frameworks
+        mcpPath = appDir + "/../Frameworks/quickdesk-mcp";
+    } else {
+        LOG_INFO("using out of bundle quickdesk-mcp");
+    }
 #else
     auto mcpPath = appDir + "/quickdesk-mcp";
 #endif
@@ -1063,7 +1092,15 @@ QString MainController::getAgentBinaryPath() const {
 #ifdef Q_OS_WIN
     auto agentPath = appDir + "/quickdesk-agent.exe";
 #elif defined(Q_OS_MAC)
-    auto agentPath = appDir + "/../Frameworks/quickdesk-agent";
+    auto agentPath = appDir + "/../../../quickdesk-agent";
+    QFileInfo fileInfo(agentPath);
+    if (!fileInfo.exists() || !fileInfo.isExecutable()) {
+        LOG_INFO("using Contents/Frameworks/quickdesk-agent");  
+        // appDir = Contents/MacOS, agent binary is in Contents/Frameworks
+        agentPath = appDir + "/../Frameworks/quickdesk-agent";
+    } else {
+        LOG_INFO("using out of bundle quickdesk-agent");
+    }
 #else
     auto agentPath = appDir + "/quickdesk-agent";
 #endif

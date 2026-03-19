@@ -40,6 +40,7 @@ public:
     // modelDir: 包含 .onnx 和 ppocr_keys_v1.txt 的目录
     // 返回 false 表示模型文件缺失或加载失败
     bool initialize(const QString& modelDir = QString());
+    void uninitialize();
 
     bool isInitialized() const;
 

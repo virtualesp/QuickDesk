@@ -25,12 +25,6 @@ OcrEngine& OcrEngine::instance() {
 }
 
 OcrEngine::~OcrEngine() {
-#ifdef QUICKDESK_OCR_ENABLED
-    if (m_handle) {
-        OcrDestroy(m_handle);
-        m_handle = nullptr;
-    }
-#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -118,6 +112,13 @@ bool OcrEngine::initialize(const QString& modelDir) {
     return true;
 }
 
+void OcrEngine::uninitialize() {
+    if (m_handle) {
+        OcrDestroy(m_handle);
+        m_handle = nullptr;
+    }
+}
+
 bool OcrEngine::isInitialized() const {
     QMutexLocker lock(&m_mutex);
     return m_handle != nullptr;
@@ -183,6 +184,7 @@ OcrResult OcrEngine::recognize(const QImage& image) {
 #else // QUICKDESK_OCR_ENABLED not defined — stub implementations
 
 bool OcrEngine::initialize(const QString&) { return false; }
+void OcrEngine::uninitialize(){ }
 bool OcrEngine::isInitialized() const { return false; }
 OcrResult OcrEngine::recognize(const QImage&) { return {}; }
 

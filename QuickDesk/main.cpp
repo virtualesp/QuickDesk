@@ -15,6 +15,7 @@
 #include "infra/env/applicationcontext.h"
 #include "infra/log/log.h"
 
+#include "api/OcrEngine.h"
 #include "controller/MainController.h"
 #include "manager/ServerManager.h"
 #include "manager/HostManager.h"
@@ -135,6 +136,9 @@ int main(int argc, char *argv[])
     LOG_INFO("QuickDesk started successfully");
     
     int runRet = app.exec();
+
+    quickdesk::OcrEngine::instance().uninitialize();
+
     LOG_INFO("QuickDesk exiting with code {}", runRet);
 
     return runRet;
