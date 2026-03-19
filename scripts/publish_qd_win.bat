@@ -163,6 +163,25 @@ if exist "%release_path%\quickdesk-mcp.exe" (
 )
 echo=
 
+:: copy agent and built-in skills
+echo [*] copying quickdesk-agent...
+if exist "%release_path%\quickdesk-agent.exe" (
+    copy /Y "%release_path%\quickdesk-agent.exe" "%publish_path%\" >nul
+    echo [*] copied quickdesk-agent.exe from output
+) else (
+    echo [!] warning: quickdesk-agent.exe not found (run build_agent_win.bat first)
+)
+
+echo [*] copying built-in skills...
+if exist "%release_path%\skills" (
+    if not exist "%publish_path%\skills" mkdir "%publish_path%\skills"
+    xcopy "%release_path%\skills" "%publish_path%\skills" /E /Y /Q >nul
+    echo [*] copied skills directory
+) else (
+    echo [!] warning: skills directory not found (run build_agent_win.bat first)
+)
+echo=
+
 :: add Qt dependencies (specify qml path)
 echo [*] running windeployqt to add Qt dependencies...
 windeployqt --qmldir "%script_path%..\QuickDesk\qml" "%publish_path%\QuickDesk.exe"

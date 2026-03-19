@@ -1,0 +1,20 @@
+[package]
+name = "quickdesk-agent"
+version.workspace = true
+edition.workspace = true
+description = "QuickDesk host-side agent — manages skill MCP servers and bridges tool calls"
+
+[[bin]]
+name = "quickdesk-agent"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+futures-util = "0.3"

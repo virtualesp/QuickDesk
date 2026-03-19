@@ -1,0 +1,13 @@
+[package]
+name = "mcp-server-common"
+version.workspace = true
+edition.workspace = true
+description = "Shared MCP stdio server framework for QuickDesk built-in skills"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }

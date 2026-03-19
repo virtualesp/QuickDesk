@@ -265,13 +265,14 @@ void WebSocketApiServer::onTextMessageReceived(const QString& message) {
     //   - OcrCache::get / put           — mutex-protected
     //   - SharedMemoryManager::readVideoFrame — QSharedMemory::lock() guard
     //   - getActiveWindowTitle()        — Win32 API, callable from any thread
-    static const QSet<QString> kOcrMethods{
+    static const QSet<QString> kAsyncMethods{
         "getUiState", "getScreenText", "findElement", "clickText",
         "assertTextPresent", "assertScreenState", "screenDiffSummary",
-        "waitForText", "verifyActionResult"
+        "waitForText", "verifyActionResult",
+        "agentExec", "agentListTools"
     };
 
-    if (kOcrMethods.contains(method)) {
+    if (kAsyncMethods.contains(method)) {
         QPointer<WebSocketApiServer> self(this);
         ApiHandler* handlerPtr = m_handler;   // owned by this, stable for app lifetime
         QWebSocket* clientPtr  = client;

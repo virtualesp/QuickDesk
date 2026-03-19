@@ -7,6 +7,7 @@
 
 #include <QJsonDocument>
 #include <QProcess>
+#include <QTimer>
 
 namespace quickdesk {
 
@@ -16,7 +17,14 @@ AgentManager::AgentManager(QObject* parent)
 
 AgentManager::~AgentManager()
 {
-    stopAgent();
+    if (m_agentProcess) {
+        if (m_agentProcess->state() != QProcess::NotRunning) {
+            m_agentProcess->kill();
+            m_agentProcess->waitForFinished(1000);
+        }
+        delete m_agentProcess;
+        m_agentProcess = nullptr;
+    }
 }
 
 void AgentManager::setHostManager(HostManager* hostManager)
@@ -26,6 +34,23 @@ void AgentManager::setHostManager(HostManager* hostManager)
     // Wire: client → agent
     connect(m_hostManager, &HostManager::agentMessage,
             this, &AgentManager::onMessageFromClient);
+
+    // When a new client connects, push cached agent capabilities
+    connect(m_hostManager, &HostManager::clientConnected,
+            this, [this](const QString& /*connectionId*/, const QJsonObject& /*info*/) {
+        if (m_cachedTools.isEmpty()) return;
+
+        QJsonObject msg;
+        msg["type"] = QStringLiteral("capabilitiesReady");
+        msg["tools"] = m_cachedTools;
+
+        QByteArray bytes = QJsonDocument(msg).toJson(QJsonDocument::Compact);
+        QString jsonData = QString::fromUtf8(bytes);
+        m_hostManager->sendAgentBridgeSend(jsonData);
+
+        LOG_INFO("AgentManager: pushed cached capabilities ({} tools) to new client",
+                 m_cachedTools.size());
+    });
 }
 
 void AgentManager::startAgent(const QString& agentPath, const QString& skillsDir)
@@ -45,30 +70,44 @@ void AgentManager::startAgent(const QString& agentPath, const QString& skillsDir
     connect(m_agentProcess,
             QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &AgentManager::onAgentFinished);
+    connect(m_agentProcess, &QProcess::started, this, [this]() {
+        LOG_INFO("AgentManager: agent started (pid={})", m_agentProcess->processId());
+    });
+    connect(m_agentProcess, &QProcess::errorOccurred, this, [this, agentPath](QProcess::ProcessError err) {
+        if (err == QProcess::FailedToStart) {
+            LOG_ERROR("AgentManager: failed to start agent at {}", agentPath.toStdString());
+        }
+    });
 
     m_agentProcess->start();
-    if (!m_agentProcess->waitForStarted(3000)) {
-        LOG_ERROR("AgentManager: failed to start agent at {}", agentPath.toStdString());
-        return;
-    }
-
-    LOG_INFO("AgentManager: agent started (pid={})", m_agentProcess->processId());
 }
 
 void AgentManager::stopAgent()
 {
     if (!m_agentProcess) return;
 
-    if (m_agentProcess->state() != QProcess::NotRunning) {
-        m_agentProcess->terminate();
-        if (!m_agentProcess->waitForFinished(3000)) {
-            m_agentProcess->kill();
-        }
+    if (m_agentProcess->state() == QProcess::NotRunning) {
+        delete m_agentProcess;
+        m_agentProcess = nullptr;
+        m_readBuffer.clear();
+        m_cachedTools = QJsonArray();
+        return;
     }
 
-    delete m_agentProcess;
+    QProcess* proc = m_agentProcess;
     m_agentProcess = nullptr;
     m_readBuffer.clear();
+    m_cachedTools = QJsonArray();
+
+    proc->terminate();
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            proc, &QObject::deleteLater);
+
+    QTimer::singleShot(3000, proc, [proc]() {
+        if (proc->state() == QProcess::NotRunning) return;
+        LOG_WARN("AgentManager: agent did not terminate, killing...");
+        proc->kill();
+    });
 }
 
 bool AgentManager::isRunning() const
@@ -143,14 +182,16 @@ void AgentManager::handleAgentMessage(const QJsonObject& message)
 {
     QString type = message["type"].toString();
 
-    if (type == "capabilitiesChanged") {
+    if (type == "capabilitiesReady" || type == "capabilitiesChanged") {
         QJsonArray tools = message["tools"].toArray();
-        LOG_INFO("AgentManager: capabilities updated, {} tool(s)", tools.size());
+        m_cachedTools = tools;
+        LOG_INFO("AgentManager: capabilities {}, {} tool(s)",
+                 type.toStdString(), tools.size());
         emit capabilitiesChanged(tools);
-        return;
+        // Fall through to forward to connected clients
     }
 
-    // All other messages (toolResult, error, etc.) are forwarded to the client.
+    // Forward all messages (toolResult, capabilitiesReady, error, etc.) to the client.
     if (!m_hostManager) return;
 
     QByteArray bytes = QJsonDocument(message).toJson(QJsonDocument::Compact);

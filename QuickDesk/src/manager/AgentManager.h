@@ -79,6 +79,7 @@ private:
     QPointer<HostManager> m_hostManager;
     QProcess*             m_agentProcess = nullptr;
     QByteArray            m_readBuffer;  // accumulates partial lines from stdout
+    QJsonArray            m_cachedTools; // tools from the last capabilitiesReady
 };
 
 } // namespace quickdesk

@@ -117,6 +117,27 @@ else
 fi
 echo
 
+# Copy agent and built-in skills
+echo "[*] copying quickdesk-agent..."
+agent_output="$script_path/../output/arm64/$build_mode/quickdesk-agent"
+if [ -f "$agent_output" ]; then
+    cp "$agent_output" "$frameworks_dir/"
+    echo "[*] copied quickdesk-agent from output"
+else
+    echo "[!] warning: quickdesk-agent not found (run build_agent_mac.sh first)"
+fi
+
+echo "[*] copying built-in skills..."
+skills_output="$script_path/../output/arm64/$build_mode/skills"
+if [ -d "$skills_output" ]; then
+    mkdir -p "$frameworks_dir/skills"
+    cp -R "$skills_output/"* "$frameworks_dir/skills/"
+    echo "[*] copied skills directory"
+else
+    echo "[!] warning: skills directory not found (run build_agent_mac.sh first)"
+fi
+echo
+
 echo "[*] running macdeployqt..."
 macdeployqt "$publish_path/QuickDesk.app" -qmldir="$script_path/../QuickDesk/qml"
 if [ $? -ne 0 ]; then
@@ -226,6 +247,17 @@ if [ -f "$frameworks_dir/quickdesk_client" ]; then
 fi
 if [ -f "$frameworks_dir/quickdesk-mcp" ]; then
     codesign --force --sign - "$frameworks_dir/quickdesk-mcp"
+fi
+if [ -f "$frameworks_dir/quickdesk-agent" ]; then
+    codesign --force --sign - "$frameworks_dir/quickdesk-agent"
+fi
+# Sign built-in skill binaries
+if [ -d "$frameworks_dir/skills" ]; then
+    for skill_bin in "$frameworks_dir/skills/sys-info" "$frameworks_dir/skills/file-ops" "$frameworks_dir/skills/shell-runner"; do
+        if [ -f "$skill_bin" ]; then
+            codesign --force --sign - "$skill_bin"
+        fi
+    done
 fi
 find "$frameworks_dir" -name "*.framework" -maxdepth 1 -exec codesign --force --sign - {} \;
 find "$frameworks_dir" -name "*.dylib" -maxdepth 1 -exec codesign --force --sign - {} \;

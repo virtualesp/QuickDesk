@@ -2,6 +2,7 @@ use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::{Mutex, oneshot};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
@@ -131,7 +132,11 @@ impl WsClient {
         };
         let _ = id; // suppress unused-variable warning
 
-        rx.await.map_err(|_| "Response channel closed".to_string())?
+        match tokio::time::timeout(Duration::from_secs(30), rx).await {
+            Ok(Ok(v)) => v,
+            Ok(Err(_)) => Err("Response channel closed".to_string()),
+            Err(_) => Err("WebSocket request timed out after 30s".to_string()),
+        }
     }
 
     async fn reader_loop(

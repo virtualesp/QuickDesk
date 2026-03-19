@@ -1014,17 +1014,20 @@ void MainController::stopMcpHttpProcess() {
     if (m_mcpHttpProcess->state() == QProcess::NotRunning) return;
 
     LOG_INFO("Stopping quickdesk-mcp HTTP process");
-    // Close stdin pipe first — the MCP process watches for stdin EOF
-    // as its primary graceful-shutdown signal (on Windows, terminate()
-    // sends WM_CLOSE which console processes cannot receive).
     m_mcpHttpProcess->closeWriteChannel();
-    if (!m_mcpHttpProcess->waitForFinished(2000)) {
-        m_mcpHttpProcess->terminate();
-        if (!m_mcpHttpProcess->waitForFinished(1000)) {
-            m_mcpHttpProcess->kill();
-            m_mcpHttpProcess->waitForFinished(1000);
-        }
-    }
+
+    QProcess* proc = m_mcpHttpProcess;
+    QTimer::singleShot(2000, proc, [proc]() {
+        if (proc->state() == QProcess::NotRunning) return;
+        LOG_WARN("quickdesk-mcp did not exit gracefully, terminating...");
+        proc->terminate();
+
+        QTimer::singleShot(1000, proc, [proc]() {
+            if (proc->state() == QProcess::NotRunning) return;
+            LOG_WARN("quickdesk-mcp did not terminate, killing...");
+            proc->kill();
+        });
+    });
 }
 
 QString MainController::getMcpBinaryPath() const {

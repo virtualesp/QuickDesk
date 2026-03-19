@@ -1,0 +1,18 @@
+[package]
+name = "file-ops"
+version.workspace = true
+edition.workspace = true
+description = "MCP server skill — file operations for remote host"
+
+[[bin]]
+name = "file-ops"
+path = "src/main.rs"
+
+[dependencies]
+mcp-server-common = { path = "../../mcp-server-common" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }

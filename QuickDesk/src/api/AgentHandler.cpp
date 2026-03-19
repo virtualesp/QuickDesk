@@ -4,8 +4,7 @@
 #include "AgentHandler.h"
 
 #include <QJsonDocument>
-#include <QTimer>
-#include <QUuid>
+#include <QMutexLocker>
 
 #include "../controller/MainController.h"
 #include "../manager/ClientManager.h"
@@ -17,7 +16,6 @@ AgentHandler::AgentHandler(MainController* controller, QObject* parent)
     : QObject(parent)
     , m_controller(controller)
 {
-    // Forward agentBridgeResponseReceived from ClientManager to onAgentResponse.
     connect(m_controller->clientManager(),
             &ClientManager::agentBridgeResponseReceived,
             this,
@@ -26,7 +24,7 @@ AgentHandler::AgentHandler(MainController* controller, QObject* parent)
             });
 }
 
-// ---- Public API ----
+// ---- Public API (called from worker threads) ----
 
 QJsonObject AgentHandler::handleAgentExec(const QJsonObject& params)
 {
@@ -36,6 +34,10 @@ QJsonObject AgentHandler::handleAgentExec(const QJsonObject& params)
 
     if (connectionId.isEmpty() || tool.isEmpty()) {
         return {{"error", "agentExec: connection_id and tool are required"}};
+    }
+
+    if (!isConnectionValid(connectionId)) {
+        return {{"error", QString("agentExec: connection '%1' not found").arg(connectionId)}};
     }
 
     QJsonObject payload;
@@ -55,6 +57,10 @@ QJsonObject AgentHandler::handleAgentListTools(const QJsonObject& params)
         return {{"error", "agentListTools: connection_id is required"}};
     }
 
+    if (!isConnectionValid(connectionId)) {
+        return {{"error", QString("agentListTools: connection '%1' not found").arg(connectionId)}};
+    }
+
     QJsonObject payload;
     payload["id"]   = nextRequestId();
     payload["type"] = "listTools";
@@ -62,72 +68,79 @@ QJsonObject AgentHandler::handleAgentListTools(const QJsonObject& params)
     return sendAndWait(connectionId, payload);
 }
 
-// ---- Callback from ClientManager ----
+// ---- Callback from ClientManager (main thread) ----
 
 void AgentHandler::onAgentResponse(const QString& /*connectionId*/,
                                    const QJsonObject& response)
 {
     QString id = response["id"].toString();
-    if (id.isEmpty()) {
-        return;
-    }
+    if (id.isEmpty()) return;
 
+    QMutexLocker pendingLock(&m_pendingMutex);
     auto it = m_pending.find(id);
-    if (it == m_pending.end()) {
-        return;  // No one waiting — ignore
-    }
+    if (it == m_pending.end()) return;
 
-    PendingRequest* req = it.value();
-    req->result = response;
-    if (req->loop && req->loop->isRunning()) {
-        req->loop->quit();
-    }
+    PendingRequest& req = it.value();
+    QMutexLocker resultLock(req.mutex);
+    *req.result = response;
+    *req.done   = true;
+    req.cond->wakeOne();
 }
 
 // ---- Private helpers ----
+
+bool AgentHandler::isConnectionValid(const QString& connectionId) const
+{
+    auto* cm = m_controller->clientManager();
+    return cm && cm->connectionIds().contains(connectionId);
+}
 
 QJsonObject AgentHandler::sendAndWait(const QString& connectionId,
                                       const QJsonObject& payload,
                                       int timeoutMs)
 {
     QString id = payload["id"].toString();
-
-    // Serialise payload to string for the channel
     QByteArray bytes = QJsonDocument(payload).toJson(QJsonDocument::Compact);
     QString jsonData = QString::fromUtf8(bytes);
 
-    // Register pending request
-    QEventLoop loop;
-    PendingRequest req;
-    req.loop = &loop;
-    m_pending.insert(id, &req);
+    QMutex mutex;
+    QWaitCondition cond;
+    QJsonObject result;
+    bool done = false;
 
-    // Set up timeout
-    QTimer timer;
-    timer.setSingleShot(true);
-    connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
-    timer.start(timeoutMs);
-
-    // Send to host
-    m_controller->clientManager()->sendAgentCommand(connectionId, jsonData);
-
-    // Block until response or timeout
-    loop.exec();
-
-    m_pending.remove(id);
-
-    if (!timer.isActive()) {
-        // Timer fired — timed out
-        return {{"error", QString("agentExec timed out after %1 ms").arg(timeoutMs)}};
+    {
+        QMutexLocker locker(&m_pendingMutex);
+        m_pending.insert(id, PendingRequest{&mutex, &cond, &result, &done});
     }
 
-    timer.stop();
-    return req.result;
+    // NativeMessaging is not thread-safe — send from the main thread.
+    auto* cm = m_controller->clientManager();
+    QMetaObject::invokeMethod(cm, [cm, connectionId, jsonData]() {
+        cm->sendAgentCommand(connectionId, jsonData);
+    }, Qt::QueuedConnection);
+
+    // Block the *worker thread* (not the main thread) until response or timeout.
+    {
+        QMutexLocker locker(&mutex);
+        if (!done) {
+            cond.wait(&mutex, timeoutMs);
+        }
+    }
+
+    {
+        QMutexLocker locker(&m_pendingMutex);
+        m_pending.remove(id);
+    }
+
+    if (!done) {
+        return {{"error", QString("agentExec timed out after %1 ms").arg(timeoutMs)}};
+    }
+    return result;
 }
 
 QString AgentHandler::nextRequestId()
 {
-    return QString("agent-%1").arg(m_nextId++);
+    return QString("agent-%1").arg(m_nextId.fetchAndAddRelaxed(1));
 }
 
 } // namespace quickdesk

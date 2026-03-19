@@ -34,12 +34,19 @@ ProcessManager::~ProcessManager()
     m_hostRestartTimer.stop();
     m_clientRestartTimer.stop();
     m_pipeConnectTimer.stop();
-    
-    // Disable auto-restart during destruction
+
     m_hostAutoRestart = false;
     m_clientAutoRestart = false;
-    
-    stopAllProcesses();
+
+    // In the destructor, kill immediately — brief wait is acceptable.
+    if (m_hostProcess && m_hostProcess->state() != QProcess::NotRunning) {
+        m_hostProcess->kill();
+        m_hostProcess->waitForFinished(1000);
+    }
+    if (m_clientProcess && m_clientProcess->state() != QProcess::NotRunning) {
+        m_clientProcess->kill();
+        m_clientProcess->waitForFinished(1000);
+    }
 }
 
 bool ProcessManager::startHostProcess()
@@ -148,61 +155,61 @@ void ProcessManager::stopHostProcess()
         return;
     }
     
-    if (m_hostProcess && m_hostProcess->state() != QProcess::NotRunning) {
-        LOG_INFO("begin stop host process...");
-        m_hostProcess->closeWriteChannel();
-        bool finished = m_hostProcess->waitForFinished(10000);
-        if (!finished) {
-            LOG_WARN("Host process did not exit gracefully, terminating...");
-            m_hostProcess->terminate();
-            finished = m_hostProcess->waitForFinished(5000);
-        }
-        if (!finished) {
-            LOG_WARN("Host process did not terminate, killing...");
-            m_hostProcess->kill();
-            finished = m_hostProcess->waitForFinished(5000);
-        }
-        LOG_INFO("end stop host process...");
-        if (!finished && m_hostProcess->state() != QProcess::NotRunning) {
-            LOG_WARN("Host process still running, skipping destroy");
-            return;
-        }
+    if (!m_hostProcess || m_hostProcess->state() == QProcess::NotRunning) {
+        m_hostMessaging.reset();
+        m_hostProcess.reset();
+        m_hostRestartCount = 0;
+        setHostProcessStatus(ProcessStatus::NotStarted);
+        return;
     }
-    m_hostMessaging.reset();
-    m_hostProcess.reset();
-    m_hostRestartCount = 0;
-    setHostProcessStatus(ProcessStatus::NotStarted);
+
+    LOG_INFO("Initiating async host process shutdown...");
+    m_hostProcess->closeWriteChannel();
+
+    // Phase 1→2→3 escalation via single-shot timers.
+    // Cleanup happens in onHostProcessFinished when the process actually exits.
+    QProcess* proc = m_hostProcess.get();
+    QTimer::singleShot(5000, proc, [proc]() {
+        if (proc->state() == QProcess::NotRunning) return;
+        LOG_WARN("Host process did not exit gracefully, terminating...");
+        proc->terminate();
+
+        QTimer::singleShot(3000, proc, [proc]() {
+            if (proc->state() == QProcess::NotRunning) return;
+            LOG_WARN("Host process did not terminate, killing...");
+            proc->kill();
+        });
+    });
 }
 
 void ProcessManager::stopClientProcess()
 {
     m_clientRestartTimer.stop();
     m_clientStoppingIntentionally = true;
-    
-    if (m_clientProcess && m_clientProcess->state() != QProcess::NotRunning) {
-        LOG_INFO("begin stop client process...");
-        m_clientProcess->closeWriteChannel();
-        bool finished = m_clientProcess->waitForFinished(3000);
-        if (!finished) {
-            LOG_WARN("Client process did not exit gracefully, terminating...");
-            m_clientProcess->terminate();
-            finished = m_clientProcess->waitForFinished(3000);
-        }
-        if (!finished) {
-            LOG_WARN("Client process did not terminate, killing...");
-            m_clientProcess->kill();
-            finished = m_clientProcess->waitForFinished(3000);
-        }
-        LOG_INFO("end stop client process...");
-        if (!finished && m_clientProcess->state() != QProcess::NotRunning) {
-            LOG_WARN("Client process still running, skipping destroy");
-            return;
-        }
+
+    if (!m_clientProcess || m_clientProcess->state() == QProcess::NotRunning) {
+        m_clientMessaging.reset();
+        m_clientProcess.reset();
+        m_clientRestartCount = 0;
+        setClientProcessStatus(ProcessStatus::NotStarted);
+        return;
     }
-    m_clientMessaging.reset();
-    m_clientProcess.reset();
-    m_clientRestartCount = 0;
-    setClientProcessStatus(ProcessStatus::NotStarted);
+
+    LOG_INFO("Initiating async client process shutdown...");
+    m_clientProcess->closeWriteChannel();
+
+    QProcess* proc = m_clientProcess.get();
+    QTimer::singleShot(3000, proc, [proc]() {
+        if (proc->state() == QProcess::NotRunning) return;
+        LOG_WARN("Client process did not exit gracefully, terminating...");
+        proc->terminate();
+
+        QTimer::singleShot(2000, proc, [proc]() {
+            if (proc->state() == QProcess::NotRunning) return;
+            LOG_WARN("Client process did not terminate, killing...");
+            proc->kill();
+        });
+    });
 }
 
 void ProcessManager::stopAllProcesses()
@@ -357,8 +364,9 @@ void ProcessManager::onHostProcessFinished(int exitCode, QProcess::ExitStatus st
     bool isAbnormalExit = (status == QProcess::CrashExit) || (exitCode != 0);
     
     if (m_hostStoppingIntentionally) {
-        // User requested stop, don't restart
         m_hostStoppingIntentionally = false;
+        m_hostProcess.reset();
+        m_hostRestartCount = 0;
         setHostProcessStatus(ProcessStatus::NotStarted);
         LOG_INFO("Host stopped intentionally, not restarting");
         return;
@@ -411,8 +419,9 @@ void ProcessManager::onClientProcessFinished(int exitCode, QProcess::ExitStatus 
     bool isAbnormalExit = (status == QProcess::CrashExit) || (exitCode != 0);
     
     if (m_clientStoppingIntentionally) {
-        // User requested stop, don't restart
         m_clientStoppingIntentionally = false;
+        m_clientProcess.reset();
+        m_clientRestartCount = 0;
         setClientProcessStatus(ProcessStatus::NotStarted);
         LOG_INFO("Client stopped intentionally, not restarting");
         return;

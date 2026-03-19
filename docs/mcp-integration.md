@@ -487,6 +487,67 @@ assert_text_present(connection_id=conn_id, text="Are you sure")
 | `get_signaling_status` | Signaling server connection status. |
 | `refresh_access_code` | Generate a new access code for the local host. |
 
+### Remote Agent (Host-Side Skills)
+
+These tools invoke skills running on the remote host machine via the QuickDesk Agent. The agent starts automatically when the host launches and reports its available tools when a client connects. Use `agent_list_tools` to discover available tools before calling `agent_exec`.
+
+| Tool | Description |
+|------|-------------|
+| `agent_list_tools` | List all tools available on the remote host agent. Returns tool names, descriptions, and input schemas. |
+| `agent_exec` | Execute a tool on the remote host agent. Pass the tool name and arguments as a JSON object. |
+
+#### Built-in Agent Tools
+
+The following tools are provided by built-in skills that ship with QuickDesk (zero external dependencies):
+
+**sys-info** — Remote host system information
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `get_system_info` | OS version, CPU model, memory usage, disk usage, hostname, and uptime | (none) |
+| `list_processes` | Running processes with name, PID, CPU%, and memory usage | `sort_by` (`cpu`/`memory`/`name`), `limit` (default 50) |
+
+**file-ops** — Remote host file operations
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `read_file` | Read file contents | `path` (absolute path) |
+| `write_file` | Write content to a file (creates or overwrites) | `path`, `content` |
+| `list_directory` | List files and directories | `path` (absolute path) |
+| `create_directory` | Create a directory (including parents) | `path` |
+| `move_file` | Move or rename a file/directory | `source`, `destination` |
+| `get_file_info` | File metadata: size, modified time, permissions, type | `path` |
+
+**shell-runner** — Remote host command execution
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `run_command` | Execute a shell command. Returns stdout, stderr, and exit code. | `command`, `timeout_secs` (default 60), `working_dir` |
+
+#### Agent Tool Usage
+
+```
+// Discover available tools on the remote host
+agent_list_tools(connection_id=conn_id)
+    → returns all tools with descriptions and parameter schemas
+
+// Get system information
+agent_exec(connection_id=conn_id, tool="get_system_info", args={})
+    → OS, CPU, memory, disk, hostname, uptime
+
+// Run a command on the remote host
+agent_exec(connection_id=conn_id, tool="run_command",
+           args={"command": "ipconfig /all"})
+    → stdout, stderr, exit_code
+
+// Read a remote file
+agent_exec(connection_id=conn_id, tool="read_file",
+           args={"path": "C:\\Users\\admin\\config.ini"})
+    → file contents
+```
+
+> **Note:** Agent tools run directly on the remote host without needing a visible desktop session. They are faster and more reliable than opening a terminal via screenshot-based automation for tasks like reading files, running commands, and checking system status.
+
 ### Events (Reactive Automation)
 
 Instead of polling with repeated screenshots, these tools let AI agents efficiently wait for state changes on the remote desktop.

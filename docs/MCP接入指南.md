@@ -485,6 +485,67 @@ assert_text_present(connection_id=conn_id, text="确认删除")
 | `get_signaling_status` | 信令服务器连接状态。 |
 | `refresh_access_code` | 刷新本机访问码。 |
 
+### 远程 Agent（被控端 Skills）
+
+这些工具通过 QuickDesk Agent 在远程主机上执行技能。Agent 在被控端启动时自动运行并加载 skills，客户端连接后自动上报可用工具。使用 `agent_list_tools` 发现可用工具，再通过 `agent_exec` 调用。
+
+| 工具 | 说明 |
+|------|------|
+| `agent_list_tools` | 列出远程 Agent 上的所有可用工具。返回工具名、描述和参数结构。 |
+| `agent_exec` | 在远程 Agent 上执行工具。传入工具名和参数（JSON 对象）。 |
+
+#### 内置 Agent 工具
+
+以下工具由 QuickDesk 内置 skill 提供，零外部依赖，随 QuickDesk 一起分发：
+
+**sys-info** — 远程主机系统信息
+
+| 工具 | 说明 | 参数 |
+|------|------|------|
+| `get_system_info` | 操作系统版本、CPU 型号、内存使用、磁盘使用、主机名、运行时间 | （无） |
+| `list_processes` | 运行中的进程：名称、PID、CPU%、内存 | `sort_by`（`cpu`/`memory`/`name`），`limit`（默认 50） |
+
+**file-ops** — 远程主机文件操作
+
+| 工具 | 说明 | 参数 |
+|------|------|------|
+| `read_file` | 读取文件内容 | `path`（绝对路径） |
+| `write_file` | 写入文件（创建或覆盖） | `path`、`content` |
+| `list_directory` | 列出目录下的文件和子目录 | `path`（绝对路径） |
+| `create_directory` | 创建目录（含父目录） | `path` |
+| `move_file` | 移动或重命名文件/目录 | `source`、`destination` |
+| `get_file_info` | 文件元信息：大小、修改时间、权限、类型 | `path` |
+
+**shell-runner** — 远程主机命令执行
+
+| 工具 | 说明 | 参数 |
+|------|------|------|
+| `run_command` | 执行 shell 命令，返回 stdout、stderr 和退出码 | `command`、`timeout_secs`（默认 60）、`working_dir` |
+
+#### Agent 工具使用示例
+
+```
+// 发现远程主机上的可用工具
+agent_list_tools(connection_id=conn_id)
+    → 返回所有工具及其描述和参数结构
+
+// 获取系统信息
+agent_exec(connection_id=conn_id, tool="get_system_info", args={})
+    → 操作系统、CPU、内存、磁盘、主机名、运行时间
+
+// 在远程主机执行命令
+agent_exec(connection_id=conn_id, tool="run_command",
+           args={"command": "ipconfig /all"})
+    → stdout、stderr、exit_code
+
+// 读取远程文件
+agent_exec(connection_id=conn_id, tool="read_file",
+           args={"path": "C:\\Users\\admin\\config.ini"})
+    → 文件内容
+```
+
+> **注意：** Agent 工具直接在远程主机执行，不需要可见的桌面会话。对于读文件、执行命令、查看系统状态等任务，比截图自动化更快更可靠。
+
 ### 事件（响应式自动化）
 
 相比轮询截图，事件工具让 AI Agent 高效等待远程桌面的状态变化。

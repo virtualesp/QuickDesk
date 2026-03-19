@@ -1217,6 +1217,39 @@ If no attempt succeeds, returns a summary of all failures.")]
         ]);
         serde_json::to_string_pretty(&types).unwrap_or_default()
     }
+
+    // ---- Agent bridge tools ----
+
+    #[tool(description = "Execute a tool on the remote host agent (e.g. run_shell, list_processes). \
+The agent runs on the host machine and can call any skill tool. \
+Use agent_list_tools first to discover available tools and their parameters.")]
+    async fn agent_exec(&self, params: Parameters<AgentExecParam>) -> String {
+        let p = params.0;
+        let args = p.args.unwrap_or(serde_json::Value::Object(Default::default()));
+        let req = json!({
+            "connection_id": p.connection_id,
+            "tool": p.tool,
+            "args": args,
+        });
+        match self.ws.request("agentExec", req).await {
+            Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
+            Err(e) => format!("Error: {e}"),
+        }
+    }
+
+    #[tool(description = "List all tools available on the remote host agent. \
+Returns the tool names, descriptions, and input schemas so you know how to call them \
+with agent_exec.")]
+    async fn agent_list_tools(&self, params: Parameters<AgentListToolsParam>) -> String {
+        let p = params.0;
+        let req = json!({
+            "connection_id": p.connection_id,
+        });
+        match self.ws.request("agentListTools", req).await {
+            Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
+            Err(e) => format!("Error: {e}"),
+        }
+    }
 }
 
 #[prompt_router]
@@ -1694,38 +1727,6 @@ impl QuickDeskMcpServer {
         )])
     }
 
-    // ---- Agent bridge tools ----
-
-    #[tool(description = "Execute a tool on the remote host agent (e.g. run_shell, list_processes). \
-The agent runs on the host machine and can call any skill tool. \
-Use agent_list_tools first to discover available tools and their parameters.")]
-    async fn agent_exec(&self, params: Parameters<AgentExecParam>) -> String {
-        let p = params.0;
-        let args = p.args.unwrap_or(serde_json::Value::Object(Default::default()));
-        let req = json!({
-            "connection_id": p.connection_id,
-            "tool": p.tool,
-            "args": args,
-        });
-        match self.ws.request("agentExec", req).await {
-            Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
-            Err(e) => format!("Error: {e}"),
-        }
-    }
-
-    #[tool(description = "List all tools available on the remote host agent. \
-Returns the tool names, descriptions, and input schemas so you know how to call them \
-with agent_exec.")]
-    async fn agent_list_tools(&self, params: Parameters<AgentListToolsParam>) -> String {
-        let p = params.0;
-        let req = json!({
-            "connection_id": p.connection_id,
-        });
-        match self.ws.request("agentListTools", req).await {
-            Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
-            Err(e) => format!("Error: {e}"),
-        }
-    }
 }
 
 #[tool_handler]

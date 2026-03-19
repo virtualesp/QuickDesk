@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuickDesk MCP Test Client</title>
+<style>
+:root {
+  --bg: #1e1e2e;
+  --surface: #282840;
+  --surface2: #313150;
+  --border: #404060;
+  --text: #cdd6f4;
+  --text2: #a6adc8;
+  --accent: #89b4fa;
+  --green: #a6e3a1;
+  --red: #f38ba8;
+  --yellow: #f9e2af;
+  --orange: #fab387;
+  --radius: 8px;
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* Layout */
+.app { display: grid; grid-template-columns: 280px 1fr 1fr; grid-template-rows: 48px 1fr; height: 100vh; }
+.header { grid-column: 1 / -1; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 16px; }
+.sidebar { grid-row: 2; background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; }
+.main { grid-row: 2; display: flex; flex-direction: column; overflow: hidden; }
+.log-panel { grid-row: 2; background: var(--bg); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+
+/* Header */
+.header h1 { font-size: 16px; font-weight: 600; white-space: nowrap; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.status-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.status-dot.disconnected { background: var(--red); }
+.status-dot.connecting { background: var(--yellow); animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: 0.5; } }
+.header .status-text { font-size: 13px; color: var(--text2); }
+.header input { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 4px 10px; border-radius: var(--radius); font-size: 13px; width: 260px; }
+.header button { background: var(--accent); color: var(--bg); border: none; padding: 4px 14px; border-radius: var(--radius); font-size: 13px; cursor: pointer; font-weight: 600; }
+.header button:hover { filter: brightness(1.1); }
+.header button.danger { background: var(--red); }
+
+/* Sidebar */
+.sidebar h3 { padding: 12px 14px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); }
+.method-btn { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--text); padding: 7px 14px; font-size: 13px; cursor: pointer; font-family: var(--mono); border-left: 3px solid transparent; }
+.method-btn:hover { background: var(--surface2); }
+.method-btn.active { background: var(--surface2); border-left-color: var(--accent); color: var(--accent); }
+
+/* Main panel */
+.tool-header { padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.tool-header h2 { font-size: 15px; margin-bottom: 4px; }
+.tool-header p { font-size: 12px; color: var(--text2); }
+.params-area { flex: 1; overflow-y: auto; padding: 16px; }
+.param-row { margin-bottom: 12px; }
+.param-row label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 4px; font-family: var(--mono); }
+.param-row input, .param-row select { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: var(--radius); font-size: 13px; font-family: var(--mono); }
+.param-row input:focus, .param-row select:focus { outline: none; border-color: var(--accent); }
+.send-bar { padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); display: flex; gap: 8px; }
+.send-bar button { padding: 8px 20px; border: none; border-radius: var(--radius); cursor: pointer; font-weight: 600; font-size: 13px; }
+.btn-send { background: var(--accent); color: var(--bg); }
+.btn-send:hover { filter: brightness(1.1); }
+.btn-raw { background: var(--surface2); color: var(--text); border: 1px solid var(--border) !important; }
+
+/* Custom JSON editor */
+.json-editor { width: 100%; min-height: 160px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: var(--radius); font-size: 13px; font-family: var(--mono); resize: vertical; line-height: 1.5; }
+
+/* Log panel */
+.log-header { padding: 10px 14px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.log-header h3 { font-size: 13px; }
+.log-header button { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); padding: 2px 10px; border-radius: var(--radius); font-size: 11px; cursor: pointer; }
+.log-entries { flex: 1; overflow-y: auto; padding: 8px; font-family: var(--mono); font-size: 12px; }
+.log-entry { padding: 6px 8px; border-radius: 4px; margin-bottom: 4px; white-space: pre-wrap; word-break: break-all; line-height: 1.4; }
+.log-entry.sent { background: rgba(137,180,250,0.08); border-left: 3px solid var(--accent); }
+.log-entry.recv { background: rgba(166,227,161,0.08); border-left: 3px solid var(--green); }
+.log-entry.event { background: rgba(249,226,175,0.08); border-left: 3px solid var(--yellow); }
+.log-entry.error { background: rgba(243,139,168,0.08); border-left: 3px solid var(--red); }
+.log-entry.info { background: rgba(166,173,200,0.05); border-left: 3px solid var(--text2); }
+.log-time { color: var(--text2); margin-right: 8px; }
+.log-dir { font-weight: 600; margin-right: 6px; }
+.log-dir.out { color: var(--accent); }
+.log-dir.in { color: var(--green); }
+.log-dir.ev { color: var(--yellow); }
+.log-dir.err { color: var(--red); }
+
+/* Result display */
+.result-area { padding: 16px; background: var(--bg); overflow-y: auto; max-height: 300px; }
+.result-box { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-all; line-height: 1.5; max-height: 280px; overflow-y: auto; }
+.result-box.success { border-color: var(--green); }
+.result-box.error { border-color: var(--red); color: var(--red); }
+
+/* Tabs */
+.tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+.tab-btn { padding: 8px 16px; background: none; border: none; color: var(--text2); cursor: pointer; font-size: 13px; border-bottom: 2px solid transparent; }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Screenshot display */
+.screenshot-container { text-align: center; padding: 8px; }
+.screenshot-container img { max-width: 100%; border-radius: var(--radius); border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <h1>QuickDesk MCP Test</h1>
+    <div class="status-dot disconnected" id="statusDot"></div>
+    <span class="status-text" id="statusText">Disconnected</span>
+    <input id="wsUrl" value="ws://127.0.0.1:9600" placeholder="WebSocket URL">
+    <button id="btnConnect" onclick="toggleConnection()">Connect</button>
+    <button class="danger" onclick="clearLog()">Clear Log</button>
+  </div>
+
+  <!-- Sidebar: Method List -->
+  <div class="sidebar" id="sidebar"></div>
+
+  <!-- Main Panel -->
+  <div class="main">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('form')">Form</button>
+      <button class="tab-btn" onclick="switchTab('raw')">Raw JSON</button>
+      <button class="tab-btn" onclick="switchTab('result')">Result</button>
+    </div>
+
+    <!-- Form Tab -->
+    <div class="tab-content active" id="tab-form" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="tool-header" id="toolHeader">
+        <h2>Select a method</h2>
+        <p>Choose an API method from the sidebar to get started.</p>
+      </div>
+      <div class="params-area" id="paramsArea"></div>
+      <div class="send-bar">
+        <button class="btn-send" onclick="sendFromForm()">Send</button>
+      </div>
+    </div>
+
+    <!-- Raw JSON Tab -->
+    <div class="tab-content" id="tab-raw" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="tool-header"><h2>Custom JSON</h2><p>Send any raw JSON message to the WebSocket server.</p></div>
+      <div style="flex:1;padding:16px;overflow-y:auto;">
+        <textarea class="json-editor" id="rawJson">{
+  "method": "getHostInfo",
+  "params": {}
+}</textarea>
+      </div>
+      <div class="send-bar">
+        <button class="btn-send" onclick="sendRaw()">Send Raw</button>
+        <button class="btn-raw" onclick="formatRaw()">Format</button>
+      </div>
+    </div>
+
+    <!-- Result Tab -->
+    <div class="tab-content" id="tab-result" style="flex:1;overflow-y:auto;">
+      <div id="resultArea" style="padding:16px;">
+        <div class="result-box" id="resultBox">No result yet. Send a request first.</div>
+      </div>
+      <div id="screenshotArea" class="screenshot-container" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Log Panel -->
+  <div class="log-panel">
+    <div class="log-header">
+      <h3>Message Log</h3>
+      <label><input type="checkbox" id="autoScroll" checked> Auto-scroll</label>
+    </div>
+    <div class="log-entries" id="logEntries"></div>
+  </div>
+</div>
+
+<script>
+// ── API Method Definitions ──
+const API_METHODS = {
+  "Connection": {
+    "getHostInfo": { desc: "Get local device ID, access code, signaling state", params: {} },
+    "getHostClients": { desc: "List clients connected to this host", params: {} },
+    "getStatus": { desc: "Overall system status", params: {} },
+    "getSignalingStatus": { desc: "Signaling server connection status", params: {} },
+    "refreshAccessCode": { desc: "Refresh the local host access code", params: {} },
+    "listConnections": { desc: "List all active remote connections", params: {} },
+    "getConnectionInfo": { desc: "Get details for a specific connection", params: { connectionId: "conn_1" } },
+    "connectToHost": { desc: "Connect to a remote device", params: { deviceId: "", accessCode: "", serverUrl: "", showWindow: true } },
+    "disconnectFromHost": { desc: "Disconnect a specific connection", params: { connectionId: "conn_1" } },
+    "disconnectAll": { desc: "Disconnect all connections", params: {} },
+  },
+  "Screen": {
+    "screenshot": { desc: "Capture remote screen (returns base64 image)", params: { connectionId: "conn_1", maxWidth: 1280, format: "jpeg", quality: 80 } },
+    "getScreenSize": { desc: "Get remote screen resolution", params: { connectionId: "conn_1" } },
+    "getScreenText": { desc: "OCR: extract all text from screen", params: { connectionId: "conn_1" } },
+    "findElement": { desc: "Find UI element by text", params: { connectionId: "conn_1", text: "", exact: false, ignoreCase: true } },
+    "clickText": { desc: "Find text and click it", params: { connectionId: "conn_1", text: "", exact: false, ignoreCase: true, button: "left" } },
+    "getUiState": { desc: "Get unified UI state (resolution + OCR + window title)", params: { connectionId: "conn_1" } },
+  },
+  "Mouse": {
+    "mouseClick": { desc: "Click at (x, y)", params: { connectionId: "conn_1", x: 0, y: 0, button: "left" } },
+    "mouseDoubleClick": { desc: "Double-click at (x, y)", params: { connectionId: "conn_1", x: 0, y: 0 } },
+    "mouseMove": { desc: "Move cursor to (x, y)", params: { connectionId: "conn_1", x: 0, y: 0 } },
+    "mouseScroll": { desc: "Scroll at (x, y)", params: { connectionId: "conn_1", x: 0, y: 0, deltaX: 0, deltaY: -120 } },
+    "mouseDrag": { desc: "Drag from start to end", params: { connectionId: "conn_1", startX: 0, startY: 0, endX: 100, endY: 100, button: "left" } },
+  },
+  "Keyboard": {
+    "keyboardType": { desc: "Type text (clipboard paste)", params: { connectionId: "conn_1", text: "" } },
+    "keyboardHotkey": { desc: "Send hotkey combo", params: { connectionId: "conn_1", keys: ["ctrl", "c"] } },
+    "keyPress": { desc: "Press and hold a key", params: { connectionId: "conn_1", key: "ctrl" } },
+    "keyRelease": { desc: "Release a held key", params: { connectionId: "conn_1", key: "ctrl" } },
+  },
+  "Clipboard": {
+    "getClipboard": { desc: "Get remote clipboard content", params: { connectionId: "conn_1" } },
+    "setClipboard": { desc: "Set remote clipboard content", params: { connectionId: "conn_1", text: "" } },
+  },
+  "Verification": {
+    "waitForText": { desc: "Wait for text to appear on screen", params: { connectionId: "conn_1", text: "", timeoutMs: 5000 } },
+    "assertTextPresent": { desc: "Assert text is visible now", params: { connectionId: "conn_1", text: "" } },
+    "verifyActionResult": { desc: "Poll until conditions pass", params: { connectionId: "conn_1", expectations: [{ type: "text_present", value: "" }], timeoutMs: 3000 } },
+    "screenDiffSummary": { desc: "Diff current screen vs baseline hash", params: { connectionId: "conn_1", fromHash: "" } },
+    "assertScreenState": { desc: "Assert conditions (no polling)", params: { connectionId: "conn_1", expectations: [{ type: "text_present", value: "" }] } },
+  },
+  "Agent": {
+    "agentListTools": { desc: "List remote agent tools", params: { connection_id: "conn_1" } },
+    "agentExec": { desc: "Execute a tool on remote agent (custom)", params: { connection_id: "conn_1", tool: "", args: {} } },
+  },
+  "Agent: sys-info": {
+    "get_system_info": { desc: "OS, CPU, memory, disk, hostname, uptime", params: { connection_id: "conn_1" }, _agent: true, _args: {} },
+    "list_processes": { desc: "Running processes with CPU% and memory", params: { connection_id: "conn_1", sort_by: "cpu", limit: 20 }, _agent: true, _argsMap: { sort_by: "sort_by", limit: "limit" } },
+  },
+  "Agent: file-ops": {
+    "read_file": { desc: "Read file contents", params: { connection_id: "conn_1", path: "" }, _agent: true, _argsMap: { path: "path" } },
+    "write_file": { desc: "Write content to a file", params: { connection_id: "conn_1", path: "", content: "" }, _agent: true, _argsMap: { path: "path", content: "content" } },
+    "list_directory": { desc: "List files and directories", params: { connection_id: "conn_1", path: "C:\\" }, _agent: true, _argsMap: { path: "path" } },
+    "create_directory": { desc: "Create a directory", params: { connection_id: "conn_1", path: "" }, _agent: true, _argsMap: { path: "path" } },
+    "move_file": { desc: "Move or rename a file/directory", params: { connection_id: "conn_1", source: "", destination: "" }, _agent: true, _argsMap: { source: "source", destination: "destination" } },
+    "get_file_info": { desc: "File metadata: size, time, type", params: { connection_id: "conn_1", path: "" }, _agent: true, _argsMap: { path: "path" } },
+  },
+  "Agent: shell": {
+    "run_command": { desc: "Execute a shell command", params: { connection_id: "conn_1", command: "", timeout_secs: 60, working_dir: "" }, _agent: true, _argsMap: { command: "command", timeout_secs: "timeout_secs", working_dir: "working_dir" } },
+  },
+};
+
+// ── State ──
+let ws = null;
+let reqCounter = 0;
+let currentMethod = null;
+let reconnectTimer = null;
+let reconnectDelay = 1000;
+const MAX_RECONNECT_DELAY = 30000;
+
+// ── WebSocket ──
+function toggleConnection() {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.close();
+  } else {
+    connect();
+  }
+}
+
+function connect() {
+  const url = document.getElementById('wsUrl').value;
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  setStatus('connecting');
+  try {
+    ws = new WebSocket(url);
+  } catch (e) {
+    logMsg('error', `Connection failed: ${e.message}`);
+    scheduleReconnect();
+    return;
+  }
+
+  ws.onopen = () => {
+    setStatus('connected');
+    reconnectDelay = 1000;
+    logMsg('info', `Connected to ${url}`);
+  };
+
+  ws.onclose = (e) => {
+    setStatus('disconnected');
+    logMsg('info', `Disconnected (code=${e.code})`);
+    scheduleReconnect();
+  };
+
+  ws.onerror = () => {
+    logMsg('error', 'WebSocket error');
+  };
+
+  ws.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.event) {
+        logMsg('event', `Event: ${data.event}\n${JSON.stringify(data.data || data, null, 2)}`);
+      } else if (data.error) {
+        logMsg('recv-error', `Response [${data.id || '?'}]\n${JSON.stringify(data.error, null, 2)}`);
+        showResult(data, true);
+      } else {
+        const isScreenshot = data.result && data.result.imageData;
+        if (isScreenshot) {
+          logMsg('recv', `Response [${data.id || '?'}] (screenshot ${data.result.width}x${data.result.height})`);
+        } else {
+          logMsg('recv', `Response [${data.id || '?'}]\n${JSON.stringify(data.result || data, null, 2)}`);
+        }
+        showResult(data, false);
+      }
+    } catch {
+      logMsg('recv', e.data);
+    }
+  };
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  logMsg('info', `Reconnecting in ${reconnectDelay / 1000}s...`);
+  setStatus('connecting');
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connect();
+    reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+  }, reconnectDelay);
+}
+
+function setStatus(state) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  const btn = document.getElementById('btnConnect');
+  dot.className = 'status-dot ' + state;
+  txt.textContent = state === 'connected' ? 'Connected' : state === 'connecting' ? 'Connecting...' : 'Disconnected';
+  btn.textContent = state === 'connected' ? 'Disconnect' : 'Connect';
+}
+
+function sendMessage(method, params) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    logMsg('error', 'Not connected');
+    return;
+  }
+  reqCounter++;
+  const msg = { id: `req_${reqCounter}`, method, params };
+  const text = JSON.stringify(msg);
+  ws.send(text);
+  logMsg('sent', `[${msg.id}] ${method}\n${JSON.stringify(params, null, 2)}`);
+}
+
+// ── UI ──
+function buildSidebar() {
+  const sb = document.getElementById('sidebar');
+  sb.innerHTML = '';
+  for (const [group, methods] of Object.entries(API_METHODS)) {
+    const h = document.createElement('h3');
+    h.textContent = group;
+    sb.appendChild(h);
+    for (const [name, def] of Object.entries(methods)) {
+      const btn = document.createElement('button');
+      btn.className = 'method-btn';
+      btn.textContent = name;
+      btn.title = def.desc;
+      btn.onclick = () => selectMethod(name, def);
+      sb.appendChild(btn);
+    }
+  }
+}
+
+function selectMethod(name, def) {
+  currentMethod = { name, def };
+  // Update active state
+  document.querySelectorAll('.method-btn').forEach(b => b.classList.toggle('active', b.textContent === name));
+
+  const header = document.getElementById('toolHeader');
+  header.querySelector('h2').textContent = name;
+  header.querySelector('p').textContent = def.desc;
+
+  // Build params form
+  const area = document.getElementById('paramsArea');
+  area.innerHTML = '';
+  for (const [key, defaultVal] of Object.entries(def.params)) {
+    const row = document.createElement('div');
+    row.className = 'param-row';
+    const label = document.createElement('label');
+    label.textContent = key;
+    row.appendChild(label);
+
+    if (typeof defaultVal === 'boolean') {
+      const sel = document.createElement('select');
+      sel.dataset.param = key;
+      sel.innerHTML = '<option value="true">true</option><option value="false">false</option>';
+      sel.value = String(defaultVal);
+      row.appendChild(sel);
+    } else if (Array.isArray(defaultVal) || typeof defaultVal === 'object') {
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.dataset.param = key;
+      inp.dataset.json = 'true';
+      inp.value = JSON.stringify(defaultVal);
+      inp.placeholder = 'JSON value';
+      row.appendChild(inp);
+    } else {
+      const inp = document.createElement('input');
+      inp.type = typeof defaultVal === 'number' ? 'number' : 'text';
+      inp.dataset.param = key;
+      inp.value = defaultVal;
+      inp.placeholder = key;
+      row.appendChild(inp);
+    }
+    area.appendChild(row);
+  }
+
+  // Update raw JSON tab
+  if (def._agent) {
+    const argsMap = def._argsMap || {};
+    const args = {};
+    for (const [paramKey, argKey] of Object.entries(argsMap)) {
+      if (def.params[paramKey] !== undefined) args[argKey] = def.params[paramKey];
+    }
+    document.getElementById('rawJson').value = JSON.stringify({
+      method: 'agentExec',
+      params: { connection_id: def.params.connection_id || 'conn_1', tool: name, args }
+    }, null, 2);
+  } else {
+    document.getElementById('rawJson').value = JSON.stringify({ method: name, params: def.params }, null, 2);
+  }
+  switchTab('form');
+}
+
+function collectParams() {
+  const params = {};
+  document.querySelectorAll('#paramsArea [data-param]').forEach(el => {
+    const key = el.dataset.param;
+    let val = el.value;
+    if (val === '' || val === undefined) return;
+    if (el.dataset.json === 'true') {
+      try { val = JSON.parse(val); } catch { /* keep as string */ }
+    } else if (el.tagName === 'SELECT') {
+      val = val === 'true';
+    } else if (el.type === 'number') {
+      val = parseFloat(val);
+      if (isNaN(val)) return;
+    }
+    params[key] = val;
+  });
+  return params;
+}
+
+function sendFromForm() {
+  if (!currentMethod) { logMsg('error', 'Select a method first'); return; }
+  const params = collectParams();
+  if (currentMethod.def._agent) {
+    const argsMap = currentMethod.def._argsMap || {};
+    const args = {};
+    for (const [paramKey, argKey] of Object.entries(argsMap)) {
+      if (params[paramKey] !== undefined && params[paramKey] !== '') {
+        args[argKey] = params[paramKey];
+      }
+    }
+    sendMessage('agentExec', {
+      connection_id: params.connection_id || 'conn_1',
+      tool: currentMethod.name,
+      args
+    });
+  } else {
+    sendMessage(currentMethod.name, params);
+  }
+}
+
+function sendRaw() {
+  const raw = document.getElementById('rawJson').value;
+  try {
+    const msg = JSON.parse(raw);
+    if (!msg.id) { reqCounter++; msg.id = `req_${reqCounter}`; }
+    ws.send(JSON.stringify(msg));
+    logMsg('sent', `[${msg.id}] ${msg.method || '?'}\n${JSON.stringify(msg.params || {}, null, 2)}`);
+  } catch (e) {
+    logMsg('error', `Invalid JSON: ${e.message}`);
+  }
+}
+
+function formatRaw() {
+  const ta = document.getElementById('rawJson');
+  try { ta.value = JSON.stringify(JSON.parse(ta.value), null, 2); } catch {}
+}
+
+function showResult(data, isError) {
+  const box = document.getElementById('resultBox');
+  box.className = 'result-box ' + (isError ? 'error' : 'success');
+  const display = isError ? data.error : (data.result || data);
+  box.textContent = JSON.stringify(display, null, 2);
+
+  // Handle screenshot
+  const ssArea = document.getElementById('screenshotArea');
+  if (!isError && data.result && data.result.imageData) {
+    const fmt = data.result.format || 'jpeg';
+    ssArea.innerHTML = `<img src="data:image/${fmt};base64,${data.result.imageData}" alt="screenshot">
+      <p style="margin-top:8px;color:var(--text2);font-size:12px">${data.result.width}×${data.result.height}</p>`;
+    ssArea.style.display = 'block';
+    // Strip imageData from result display to keep it readable
+    const clean = { ...data.result };
+    delete clean.imageData;
+    box.textContent = JSON.stringify(clean, null, 2);
+  } else {
+    ssArea.style.display = 'none';
+  }
+
+  switchTab('result');
+}
+
+// ── Tabs ──
+function switchTab(id) {
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    const tabs = ['form', 'raw', 'result'];
+    btn.classList.toggle('active', tabs[i] === id);
+  });
+  document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  if (id === 'form') document.getElementById('tab-form').style.display = 'flex';
+  if (id === 'raw') document.getElementById('tab-raw').style.display = 'flex';
+}
+
+// ── Log ──
+function logMsg(type, text) {
+  const entries = document.getElementById('logEntries');
+  const div = document.createElement('div');
+  const now = new Date();
+  const time = now.toLocaleTimeString('en-GB', { hour12: false }) + '.' + String(now.getMilliseconds()).padStart(3, '0');
+
+  let cls, dirLabel, dirCls;
+  switch (type) {
+    case 'sent': cls = 'sent'; dirLabel = '→'; dirCls = 'out'; break;
+    case 'recv': cls = 'recv'; dirLabel = '←'; dirCls = 'in'; break;
+    case 'recv-error': cls = 'error'; dirLabel = '←'; dirCls = 'err'; break;
+    case 'event': cls = 'event'; dirLabel = '⚡'; dirCls = 'ev'; break;
+    case 'error': cls = 'error'; dirLabel = '✗'; dirCls = 'err'; break;
+    default: cls = 'info'; dirLabel = 'ℹ'; dirCls = 'in'; break;
+  }
+
+  div.className = `log-entry ${cls}`;
+  div.innerHTML = `<span class="log-time">${time}</span><span class="log-dir ${dirCls}">${dirLabel}</span>${escHtml(text)}`;
+  entries.appendChild(div);
+
+  if (document.getElementById('autoScroll').checked) {
+    entries.scrollTop = entries.scrollHeight;
+  }
+}
+
+function clearLog() {
+  document.getElementById('logEntries').innerHTML = '';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ── Init ──
+buildSidebar();
+</script>
+</body>
+</html>
