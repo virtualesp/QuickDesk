@@ -79,6 +79,10 @@ jobs:
         shell: cmd
         run: call scripts\build_mcp_win.bat Release
 
+      - name: Build Agent
+        shell: cmd
+        run: call scripts\build_agent_win.bat Release
+
       - name: Publish
         shell: cmd
         run: call scripts\publish_qd_win.bat Release

@@ -62,6 +62,9 @@ jobs:
       - name: Build MCP Bridge
         run: bash scripts/build_mcp_mac.sh Release
 
+      - name: Build Agent
+        run: bash scripts/build_agent_mac.sh Release
+
       - name: Publish
         run: bash scripts/publish_qd_mac.sh Release
 
