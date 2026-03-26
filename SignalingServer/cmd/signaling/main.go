@@ -199,9 +199,6 @@ func main() {
 		c.Redirect(http.StatusFound, "/admin/")
 	})
 
-	// WebClient static files (remote.html, /js/*, /images/*, /assets/*)
-	handler.RegisterWebClientUI(router)
-
 	// Start server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	log.Printf("Server starting on %s", addr)
