@@ -734,29 +734,61 @@
     <div id="loginDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:none;align-items:center;justify-content:center;">
         <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:32px;width:360px;max-width:90vw;">
             <h3 id="loginDialogTitle" style="text-align:center;margin-bottom:20px;font-size:20px;" data-i18n="user.login">登录</h3>
-            <div class="form-group">
-                <label data-i18n="user.username">用户名</label>
-                <input type="text" id="loginUsername" class="form-input" placeholder="用户名" autocomplete="username" />
+
+            <!-- Username/password login fields -->
+            <div id="loginFields">
+                <div class="form-group">
+                    <label data-i18n="user.username">用户名</label>
+                    <input type="text" id="loginUsername" class="form-input" placeholder="用户名" autocomplete="username" />
+                </div>
+                <div class="form-group">
+                    <label data-i18n="user.password">密码</label>
+                    <input type="password" id="loginPassword" class="form-input" placeholder="密码" autocomplete="current-password" />
+                </div>
             </div>
-            <div class="form-group">
-                <label data-i18n="user.password">密码</label>
-                <input type="password" id="loginPassword" class="form-input" placeholder="密码" autocomplete="current-password" />
+
+            <!-- SMS login fields (hidden by default) -->
+            <div id="smsLoginFields" style="display:none;">
+                <div class="form-group">
+                    <label data-i18n="user.phone">手机号</label>
+                    <input type="text" id="smsLoginPhone" class="form-input" placeholder="手机号" />
+                </div>
+                <div class="form-group">
+                    <label data-i18n="user.smsCode">验证码</label>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="smsLoginCode" class="form-input" placeholder="验证码" style="flex:1;" />
+                        <button id="smsLoginSendBtn" class="btn btn-secondary" style="white-space:nowrap;min-width:80px;" data-i18n="user.sendCode">发送验证码</button>
+                    </div>
+                </div>
             </div>
+
+            <!-- Register fields -->
             <div id="registerFields" style="display:none;">
                 <div class="form-group">
-                    <label data-i18n="user.phone">手机号 (可选)</label>
+                    <label data-i18n="user.phone" id="regPhoneLabel">手机号 (可选)</label>
                     <input type="text" id="loginPhone" class="form-input" placeholder="手机号" />
+                </div>
+                <div id="regSmsCodeGroup" class="form-group" style="display:none;">
+                    <label data-i18n="user.smsCode">验证码</label>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="regSmsCode" class="form-input" placeholder="验证码" style="flex:1;" />
+                        <button id="regSmsSendBtn" class="btn btn-secondary" style="white-space:nowrap;min-width:80px;" data-i18n="user.sendCode">发送验证码</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label data-i18n="user.email">邮箱 (可选)</label>
                     <input type="email" id="loginEmail" class="form-input" placeholder="邮箱" />
                 </div>
             </div>
+
             <div id="loginError" style="display:none;color:var(--error);font-size:13px;margin-bottom:12px;text-align:center;"></div>
             <div id="loginSuccess" style="display:none;color:var(--success);font-size:13px;margin-bottom:12px;text-align:center;"></div>
             <button id="loginSubmitBtn" class="btn btn-primary btn-full" style="margin-bottom:12px;" data-i18n="user.login">登录</button>
             <div style="text-align:center;">
                 <span id="loginModeSwitch" style="color:var(--accent);font-size:13px;cursor:pointer;" data-i18n="user.noAccount">没有账号？注册</span>
+            </div>
+            <div id="smsLoginToggle" style="display:none;text-align:center;margin-top:4px;">
+                <span id="smsLoginSwitchBtn" style="color:var(--accent);font-size:13px;cursor:pointer;" data-i18n="user.smsLogin">短信验证码登录</span>
             </div>
             <div style="text-align:center;margin-top:8px;">
                 <span id="loginCancelBtn" style="color:var(--text-secondary);font-size:13px;cursor:pointer;" data-i18n="user.cancel">取消</span>

@@ -102,10 +102,27 @@ func main() {
 		settingsHandler := handler.NewSettingsHandler(db)
 		v1.GET("/settings", settingsHandler.GetSettings)
 
+		// Public feature flags (clients use this to decide which UI to show)
+		v1.GET("/features", apiHandler.GetFeatures)
+
+		// SMS service (nil-safe – disabled when Aliyun credentials are not configured)
+		smsService := service.NewSmsService(
+			redisClient,
+			cfg.Sms.AccessKeyID, cfg.Sms.AccessKeySecret,
+			cfg.Sms.SignName, cfg.Sms.TemplateCode,
+			cfg.Sms.Enabled,
+		)
+
+		// SMS verification code endpoint
+		smsHandler := handler.NewSmsHandler(smsService, db)
+		v1.POST("/sms/send", smsHandler.SendCode)
+
 		// User authentication (public, no API key required)
 		userAuth := handler.NewUserAuth(db, redisClient)
+		userAuth.SetSmsService(smsService)
 		v1.POST("/user/register", userAuth.Register)
 		v1.POST("/user/login", userAuth.Login)
+		v1.POST("/user/login-sms", userAuth.LoginWithSms)
 		v1.POST("/user/logout", userAuth.Logout)
 
 		// User device binding APIs (require user login token)

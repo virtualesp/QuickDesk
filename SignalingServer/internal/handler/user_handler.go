@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"quickdesk/signaling/internal/models"
+	"quickdesk/signaling/internal/service"
 	"strconv"
 	"time"
 
@@ -216,11 +217,17 @@ const userTokenTTL = 7 * 24 * time.Hour
 type UserAuth struct {
 	db  *gorm.DB
 	rdb *redis.Client
+	sms *service.SmsService
 }
 
 // NewUserAuth creates a new UserAuth instance.
 func NewUserAuth(db *gorm.DB, rdb *redis.Client) *UserAuth {
 	return &UserAuth{db: db, rdb: rdb}
+}
+
+// SetSmsService injects the SMS service (may be nil if SMS is disabled).
+func (a *UserAuth) SetSmsService(sms *service.SmsService) {
+	a.sms = sms
 }
 
 // CleanupLoop is a no-op kept for API compatibility. Redis TTL handles expiry automatically.
@@ -242,6 +249,7 @@ func (a *UserAuth) Register(c *gin.Context) {
 		Username    string `json:"username" binding:"required"`
 		Password    string `json:"password" binding:"required"`
 		Phone       string `json:"phone"`
+		SmsCode     string `json:"sms_code"`
 		Email       string `json:"email"`
 		Level       string `json:"level"`
 		ChannelType string `json:"channelType"`
@@ -252,10 +260,37 @@ func (a *UserAuth) Register(c *gin.Context) {
 		return
 	}
 
+	// When SMS is enabled, phone + sms_code are mandatory
+	smsEnabled := a.sms != nil && a.sms.IsEnabled()
+	if smsEnabled {
+		if req.Phone == "" || req.SmsCode == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "手机号和验证码为必填项"})
+			return
+		}
+		if !service.ValidatePhone(req.Phone) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "手机号格式不正确"})
+			return
+		}
+		// Verify SMS code
+		if err := a.sms.VerifyCode(c.Request.Context(), req.Phone, req.SmsCode); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
 	var existing models.User
 	if result := a.db.Where("username = ?", req.Username).First(&existing); result.Error == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "用户名已存在"})
 		return
+	}
+
+	// Check phone uniqueness (when phone is provided)
+	if req.Phone != "" {
+		var phoneUser models.User
+		if result := a.db.Where("phone = ?", req.Phone).First(&phoneUser); result.Error == nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "该手机号已注册"})
+			return
+		}
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -316,6 +351,69 @@ func (a *UserAuth) Login(c *gin.Context) {
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
+		return
+	}
+
+	if !user.Status {
+		c.JSON(http.StatusForbidden, gin.H{"error": "账号已被禁用"})
+		return
+	}
+
+	token := a.generateToken()
+	ctx := context.Background()
+	if err := a.rdb.Set(ctx, a.redisKey(token), user.ID, userTokenTTL).Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "session 存储失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"token": token,
+		"user": gin.H{
+			"id":          user.ID,
+			"username":    user.Username,
+			"phone":       user.Phone,
+			"email":       user.Email,
+			"level":       user.Level,
+			"deviceCount": user.DeviceCount,
+			"channelType": user.ChannelType,
+			"status":      user.Status,
+			"createdAt":   user.CreatedAt,
+			"updatedAt":   user.UpdatedAt,
+		},
+	})
+}
+
+// LoginWithSms handles POST /api/v1/user/login-sms
+func (a *UserAuth) LoginWithSms(c *gin.Context) {
+	if a.sms == nil || !a.sms.IsEnabled() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "短信服务未启用"})
+		return
+	}
+
+	var req struct {
+		Phone   string `json:"phone" binding:"required"`
+		SmsCode string `json:"sms_code" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请提供手机号和验证码"})
+		return
+	}
+
+	if !service.ValidatePhone(req.Phone) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "手机号格式不正确"})
+		return
+	}
+
+	// Verify SMS code
+	if err := a.sms.VerifyCode(c.Request.Context(), req.Phone, req.SmsCode); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Find user by phone
+	var user models.User
+	if result := a.db.Where("phone = ?", req.Phone).First(&user); result.Error != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "该手机号未注册"})
 		return
 	}
 

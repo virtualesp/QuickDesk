@@ -26,6 +26,14 @@ type SecurityConfig struct {
 	AllowedOrigins []string // Allowed Origin domains for WebClient; empty means disabled
 }
 
+type SmsConfig struct {
+	AccessKeyID     string
+	AccessKeySecret string
+	SignName        string
+	TemplateCode    string
+	Enabled         bool // true when all required fields are configured
+}
+
 type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
 	Database DatabaseConfig `mapstructure:"database"`
@@ -33,6 +41,7 @@ type Config struct {
 	Ice      IceConfig
 	Admin    AdminConfig
 	Security SecurityConfig
+	Sms      SmsConfig
 }
 
 type ServerConfig struct {
@@ -84,6 +93,12 @@ func Load() *Config {
 	viper.SetDefault("API_KEY", "")
 	viper.SetDefault("ALLOWED_ORIGINS", "")
 
+	// Aliyun SMS (optional – leave empty to disable phone features)
+	viper.SetDefault("ALIYUN_SMS_ACCESS_KEY_ID", "")
+	viper.SetDefault("ALIYUN_SMS_ACCESS_KEY_SECRET", "")
+	viper.SetDefault("ALIYUN_SMS_SIGN_NAME", "")
+	viper.SetDefault("ALIYUN_SMS_TEMPLATE_CODE", "")
+
 	// Read config file (optional, will use defaults if not exists)
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
@@ -126,15 +141,29 @@ func Load() *Config {
 		AllowedOrigins: allowedOrigins,
 	}
 
+	// Aliyun SMS – enabled only when all four fields are set
+	smsKeyID := viper.GetString("ALIYUN_SMS_ACCESS_KEY_ID")
+	smsKeySecret := viper.GetString("ALIYUN_SMS_ACCESS_KEY_SECRET")
+	smsSignName := viper.GetString("ALIYUN_SMS_SIGN_NAME")
+	smsTemplate := viper.GetString("ALIYUN_SMS_TEMPLATE_CODE")
+	smsEnabled := smsKeyID != "" && smsKeySecret != "" && smsSignName != "" && smsTemplate != ""
+	cfg.Sms = SmsConfig{
+		AccessKeyID:     smsKeyID,
+		AccessKeySecret: smsKeySecret,
+		SignName:        smsSignName,
+		TemplateCode:    smsTemplate,
+		Enabled:         smsEnabled,
+	}
+
 	apiKeyStatus := "disabled"
 	if cfg.Security.APIKey != "" {
 		apiKeyStatus = "enabled"
 	}
-	log.Printf("Loaded config: Server=%s:%d, DB=%s:%d/%s, ICE TURN=%d STUN=%d TTL=%ds MaxRate=%dkbps, APIKey=%s, AllowedOrigins=%d",
+	log.Printf("Loaded config: Server=%s:%d, DB=%s:%d/%s, ICE TURN=%d STUN=%d TTL=%ds MaxRate=%dkbps, APIKey=%s, AllowedOrigins=%d, SMS=%v",
 		cfg.Server.Host, cfg.Server.Port,
 		cfg.Database.Host, cfg.Database.Port, cfg.Database.DBName,
 		len(cfg.Ice.TurnURLs), len(cfg.Ice.StunURLs), cfg.Ice.CredentialTTL, cfg.Ice.MaxRateKbps,
-		apiKeyStatus, len(cfg.Security.AllowedOrigins))
+		apiKeyStatus, len(cfg.Security.AllowedOrigins), cfg.Sms.Enabled)
 
 	return cfg
 }

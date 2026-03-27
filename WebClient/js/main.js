@@ -160,7 +160,10 @@ class QuickDeskApp {
         const userMenuLogout = document.getElementById('userMenuLogout');
         const refreshDevicesBtn = document.getElementById('refreshDevicesBtn');
 
-        this._loginMode = 'login'; // 'login' or 'register'
+        this._loginMode = 'login'; // 'login', 'register', or 'sms-login'
+        this._smsEnabled = false;
+        this._smsCountdown = 0;
+        this._smsTimer = null;
 
         userArea?.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -181,6 +184,21 @@ class QuickDeskApp {
         userMenuLogout?.addEventListener('click', () => this._onLogout());
         refreshDevicesBtn?.addEventListener('click', () => this._refreshCloudData());
 
+        // SMS login toggle
+        document.getElementById('smsLoginSwitchBtn')?.addEventListener('click', () => {
+            this._loginMode = this._loginMode === 'sms-login' ? 'login' : 'sms-login';
+            this._updateLoginDialogMode();
+            this._clearLoginMessages();
+        });
+
+        // SMS send buttons
+        document.getElementById('smsLoginSendBtn')?.addEventListener('click', () => {
+            this._sendSmsCode('smsLoginPhone', 'login');
+        });
+        document.getElementById('regSmsSendBtn')?.addEventListener('click', () => {
+            this._sendSmsCode('loginPhone', 'register');
+        });
+
         // Close user menu on outside click
         document.addEventListener('click', () => {
             const menu = document.getElementById('userMenuPopup');
@@ -190,6 +208,9 @@ class QuickDeskApp {
         // Enter key for login form
         document.getElementById('loginPassword')?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && this._loginMode === 'login') this._onLoginSubmit();
+        });
+        document.getElementById('smsLoginCode')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && this._loginMode === 'sms-login') this._onLoginSubmit();
         });
 
         // Sync events
@@ -204,9 +225,13 @@ class QuickDeskApp {
     }
 
     async _restoreSession() {
+        userApi.setBaseUrl(this._getServerUrl());
+
+        // Fetch features regardless of login state
+        this._fetchFeatures();
+
         if (!userApi.isLoggedIn()) return;
 
-        userApi.setBaseUrl(this._getServerUrl());
         const result = await userApi.fetchMe();
         if (result.ok) {
             this._onLoginSuccess();
@@ -214,6 +239,13 @@ class QuickDeskApp {
             // Token expired
             userApi._clearSession();
             this._updateUserUI();
+        }
+    }
+
+    async _fetchFeatures() {
+        const result = await userApi.fetchFeatures();
+        if (result.ok && result.data) {
+            this._smsEnabled = !!result.data.sms_enabled;
         }
     }
 
@@ -235,7 +267,8 @@ class QuickDeskApp {
     }
 
     _toggleLoginMode() {
-        this._loginMode = this._loginMode === 'login' ? 'register' : 'login';
+        this._loginMode = this._loginMode === 'login' || this._loginMode === 'sms-login'
+            ? 'register' : 'login';
         this._updateLoginDialogMode();
         this._clearLoginMessages();
     }
@@ -244,18 +277,51 @@ class QuickDeskApp {
         const title = document.getElementById('loginDialogTitle');
         const submitBtn = document.getElementById('loginSubmitBtn');
         const switchText = document.getElementById('loginModeSwitch');
+        const loginFields = document.getElementById('loginFields');
+        const smsLoginFields = document.getElementById('smsLoginFields');
         const registerFields = document.getElementById('registerFields');
+        const smsLoginToggle = document.getElementById('smsLoginToggle');
+        const smsLoginSwitchBtn = document.getElementById('smsLoginSwitchBtn');
+        const regPhoneLabel = document.getElementById('regPhoneLabel');
+        const regSmsCodeGroup = document.getElementById('regSmsCodeGroup');
+
+        // Hide all field sections first
+        if (loginFields) loginFields.style.display = 'none';
+        if (smsLoginFields) smsLoginFields.style.display = 'none';
+        if (registerFields) registerFields.style.display = 'none';
 
         if (this._loginMode === 'login') {
             if (title) title.textContent = t('user.login') || '登录';
             if (submitBtn) submitBtn.textContent = t('user.login') || '登录';
             if (switchText) switchText.textContent = t('user.noAccount') || '没有账号？注册';
-            if (registerFields) registerFields.style.display = 'none';
+            if (loginFields) loginFields.style.display = '';
+            // Show SMS login toggle only when SMS is enabled
+            if (smsLoginToggle) smsLoginToggle.style.display = this._smsEnabled ? '' : 'none';
+            if (smsLoginSwitchBtn) smsLoginSwitchBtn.textContent = t('user.smsLogin') || '短信验证码登录';
+        } else if (this._loginMode === 'sms-login') {
+            if (title) title.textContent = t('user.smsLogin') || '短信验证码登录';
+            if (submitBtn) submitBtn.textContent = t('user.login') || '登录';
+            if (switchText) switchText.textContent = t('user.noAccount') || '没有账号？注册';
+            if (smsLoginFields) smsLoginFields.style.display = '';
+            if (smsLoginToggle) smsLoginToggle.style.display = '';
+            if (smsLoginSwitchBtn) smsLoginSwitchBtn.textContent = t('user.passwordLogin') || '账号密码登录';
         } else {
+            // register
             if (title) title.textContent = t('user.register') || '注册';
             if (submitBtn) submitBtn.textContent = t('user.register') || '注册';
             if (switchText) switchText.textContent = t('user.hasAccount') || '已有账号？登录';
+            if (loginFields) loginFields.style.display = '';
             if (registerFields) registerFields.style.display = '';
+            if (smsLoginToggle) smsLoginToggle.style.display = 'none';
+
+            // When SMS is enabled, phone is required and show SMS code field
+            if (this._smsEnabled) {
+                if (regPhoneLabel) regPhoneLabel.textContent = t('user.phone') || '手机号';
+                if (regSmsCodeGroup) regSmsCodeGroup.style.display = '';
+            } else {
+                if (regPhoneLabel) regPhoneLabel.textContent = (t('user.phone') || '手机号') + ' (' + (t('user.optional') || '可选') + ')';
+                if (regSmsCodeGroup) regSmsCodeGroup.style.display = 'none';
+            }
         }
     }
 
@@ -277,6 +343,27 @@ class QuickDeskApp {
     }
 
     async _onLoginSubmit() {
+        userApi.setBaseUrl(this._getServerUrl());
+        this._clearLoginMessages();
+
+        if (this._loginMode === 'sms-login') {
+            const phone = document.getElementById('smsLoginPhone')?.value?.trim();
+            const code = document.getElementById('smsLoginCode')?.value?.trim();
+            if (!phone || !code) {
+                this._showLoginError(t('user.phoneCodeRequired') || '请输入手机号和验证码');
+                return;
+            }
+            const result = await userApi.loginWithSms(phone, code);
+            if (result.ok) {
+                this._hideLoginDialog();
+                this._onLoginSuccess();
+                this._showToast(t('user.loginSuccess') || '登录成功', 'success');
+            } else {
+                this._showLoginError(result.error || '登录失败');
+            }
+            return;
+        }
+
         const username = document.getElementById('loginUsername')?.value?.trim();
         const password = document.getElementById('loginPassword')?.value?.trim();
 
@@ -284,9 +371,6 @@ class QuickDeskApp {
             this._showLoginError(t('user.inputRequired') || '请输入用户名和密码');
             return;
         }
-
-        userApi.setBaseUrl(this._getServerUrl());
-        this._clearLoginMessages();
 
         if (this._loginMode === 'login') {
             const result = await userApi.login(username, password);
@@ -300,13 +384,71 @@ class QuickDeskApp {
         } else {
             const phone = document.getElementById('loginPhone')?.value?.trim() || '';
             const email = document.getElementById('loginEmail')?.value?.trim() || '';
-            const result = await userApi.register(username, password, phone, email);
+            const smsCode = document.getElementById('regSmsCode')?.value?.trim() || '';
+
+            if (this._smsEnabled && (!phone || !smsCode)) {
+                this._showLoginError(t('user.phoneCodeRequired') || '请输入手机号和验证码');
+                return;
+            }
+
+            const result = await userApi.register(username, password, phone, email, smsCode);
             if (result.ok) {
                 this._showLoginSuccess(t('user.registerSuccess') || '注册成功，请登录');
                 this._loginMode = 'login';
                 this._updateLoginDialogMode();
             } else {
                 this._showLoginError(result.error || '注册失败');
+            }
+        }
+    }
+
+    async _sendSmsCode(phoneInputId, scene) {
+        const phone = document.getElementById(phoneInputId)?.value?.trim();
+        if (!phone) {
+            this._showLoginError(t('user.phoneRequired') || '请输入手机号');
+            return;
+        }
+        if (this._smsCountdown > 0) return;
+
+        userApi.setBaseUrl(this._getServerUrl());
+        this._clearLoginMessages();
+
+        const result = await userApi.sendSmsCode(phone, scene);
+        if (result.ok) {
+            this._showLoginSuccess(t('user.codeSent') || '验证码已发送');
+            this._startSmsCountdown();
+        } else {
+            this._showLoginError(result.error || '发送失败');
+        }
+    }
+
+    _startSmsCountdown() {
+        this._smsCountdown = 60;
+        this._updateSmsBtnText();
+        if (this._smsTimer) clearInterval(this._smsTimer);
+        this._smsTimer = setInterval(() => {
+            this._smsCountdown--;
+            this._updateSmsBtnText();
+            if (this._smsCountdown <= 0) {
+                clearInterval(this._smsTimer);
+                this._smsTimer = null;
+            }
+        }, 1000);
+    }
+
+    _updateSmsBtnText() {
+        const btns = [
+            document.getElementById('smsLoginSendBtn'),
+            document.getElementById('regSmsSendBtn'),
+        ];
+        for (const btn of btns) {
+            if (!btn) continue;
+            if (this._smsCountdown > 0) {
+                btn.textContent = `${this._smsCountdown}s`;
+                btn.disabled = true;
+            } else {
+                btn.textContent = t('user.sendCode') || '发送验证码';
+                btn.disabled = false;
             }
         }
     }

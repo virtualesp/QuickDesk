@@ -25,6 +25,10 @@ void AuthManager::restoreSession()
 {
     auto& lcc = core::LocalConfigCenter::instance();
     m_token = lcc.userToken();
+
+    // Always fetch features regardless of login state
+    fetchFeatures();
+
     if (m_token.isEmpty()) {
         LOG_INFO("[AuthManager] No saved token, not logged in");
         return;
@@ -33,6 +37,32 @@ void AuthManager::restoreSession()
     LOG_INFO("[AuthManager] Restoring session from saved token");
     // Validate token by fetching user info
     fetchUserInfo();
+}
+
+void AuthManager::fetchFeatures()
+{
+    QUrl url(httpBaseUrl() + "api/v1/features");
+    QList<QPair<QString, QString>> headers;
+
+    infra::HttpRequest::instance().sendGetRequest(
+        url, headers, kRequestTimeoutMs,
+        [this](int statusCode, const std::string& errorMsg, const std::string& data) {
+            QMetaObject::invokeMethod(this, [this, statusCode, errorMsg, data]() {
+                if (statusCode != 200 || !errorMsg.empty()) {
+                    LOG_WARN("[AuthManager] Failed to fetch features: {}", errorMsg);
+                    return;
+                }
+
+                QJsonDocument doc = QJsonDocument::fromJson(QByteArray::fromStdString(data));
+                QJsonObject root = doc.object();
+                bool smsEnabled = root["sms_enabled"].toBool(false);
+                if (m_smsEnabled != smsEnabled) {
+                    m_smsEnabled = smsEnabled;
+                    LOG_INFO("[AuthManager] Features: sms_enabled={}", m_smsEnabled);
+                    emit smsEnabledChanged();
+                }
+            });
+        });
 }
 
 QString AuthManager::httpBaseUrl() const
@@ -99,7 +129,8 @@ void AuthManager::login(const QString& username, const QString& password)
 }
 
 void AuthManager::registerUser(const QString& username, const QString& password,
-                                const QString& phone, const QString& email)
+                                const QString& phone, const QString& email,
+                                const QString& smsCode)
 {
     QUrl url(httpBaseUrl() + "api/v1/user/register");
     QList<QPair<QString, QString>> headers;
@@ -110,6 +141,7 @@ void AuthManager::registerUser(const QString& username, const QString& password,
     body["password"] = password;
     if (!phone.isEmpty()) body["phone"] = phone;
     if (!email.isEmpty()) body["email"] = email;
+    if (!smsCode.isEmpty()) body["sms_code"] = smsCode;
     QByteArray bodyData = QJsonDocument(body).toJson(QJsonDocument::Compact);
 
     LOG_INFO("[AuthManager] Registering user: {}", username.toStdString());
@@ -134,6 +166,95 @@ void AuthManager::registerUser(const QString& username, const QString& password,
 
                 LOG_INFO("[AuthManager] Registration successful");
                 emit registerSuccess();
+            });
+        });
+}
+
+void AuthManager::sendSmsCode(const QString& phone, const QString& scene)
+{
+    QUrl url(httpBaseUrl() + "api/v1/sms/send");
+    QList<QPair<QString, QString>> headers;
+    headers.append(qMakePair(QStringLiteral("Content-Type"), QStringLiteral("application/json")));
+
+    QJsonObject body;
+    body["phone"] = phone;
+    body["scene"] = scene;
+    QByteArray bodyData = QJsonDocument(body).toJson(QJsonDocument::Compact);
+
+    LOG_INFO("[AuthManager] Sending SMS code to {} (scene={})", phone.toStdString(), scene.toStdString());
+
+    infra::HttpRequest::instance().sendPostRequest(
+        url, headers, QString::fromUtf8(bodyData), kRequestTimeoutMs,
+        [this](int statusCode, const std::string& errorMsg, const std::string& data) {
+            QMetaObject::invokeMethod(this, [this, statusCode, errorMsg, data]() {
+                if (statusCode != 200 || !errorMsg.empty()) {
+                    QString errStr;
+                    QJsonDocument doc = QJsonDocument::fromJson(QByteArray::fromStdString(data));
+                    if (doc.isObject()) {
+                        errStr = doc.object()["error"].toString();
+                    }
+                    if (errStr.isEmpty()) {
+                        errStr = QString::fromStdString(errorMsg);
+                    }
+                    LOG_WARN("[AuthManager] SMS send failed: {}", errStr.toStdString());
+                    emit smsCodeFailed(errStr);
+                    return;
+                }
+
+                LOG_INFO("[AuthManager] SMS code sent successfully");
+                emit smsCodeSent();
+            });
+        });
+}
+
+void AuthManager::loginWithSms(const QString& phone, const QString& smsCode)
+{
+    QUrl url(httpBaseUrl() + "api/v1/user/login-sms");
+    QList<QPair<QString, QString>> headers;
+    headers.append(qMakePair(QStringLiteral("Content-Type"), QStringLiteral("application/json")));
+
+    QJsonObject body;
+    body["phone"] = phone;
+    body["sms_code"] = smsCode;
+    QByteArray bodyData = QJsonDocument(body).toJson(QJsonDocument::Compact);
+
+    LOG_INFO("[AuthManager] Logging in with SMS: {}", phone.toStdString());
+
+    infra::HttpRequest::instance().sendPostRequest(
+        url, headers, QString::fromUtf8(bodyData), kRequestTimeoutMs,
+        [this](int statusCode, const std::string& errorMsg, const std::string& data) {
+            QMetaObject::invokeMethod(this, [this, statusCode, errorMsg, data]() {
+                if (statusCode != 200 || !errorMsg.empty()) {
+                    QString errStr;
+                    QJsonDocument doc = QJsonDocument::fromJson(QByteArray::fromStdString(data));
+                    if (doc.isObject()) {
+                        errStr = doc.object()["error"].toString();
+                    }
+                    if (errStr.isEmpty()) {
+                        errStr = QString::fromStdString(errorMsg);
+                    }
+                    LOG_WARN("[AuthManager] SMS login failed: {}", errStr.toStdString());
+                    emit loginFailed(errStr);
+                    return;
+                }
+
+                QJsonDocument doc = QJsonDocument::fromJson(QByteArray::fromStdString(data));
+                QJsonObject root = doc.object();
+                m_token = root["token"].toString();
+                QJsonObject userObj = root["user"].toObject();
+                m_userId = userObj["id"].toInt();
+                m_username = userObj["username"].toString();
+                m_isLoggedIn = true;
+
+                // Persist token
+                auto& lcc = core::LocalConfigCenter::instance();
+                lcc.setUserToken(m_token);
+                lcc.setUserId(QString::number(m_userId));
+                lcc.setUsername(m_username);
+
+                LOG_INFO("[AuthManager] SMS login successful: {} (id={})", m_username.toStdString(), m_userId);
+                emit loginStateChanged();
+                emit loginSuccess();
             });
         });
 }
@@ -213,5 +334,6 @@ bool AuthManager::isLoggedIn() const { return m_isLoggedIn; }
 QString AuthManager::username() const { return m_username; }
 uint AuthManager::userId() const { return m_userId; }
 QString AuthManager::token() const { return m_token; }
+bool AuthManager::smsEnabled() const { return m_smsEnabled; }
 
 } // namespace quickdesk

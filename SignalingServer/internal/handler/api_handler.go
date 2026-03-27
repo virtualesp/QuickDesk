@@ -50,6 +50,14 @@ func (h *APIHandler) SetWSHandler(ws *WSHandler) {
 	h.wsHandler = ws
 }
 
+// GetFeatures handles GET /api/v1/features
+// Returns feature flags so clients can adapt their UI (e.g. hide SMS login when not configured).
+func (h *APIHandler) GetFeatures(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"sms_enabled": h.config.Sms.Enabled,
+	})
+}
+
 // RegisterDevice handles POST /api/v1/devices/register
 // Request: { "device_id": "optional", "os": "Windows", "os_version": "11", "app_version": "1.0.0" }
 // Response: { "device_id": "123456789", "is_new": true/false }

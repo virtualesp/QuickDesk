@@ -105,6 +105,33 @@ class UserApi {
   }
 
   // ---------------------------------------------------------------------------
+  // Feature flags
+  // ---------------------------------------------------------------------------
+
+  async fetchFeatures() {
+    return this._request('GET', '/api/v1/features');
+  }
+
+  // ---------------------------------------------------------------------------
+  // SMS methods
+  // ---------------------------------------------------------------------------
+
+  async sendSmsCode(phone, scene) {
+    return this._request('POST', '/api/v1/sms/send', { phone, scene });
+  }
+
+  async loginWithSms(phone, smsCode) {
+    const result = await this._request('POST', '/api/v1/user/login-sms', {
+      phone,
+      sms_code: smsCode,
+    });
+    if (result.ok && result.data) {
+      this._saveSession(result.data.token, result.data.user);
+    }
+    return result;
+  }
+
+  // ---------------------------------------------------------------------------
   // Auth methods
   // ---------------------------------------------------------------------------
 
@@ -119,13 +146,10 @@ class UserApi {
     return result;
   }
 
-  async register(username, password, phone, email) {
-    return this._request('POST', '/api/v1/user/register', {
-      username,
-      password,
-      phone,
-      email,
-    });
+  async register(username, password, phone, email, smsCode) {
+    const body = { username, password, phone, email };
+    if (smsCode) body.sms_code = smsCode;
+    return this._request('POST', '/api/v1/user/register', body);
   }
 
   async logout() {
