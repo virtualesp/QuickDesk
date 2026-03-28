@@ -421,7 +421,7 @@ ApplicationWindow {
                 QDMenu {
                     id: userMenu
                     x: parent.width
-                    y: parent.height - height
+                    y: parent.height
 
                     QDMenuItem {
                         text: qsTr("Account Settings")
@@ -429,7 +429,7 @@ ApplicationWindow {
                         onTriggered: {
                             var webclientUrl = root.mainController.presetManager.webclientUrl
                             if (!webclientUrl) {
-                                root.showToast(qsTr("WebClient URL not configured on the server"), QDToast.Type.Warning)
+                                toast.show(qsTr("WebClient URL not configured on the server"), QDToast.Type.Warning)
                                 return
                             }
                             var token = root.mainController.authManager.token

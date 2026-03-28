@@ -127,7 +127,7 @@ Item {
                                     Text {
                                         Layout.fillWidth: true
                                         text: {
-                                            var name = modelData.remark || modelData.device_name || qsTr("Device")
+                                            var name = modelData.remark || modelData.device_name || modelData.device_id|| qsTr("Device")
                                             return name + " (" + (modelData.device_id || "") + ")"
                                         }
                                         font.pixelSize: Theme.fontSizeMedium
