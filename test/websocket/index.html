@@ -116,7 +116,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); min-
     <input id="wsUrl" value="ws://127.0.0.1:9600" placeholder="WebSocket URL">
     <button id="btnConnect" onclick="toggleConnection()">Connect</button>
     <button class="danger" onclick="clearLog()">Clear Log</button>
-    <select id="connSelect" title="Active connection"><option value="">No connections</option></select>
+    <select id="connSelect" title="Active device"><option value="">No devices</option></select>
   </div>
 
   <!-- Sidebar: Method List -->
@@ -186,72 +186,72 @@ const API_METHODS = {
     "getSignalingStatus": { desc: "Signaling server connection status", params: {} },
     "refreshAccessCode": { desc: "Refresh the local host access code", params: {} },
     "listConnections": { desc: "List all active remote connections", params: {} },
-    "getConnectionInfo": { desc: "Get details for a specific connection", params: { connectionId: "conn_1" } },
+    "getConnectionInfo": { desc: "Get details for a specific connection", params: { deviceId: "conn_1" } },
     "connectToHost": { desc: "Connect to a remote device", params: { deviceId: "", accessCode: "", serverUrl: "", showWindow: true } },
-    "disconnectFromHost": { desc: "Disconnect a specific connection", params: { connectionId: "conn_1" } },
+    "disconnectFromHost": { desc: "Disconnect a specific connection", params: { deviceId: "conn_1" } },
     "disconnectAll": { desc: "Disconnect all connections", params: {} },
   },
   "Screen": {
-    "screenshot": { desc: "Capture remote screen (returns base64 image)", params: { connectionId: "conn_1", maxWidth: 1280, format: "jpeg", quality: 80 } },
-    "getScreenSize": { desc: "Get remote screen resolution", params: { connectionId: "conn_1" } },
-    "getScreenText": { desc: "OCR: extract all text from screen", params: { connectionId: "conn_1" } },
-    "findElement": { desc: "Find UI element by text", params: { connectionId: "conn_1", text: "", exact: false, ignoreCase: true } },
-    "clickText": { desc: "Find text and click it", params: { connectionId: "conn_1", text: "", exact: false, ignoreCase: true, button: "left" } },
-    "getUiState": { desc: "Get unified UI state (resolution + OCR + window title)", params: { connectionId: "conn_1" } },
+    "screenshot": { desc: "Capture remote screen (returns base64 image)", params: { deviceId: "conn_1", maxWidth: 1280, format: "jpeg", quality: 80 } },
+    "getScreenSize": { desc: "Get remote screen resolution", params: { deviceId: "conn_1" } },
+    "getScreenText": { desc: "OCR: extract all text from screen", params: { deviceId: "conn_1" } },
+    "findElement": { desc: "Find UI element by text", params: { deviceId: "conn_1", text: "", exact: false, ignoreCase: true } },
+    "clickText": { desc: "Find text and click it", params: { deviceId: "conn_1", text: "", exact: false, ignoreCase: true, button: "left" } },
+    "getUiState": { desc: "Get unified UI state (resolution + OCR + window title)", params: { deviceId: "conn_1" } },
   },
   "Mouse": {
-    "mouseClick": { desc: "Click at (x, y)", params: { connectionId: "conn_1", x: 0, y: 0, button: "left" } },
-    "mouseDoubleClick": { desc: "Double-click at (x, y)", params: { connectionId: "conn_1", x: 0, y: 0 } },
-    "mouseMove": { desc: "Move cursor to (x, y)", params: { connectionId: "conn_1", x: 0, y: 0 } },
-    "mouseScroll": { desc: "Scroll at (x, y)", params: { connectionId: "conn_1", x: 0, y: 0, deltaX: 0, deltaY: -120 } },
-    "mouseDrag": { desc: "Drag from start to end", params: { connectionId: "conn_1", startX: 0, startY: 0, endX: 100, endY: 100, button: "left" } },
+    "mouseClick": { desc: "Click at (x, y)", params: { deviceId: "conn_1", x: 0, y: 0, button: "left" } },
+    "mouseDoubleClick": { desc: "Double-click at (x, y)", params: { deviceId: "conn_1", x: 0, y: 0 } },
+    "mouseMove": { desc: "Move cursor to (x, y)", params: { deviceId: "conn_1", x: 0, y: 0 } },
+    "mouseScroll": { desc: "Scroll at (x, y)", params: { deviceId: "conn_1", x: 0, y: 0, deltaX: 0, deltaY: -120 } },
+    "mouseDrag": { desc: "Drag from start to end", params: { deviceId: "conn_1", startX: 0, startY: 0, endX: 100, endY: 100, button: "left" } },
   },
   "Keyboard": {
-    "keyboardType": { desc: "Type text (clipboard paste)", params: { connectionId: "conn_1", text: "" } },
-    "keyboardHotkey": { desc: "Send hotkey combo", params: { connectionId: "conn_1", keys: ["ctrl", "c"] } },
-    "keyPress": { desc: "Press and hold a key", params: { connectionId: "conn_1", key: "ctrl" } },
-    "keyRelease": { desc: "Release a held key", params: { connectionId: "conn_1", key: "ctrl" } },
+    "keyboardType": { desc: "Type text (clipboard paste)", params: { deviceId: "conn_1", text: "" } },
+    "keyboardHotkey": { desc: "Send hotkey combo", params: { deviceId: "conn_1", keys: ["ctrl", "c"] } },
+    "keyPress": { desc: "Press and hold a key", params: { deviceId: "conn_1", key: "ctrl" } },
+    "keyRelease": { desc: "Release a held key", params: { deviceId: "conn_1", key: "ctrl" } },
   },
   "Clipboard": {
-    "getClipboard": { desc: "Get remote clipboard content", params: { connectionId: "conn_1" } },
-    "setClipboard": { desc: "Set remote clipboard content", params: { connectionId: "conn_1", text: "" } },
+    "getClipboard": { desc: "Get remote clipboard content", params: { deviceId: "conn_1" } },
+    "setClipboard": { desc: "Set remote clipboard content", params: { deviceId: "conn_1", text: "" } },
   },
   "Verification": {
-    "waitForText": { desc: "Wait for text to appear on screen", params: { connectionId: "conn_1", text: "", timeoutMs: 5000 } },
-    "assertTextPresent": { desc: "Assert text is visible now", params: { connectionId: "conn_1", text: "" } },
-    "verifyActionResult": { desc: "Poll until conditions pass", params: { connectionId: "conn_1", expectations: [{ type: "text_present", value: "" }], timeoutMs: 3000 } },
-    "screenDiffSummary": { desc: "Diff current screen vs baseline hash", params: { connectionId: "conn_1", fromHash: "" } },
-    "assertScreenState": { desc: "Assert conditions (no polling)", params: { connectionId: "conn_1", expectations: [{ type: "text_present", value: "" }] } },
+    "waitForText": { desc: "Wait for text to appear on screen", params: { deviceId: "conn_1", text: "", timeoutMs: 5000 } },
+    "assertTextPresent": { desc: "Assert text is visible now", params: { deviceId: "conn_1", text: "" } },
+    "verifyActionResult": { desc: "Poll until conditions pass", params: { deviceId: "conn_1", expectations: [{ type: "text_present", value: "" }], timeoutMs: 3000 } },
+    "screenDiffSummary": { desc: "Diff current screen vs baseline hash", params: { deviceId: "conn_1", fromHash: "" } },
+    "assertScreenState": { desc: "Assert conditions (no polling)", params: { deviceId: "conn_1", expectations: [{ type: "text_present", value: "" }] } },
   },
   "Agent": {
-    "agentListTools": { desc: "List remote agent tools", params: { connection_id: "conn_1" } },
-    "agentExec": { desc: "Execute a tool on remote agent (custom)", params: { connection_id: "conn_1", tool: "", args: {} } },
+    "agentListTools": { desc: "List remote agent tools", params: { device_id: "conn_1" } },
+    "agentExec": { desc: "Execute a tool on remote agent (custom)", params: { device_id: "conn_1", tool: "", args: {} } },
   },
   "Agent: sys-info": {
-    "get_system_info": { desc: "OS, CPU, memory, disk, hostname, uptime", params: { connection_id: "conn_1" }, _agent: true, _args: {} },
-    "list_processes": { desc: "Running processes with CPU% and memory", params: { connection_id: "conn_1", sort_by: "cpu", limit: 20 }, _agent: true, _argsMap: { sort_by: "sort_by", limit: "limit" } },
+    "get_system_info": { desc: "OS, CPU, memory, disk, hostname, uptime", params: { device_id: "conn_1" }, _agent: true, _args: {} },
+    "list_processes": { desc: "Running processes with CPU% and memory", params: { device_id: "conn_1", sort_by: "cpu", limit: 20 }, _agent: true, _argsMap: { sort_by: "sort_by", limit: "limit" } },
   },
   "Agent: file-ops": {
-    "read_file": { desc: "Read file contents", params: { connection_id: "conn_1", path: "" }, _agent: true, _argsMap: { path: "path" } },
-    "write_file": { desc: "Write content to a file", params: { connection_id: "conn_1", path: "", content: "" }, _agent: true, _argsMap: { path: "path", content: "content" } },
-    "list_directory": { desc: "List files and directories", params: { connection_id: "conn_1", path: "C:\\" }, _agent: true, _argsMap: { path: "path" } },
-    "create_directory": { desc: "Create a directory", params: { connection_id: "conn_1", path: "" }, _agent: true, _argsMap: { path: "path" } },
-    "move_file": { desc: "Move or rename a file/directory", params: { connection_id: "conn_1", source: "", destination: "" }, _agent: true, _argsMap: { source: "source", destination: "destination" } },
-    "get_file_info": { desc: "File metadata: size, time, type", params: { connection_id: "conn_1", path: "" }, _agent: true, _argsMap: { path: "path" } },
+    "read_file": { desc: "Read file contents", params: { device_id: "conn_1", path: "" }, _agent: true, _argsMap: { path: "path" } },
+    "write_file": { desc: "Write content to a file", params: { device_id: "conn_1", path: "", content: "" }, _agent: true, _argsMap: { path: "path", content: "content" } },
+    "list_directory": { desc: "List files and directories", params: { device_id: "conn_1", path: "C:\\" }, _agent: true, _argsMap: { path: "path" } },
+    "create_directory": { desc: "Create a directory", params: { device_id: "conn_1", path: "" }, _agent: true, _argsMap: { path: "path" } },
+    "move_file": { desc: "Move or rename a file/directory", params: { device_id: "conn_1", source: "", destination: "" }, _agent: true, _argsMap: { source: "source", destination: "destination" } },
+    "get_file_info": { desc: "File metadata: size, time, type", params: { device_id: "conn_1", path: "" }, _agent: true, _argsMap: { path: "path" } },
   },
   "Agent: shell": {
-    "run_command": { desc: "Execute a shell command", params: { connection_id: "conn_1", command: "", timeout_secs: 60, working_dir: "" }, _agent: true, _argsMap: { command: "command", timeout_secs: "timeout_secs", working_dir: "working_dir" } },
+    "run_command": { desc: "Execute a shell command", params: { device_id: "conn_1", command: "", timeout_secs: 60, working_dir: "" }, _agent: true, _argsMap: { command: "command", timeout_secs: "timeout_secs", working_dir: "working_dir" } },
   },
   "Events": {
     "getRecentEvents": { desc: "Get cached recent events", params: { eventType: "", limit: 20 } },
     "listEventTypes": { desc: "List supported event types", params: {} },
-    "waitForEvent": { desc: "Wait for a specific event", params: { connectionId: "conn_1", event: "connectionStateChanged", filter: {}, timeoutMs: 5000 } },
-    "waitForConnectionState": { desc: "Wait for connection state", params: { connectionId: "conn_1", state: "connected", timeoutMs: 15000 } },
-    "waitForClipboardChange": { desc: "Wait for clipboard change", params: { connectionId: "conn_1", timeoutMs: 10000 } },
-    "waitForScreenChange": { desc: "Wait for screen content to change", params: { connectionId: "conn_1", timeoutMs: 5000 } },
+    "waitForEvent": { desc: "Wait for a specific event", params: { deviceId: "conn_1", event: "connectionStateChanged", filter: {}, timeoutMs: 5000 } },
+    "waitForConnectionState": { desc: "Wait for connection state", params: { deviceId: "conn_1", state: "connected", timeoutMs: 15000 } },
+    "waitForClipboardChange": { desc: "Wait for clipboard change", params: { deviceId: "conn_1", timeoutMs: 10000 } },
+    "waitForScreenChange": { desc: "Wait for screen content to change", params: { deviceId: "conn_1", timeoutMs: 5000 } },
   },
   "Trust": {
-    "requestConfirmation": { desc: "Request user confirmation for an operation", params: { connection_id: "conn_1", tool_name: "run_command", arguments: { command: "dir" }, risk_level: "high", reasons: ["base risk for tool"], timeout_secs: 60 } },
+    "requestConfirmation": { desc: "Request user confirmation for an operation", params: { device_id: "conn_1", tool_name: "run_command", arguments: { command: "dir" }, risk_level: "high", reasons: ["base risk for tool"], timeout_secs: 60 } },
     "emergencyStop": { desc: "Activate emergency stop", params: { reason: "test" } },
     "deactivateEmergency": { desc: "Deactivate emergency stop", params: {} },
   },
@@ -312,11 +312,11 @@ function connect() {
         const prev = sel.value;
         sel.innerHTML = '';
         if (data.result.connections.length === 0) {
-          sel.innerHTML = '<option value="">No connections</option>';
+          sel.innerHTML = '<option value="">No devices</option>';
         } else {
           data.result.connections.forEach(c => {
             const opt = document.createElement('option');
-            opt.value = c.connectionId || c.id || '';
+            opt.value = c.deviceId || c.id || '';
             opt.textContent = opt.value + (c.state ? ` (${c.state})` : '');
             sel.appendChild(opt);
           });
@@ -425,7 +425,7 @@ function selectMethod(name, def) {
     label.textContent = key;
     row.appendChild(label);
 
-    if (key === 'connectionId' || key === 'connection_id') {
+    if (key === 'deviceId' || key === 'device_id') {
       const span = document.createElement('input');
       span.type = 'text';
       span.dataset.param = key;
@@ -468,14 +468,14 @@ function selectMethod(name, def) {
     }
     document.getElementById('rawJson').value = JSON.stringify({
       method: 'agentExec',
-      params: { connection_id: document.getElementById('connSelect').value || def.params.connection_id || 'conn_1', tool: name, args }
+      params: { device_id: document.getElementById('connSelect').value || def.params.device_id || 'conn_1', tool: name, args }
     }, null, 2);
   } else {
     const rawParams = { ...def.params };
-    const connVal = document.getElementById('connSelect').value;
-    if (connVal) {
-      if ('connectionId' in rawParams) rawParams.connectionId = connVal;
-      if ('connection_id' in rawParams) rawParams.connection_id = connVal;
+    const deviceVal = document.getElementById('connSelect').value;
+    if (deviceVal) {
+      if ('deviceId' in rawParams) rawParams.deviceId = deviceVal;
+      if ('device_id' in rawParams) rawParams.device_id = deviceVal;
     }
     document.getElementById('rawJson').value = JSON.stringify({ method: name, params: rawParams }, null, 2);
   }
@@ -504,10 +504,10 @@ function collectParams() {
 function sendFromForm() {
   if (!currentMethod) { logMsg('error', 'Select a method first'); return; }
   const params = collectParams();
-  const connVal = document.getElementById('connSelect').value;
-  if (connVal) {
-    if ('connectionId' in currentMethod.def.params) params.connectionId = connVal;
-    if ('connection_id' in currentMethod.def.params) params.connection_id = connVal;
+  const deviceVal = document.getElementById('connSelect').value;
+  if (deviceVal) {
+    if ('deviceId' in currentMethod.def.params) params.deviceId = deviceVal;
+    if ('device_id' in currentMethod.def.params) params.device_id = deviceVal;
   }
   if (currentMethod.def._agent) {
     const argsMap = currentMethod.def._argsMap || {};
@@ -518,7 +518,7 @@ function sendFromForm() {
       }
     }
     sendMessage('agentExec', {
-      connection_id: params.connection_id || 'conn_1',
+      device_id: params.device_id || 'conn_1',
       tool: currentMethod.name,
       args
     });

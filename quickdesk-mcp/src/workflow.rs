@@ -82,15 +82,10 @@ impl WorkflowStore {
         base.join(".quickdesk").join("workflows")
     }
 
-    pub fn start_recording(
-        &self,
-        name: &str,
-        device_id: &str,
-        connection_id: &str,
-    ) -> Result<String, String> {
+    pub fn start_recording(&self, name: &str, device_id: &str) -> Result<String, String> {
         let mut recordings = self.active_recordings.lock().unwrap();
-        if recordings.contains_key(connection_id) {
-            return Err("a recording is already active for this connection".to_string());
+        if recordings.contains_key(device_id) {
+            return Err("a recording is already active for this device".to_string());
         }
 
         let id = Uuid::new_v4().to_string();
@@ -102,28 +97,28 @@ impl WorkflowStore {
             started_at: Utc::now().to_rfc3339(),
             last_step_time: std::time::Instant::now(),
         };
-        recordings.insert(connection_id.to_string(), state);
-        info!("recording started: id={id} name={name} connection={connection_id}");
+        recordings.insert(device_id.to_string(), state);
+        info!("recording started: id={id} name={name} device_id={device_id}");
         Ok(id)
     }
 
-    pub fn is_recording(&self, connection_id: &str) -> bool {
+    pub fn is_recording(&self, device_id: &str) -> bool {
         self.active_recordings
             .lock()
             .unwrap()
-            .contains_key(connection_id)
+            .contains_key(device_id)
     }
 
     pub fn record_step(
         &self,
-        connection_id: &str,
+        device_id: &str,
         tool_name: &str,
         arguments: &Value,
         result_summary: &str,
         success: bool,
     ) {
         let mut recordings = self.active_recordings.lock().unwrap();
-        if let Some(state) = recordings.get_mut(connection_id) {
+        if let Some(state) = recordings.get_mut(device_id) {
             let now = std::time::Instant::now();
             let delay = now.duration_since(state.last_step_time).as_millis() as u64;
             state.last_step_time = now;
@@ -144,14 +139,14 @@ impl WorkflowStore {
 
     pub fn stop_recording(
         &self,
-        connection_id: &str,
+        device_id: &str,
         description: &str,
         tags: &[String],
     ) -> Result<Workflow, String> {
         let mut recordings = self.active_recordings.lock().unwrap();
         let state = recordings
-            .remove(connection_id)
-            .ok_or_else(|| "no active recording for this connection".to_string())?;
+            .remove(device_id)
+            .ok_or_else(|| "no active recording for this device".to_string())?;
 
         if state.steps.is_empty() {
             return Err("no steps were recorded".to_string());

@@ -104,7 +104,7 @@ async function toggleFavorite(id) {
   if (isFavorite(id)) {
     await userApi.removeFavorite(id)
   } else {
-    await userApi.addFavorite(id, '', '')
+    await userApi.addFavorite(id, '', id === deviceId.value ? accessCode.value : '')
   }
   await loadFavorites()
   history.value = ConnectionHistory.getAll()

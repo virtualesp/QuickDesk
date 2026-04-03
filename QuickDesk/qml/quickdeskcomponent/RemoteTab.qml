@@ -8,7 +8,7 @@ Rectangle {
     id: control
     
     // Properties
-    property string connectionId: ""
+    property string deviceId: ""
     property string deviceName: ""
     property int ping: 0
     property string connectionState: "connected" // connected, connecting, disconnected
@@ -65,7 +65,7 @@ Rectangle {
                 spacing: Theme.spacingXSmall
 
                 Text {
-                    text: deviceName || connectionId
+                    text: deviceName || deviceId
                     font.pixelSize: Theme.fontSizeSmall
                     font.weight: isActive ? Font.DemiBold : Font.Normal
                     color: Theme.text

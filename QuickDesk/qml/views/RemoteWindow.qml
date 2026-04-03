@@ -32,7 +32,7 @@ Window {
     }
     
     // Performance stats stored separately to avoid triggering model rebuild
-    // Map: connectionId -> { frameWidth, frameHeight, frameRate, ping,
+    // Map: deviceId -> { frameWidth, frameHeight, frameRate, ping,
     //   originalWidth, originalHeight, captureMs, encodeMs, networkDelayMs,
     //   decodeMs, paintMs, totalLatencyMs, inputRoundtripMs, bandwidthKbps,
     //   packetRate, codec, frameQuality, encodedRectWidth, encodedRectHeight }
@@ -40,8 +40,8 @@ Window {
     property int statsVersion: 0  // Increment to notify changes
     
     // Get performance stats for a connection
-    function getPerformanceStats(connectionId) {
-        return performanceStatsMap[connectionId] || {
+    function getPerformanceStats(deviceId) {
+        return performanceStatsMap[deviceId] || {
             frameWidth: 0, frameHeight: 0, frameRate: 0, ping: 0,
             originalWidth: 0, originalHeight: 0,
             captureMs: 0, encodeMs: 0, networkDelayMs: 0, decodeMs: 0, paintMs: 0,
@@ -53,8 +53,8 @@ Window {
     }
     
     // Update performance stats without modifying connections model
-    function updatePerformanceStats(connectionId, width, height, fps, ping) {
-        var stats = performanceStatsMap[connectionId]
+    function updatePerformanceStats(deviceId, width, height, fps, ping) {
+        var stats = performanceStatsMap[deviceId]
         
         // Handle video size update
         if (width !== undefined && height !== undefined && width > 0 && height > 0) {
@@ -79,12 +79,12 @@ Window {
             if (!stats || (stats.originalWidth === 0 && width > 0 && height > 0)) {
                 originalWidth = width
                 originalHeight = height
-                console.log("✓ Recorded original resolution for", connectionId, ":", width + "x" + height)
+                console.log("✓ Recorded original resolution for", deviceId, ":", width + "x" + height)
             }
             
             // Merge into existing stats to preserve route data etc.
             var newStatsMap = Object.assign({}, performanceStatsMap)
-            newStatsMap[connectionId] = Object.assign({}, stats || {}, {
+            newStatsMap[deviceId] = Object.assign({}, stats || {}, {
                 frameWidth: width,
                 frameHeight: height,
                 frameRate: fps !== undefined ? fps : (stats ? stats.frameRate : 0),
@@ -102,25 +102,25 @@ Window {
         // Handle ping-only update
         else if (ping !== undefined && stats) {
             var newStatsMap = Object.assign({}, performanceStatsMap)
-            newStatsMap[connectionId] = Object.assign({}, stats, {ping: ping})
+            newStatsMap[deviceId] = Object.assign({}, stats, {ping: ping})
             performanceStatsMap = newStatsMap
         }
     }
     
     // Add connection to this window
-    function addConnection(connectionId, deviceId) {
-        var existingIdx = connectionModel.indexOf(connectionId)
+    function addConnection(deviceId) {
+        var existingIdx = connectionModel.indexOf(deviceId)
         if (existingIdx >= 0) {
-            console.log("Connection already exists in window:", connectionId)
+            console.log("Connection already exists in window:", deviceId)
             currentTabIndex = existingIdx
             return
         }
         
-        connectionModel.addConnection(connectionId, deviceId)
+        connectionModel.addConnection(deviceId)
         
         // Initialize performance stats
         var newStatsMap = Object.assign({}, performanceStatsMap)
-        newStatsMap[connectionId] = {
+        newStatsMap[deviceId] = {
             frameWidth: 0, frameHeight: 0, frameRate: 0, ping: 0,
             originalWidth: 0, originalHeight: 0,
             captureMs: 0, encodeMs: 0, networkDelayMs: 0, decodeMs: 0, paintMs: 0,
@@ -132,7 +132,7 @@ Window {
         performanceStatsMap = newStatsMap
         
         currentTabIndex = connectionModel.count - 1
-        console.log("Added connection to remote window:", connectionId, "Total tabs:", connectionModel.count)
+        console.log("Added connection to remote window:", deviceId, "Total tabs:", connectionModel.count)
     }
     
     // Close connection and remove tab (unified function for both scenarios)
@@ -144,15 +144,15 @@ Window {
             return
         }
         
-        var connId = connectionModel.connectionIdAt(index)
+        var tabDeviceId = connectionModel.deviceIdAt(index)
         
         // Prevent re-entrant calls (disconnectFromHost may trigger onConnectionStateChanged synchronously)
-        if (closingConnections[connId]) {
+        if (closingConnections[tabDeviceId]) {
             return
         }
-        closingConnections[connId] = true
+        closingConnections[tabDeviceId] = true
         
-        console.log("Closing connection:", connId, "at index:", index, "needDisconnect:", needDisconnect)
+        console.log("Closing connection:", tabDeviceId, "at index:", index, "needDisconnect:", needDisconnect)
         
         // 1. Remove the tab first (before disconnect to avoid re-entrant state change handler)
         removeConnection(index)
@@ -160,21 +160,21 @@ Window {
         // 2. Only call disconnectFromHost when the caller is initiating the disconnect
         //    (skip if we're reacting to a connectionStateChanged/connectionRemoved signal)
         if (needDisconnect && clientManager) {
-            clientManager.disconnectFromHost(connId)
+            clientManager.disconnectFromHost(tabDeviceId)
         }
         
-        delete closingConnections[connId]
+        delete closingConnections[tabDeviceId]
     }
     
     // Remove connection from this window (internal helper)
     function removeConnection(index) {
         if (index < 0 || index >= connectionModel.count) return
         
-        var connId = connectionModel.connectionIdAt(index)
+        var tabDeviceId = connectionModel.deviceIdAt(index)
         
         // Remove from performance stats map
         var newStatsMap = Object.assign({}, performanceStatsMap)
-        delete newStatsMap[connId]
+        delete newStatsMap[tabDeviceId]
         performanceStatsMap = newStatsMap
         
         // Remove from model — only destroys this one delegate
@@ -190,7 +190,7 @@ Window {
             remoteWindow.close()
         }
         
-        console.log("Removed connection from remote window:", connId, "Remaining tabs:", connectionModel.count)
+        console.log("Removed connection from remote window:", tabDeviceId, "Remaining tabs:", connectionModel.count)
     }
     
     // Clean up all connections when window closes
@@ -198,8 +198,8 @@ Window {
         console.log("RemoteWindow closing, disconnecting all connections")
         for (var i = 0; i < connectionModel.count; i++) {
             if (clientManager) {
-                console.log("Disconnecting:", connectionModel.connectionIdAt(i))
-                clientManager.disconnectFromHost(connectionModel.connectionIdAt(i))
+                console.log("Disconnecting:", connectionModel.deviceIdAt(i))
+                clientManager.disconnectFromHost(connectionModel.deviceIdAt(i))
             }
         }
         connectionModel.clear()
@@ -276,11 +276,11 @@ Window {
         if (hasAutoResized) return
         if (connectionModel.count === 0) return
 
-        var connId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count
-                     ? connectionModel.connectionIdAt(currentTabIndex) : ""
-        if (!connId) return
+        var tabDeviceId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count
+                     ? connectionModel.deviceIdAt(currentTabIndex) : ""
+        if (!tabDeviceId) return
 
-        var s = getPerformanceStats(connId)
+        var s = getPerformanceStats(tabDeviceId)
         if (s && s.frameWidth > 0 && s.frameHeight > 0) {
             var w = s.frameWidth
             var h = s.frameHeight
@@ -291,15 +291,15 @@ Window {
     }
 
     // Update connection state
-    function updateConnectionState(connectionId, state, ping) {
+    function updateConnectionState(deviceId, state, ping) {
         // Update state in model (only emits dataChanged for the affected row)
         if (state !== "") {
-            connectionModel.updateState(connectionId, state)
+            connectionModel.updateState(deviceId, state)
         }
         
         // Update ping in performance stats map (doesn't trigger model rebuild)
         if (ping !== undefined) {
-            updatePerformanceStats(connectionId, undefined, undefined, undefined, ping)
+            updatePerformanceStats(deviceId, undefined, undefined, undefined, ping)
         }
     }
     
@@ -343,8 +343,9 @@ Window {
                 Item {
                     id: delegateItem
                     required property int index
-                    required property string connectionId
                     required property string deviceId
+                    required property string name
+                    required property string state
                     
                     // Detect self-connection: remote deviceId matches local deviceId
                     readonly property bool isSelfConnection: remoteWindow.localDeviceId !== "" && delegateItem.deviceId === remoteWindow.localDeviceId
@@ -353,20 +354,20 @@ Window {
                     RemoteDesktopView {
                         id: desktopView
                         anchors.fill: parent
-                        connectionId: delegateItem.connectionId
+                        deviceId: delegateItem.deviceId
                         clientManager: remoteWindow.clientManager
                         active: delegateItem.index === remoteWindow.currentTabIndex
                         inputEnabled: !delegateItem.isSelfConnection  // Disable input for self-connection
                         
                         onFilesDropped: function(urls) {
-                            var connId = delegateItem.connectionId
-                            if (!connId || !remoteWindow.clientManager) return
+                            var devId = delegateItem.deviceId
+                            if (!devId || !remoteWindow.clientManager) return
                             for (var i = 0; i < urls.length; i++) {
-                                remoteWindow.clientManager.startFileUpload(connId, urls[i])
+                                remoteWindow.clientManager.startFileUpload(devId, urls[i])
                                 var fname = urls[i].toString().split('/').pop()
                                 transferModel.append({
                                     transferId: "",
-                                    connectionId: connId,
+                                    deviceId: devId,
                                     filename: decodeURIComponent(fname),
                                     progress: 0,
                                     status: "uploading",
@@ -381,16 +382,16 @@ Window {
                         // Monitor video size changes (frameRate and ping updated from PerformanceTracker)
                         onFrameWidthChanged: {
                             if (frameWidth > 0 && frameHeight > 0) {
-                                var connId = delegateItem.connectionId
-                                var stats = remoteWindow.getPerformanceStats(connId)
-                                remoteWindow.updatePerformanceStats(connId, frameWidth, frameHeight, stats.frameRate, stats.ping)
+                                var devId = delegateItem.deviceId
+                                var stats = remoteWindow.getPerformanceStats(devId)
+                                remoteWindow.updatePerformanceStats(devId, frameWidth, frameHeight, stats.frameRate, stats.ping)
                             }
                         }
                         onFrameHeightChanged: {
                             if (frameWidth > 0 && frameHeight > 0) {
-                                var connId = delegateItem.connectionId
-                                var stats = remoteWindow.getPerformanceStats(connId)
-                                remoteWindow.updatePerformanceStats(connId, frameWidth, frameHeight, stats.frameRate, stats.ping)
+                                var devId = delegateItem.deviceId
+                                var stats = remoteWindow.getPerformanceStats(devId)
+                                remoteWindow.updatePerformanceStats(devId, frameWidth, frameHeight, stats.frameRate, stats.ping)
                             }
                         }
                     }
@@ -410,34 +411,34 @@ Window {
             z: 1000
             visible: connectionModel.count > 0
             
-            connectionId: currentTabIndex >= 0 && currentTabIndex < connectionModel.count 
-                ? connectionModel.connectionIdAt(currentTabIndex) 
+            deviceId: currentTabIndex >= 0 && currentTabIndex < connectionModel.count 
+                ? connectionModel.deviceIdAt(currentTabIndex) 
                 : ""
             clientManager: remoteWindow.clientManager
             supportsSendAttentionSequence: {
-                var connId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count 
-                    ? connectionModel.connectionIdAt(currentTabIndex) : ""
-                var stats = connId ? remoteWindow.getPerformanceStats(connId) : null
+                var devId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count 
+                    ? connectionModel.deviceIdAt(currentTabIndex) : ""
+                var stats = devId ? remoteWindow.getPerformanceStats(devId) : null
                 return stats ? (stats.supportsSendAttentionSequence || false) : false
             }
             supportsLockWorkstation: {
-                var connId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count 
-                    ? connectionModel.connectionIdAt(currentTabIndex) : ""
-                var stats = connId ? remoteWindow.getPerformanceStats(connId) : null
+                var devId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count 
+                    ? connectionModel.deviceIdAt(currentTabIndex) : ""
+                var stats = devId ? remoteWindow.getPerformanceStats(devId) : null
                 return stats ? (stats.supportsLockWorkstation || false) : false
             }
             supportsFileTransfer: {
-                var connId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count 
-                    ? connectionModel.connectionIdAt(currentTabIndex) : ""
-                var stats = connId ? remoteWindow.getPerformanceStats(connId) : null
+                var devId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count 
+                    ? connectionModel.deviceIdAt(currentTabIndex) : ""
+                var stats = devId ? remoteWindow.getPerformanceStats(devId) : null
                 return stats ? (stats.supportsFileTransfer || false) : false
             }
             emergencyStopActive: remoteWindow.emergencyStopActive
             videoInfo: {
-                var connId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count 
-                    ? connectionModel.connectionIdAt(currentTabIndex) 
+                var devId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count 
+                    ? connectionModel.deviceIdAt(currentTabIndex) 
                     : ""
-                return connId ? remoteWindow.getPerformanceStats(connId) : null
+                return devId ? remoteWindow.getPerformanceStats(devId) : null
             }
             desktopView: {
                 // Find the current desktop view
@@ -448,9 +449,9 @@ Window {
                 return null
             }
             
-            onDisconnectRequested: function(connectionId) {
-                console.log("FloatingToolButton disconnect requested for:", connectionId)
-                var idx = connectionModel.indexOf(connectionId)
+            onDisconnectRequested: function(deviceId) {
+                console.log("FloatingToolButton disconnect requested for:", deviceId)
+                var idx = connectionModel.indexOf(deviceId)
                 if (idx >= 0) {
                     remoteWindow.closeConnection(idx)
                 }
@@ -470,11 +471,11 @@ Window {
             
             onFitToRemoteDesktopRequested: {
                 // Get current tab's frame dimensions and resize window
-                var connId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count
-                    ? connectionModel.connectionIdAt(currentTabIndex) : ""
-                if (!connId) return
+                var devId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count
+                    ? connectionModel.deviceIdAt(currentTabIndex) : ""
+                if (!devId) return
 
-                var s = remoteWindow.getPerformanceStats(connId)
+                var s = remoteWindow.getPerformanceStats(devId)
                 if (s && s.frameWidth > 0 && s.frameHeight > 0) {
                     console.log("Manual fit window to remote desktop:", s.frameWidth + "x" + s.frameHeight)
                     remoteWindow.resizeToFit(s.frameWidth, s.frameHeight)
@@ -496,10 +497,10 @@ Window {
             }
 
             onDownloadFileRequested: {
-                var connId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count
-                    ? connectionModel.connectionIdAt(currentTabIndex) : ""
-                if (connId && remoteWindow.clientManager) {
-                    remoteWindow.clientManager.startFileDownload(connId)
+                var devId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count
+                    ? connectionModel.deviceIdAt(currentTabIndex) : ""
+                if (devId && remoteWindow.clientManager) {
+                    remoteWindow.clientManager.startFileDownload(devId)
                 }
             }
 
@@ -520,9 +521,9 @@ Window {
             stats: {
                 // Force re-evaluation when statsVersion changes
                 var _version = remoteWindow.statsVersion
-                var connId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count
-                    ? connectionModel.connectionIdAt(currentTabIndex) : ""
-                return connId ? remoteWindow.getPerformanceStats(connId) : null
+                var devId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count
+                    ? connectionModel.deviceIdAt(currentTabIndex) : ""
+                return devId ? remoteWindow.getPerformanceStats(devId) : null
             }
         }
     }
@@ -531,27 +532,27 @@ Window {
     Connections {
         target: remoteWindow.clientManager
         
-        function onConnectionStateChanged(connectionId, state, hostInfo) {
-            console.log("Remote window: connection state changed:", connectionId, state)
+        function onConnectionStateChanged(deviceId, state, hostInfo) {
+            console.log("Remote window: connection state changed:", deviceId, state)
 
             if (!remoteWindow || !remoteWindow.closingConnections) return
 
             // Skip if this connection is already being closed
-            if (remoteWindow.closingConnections[connectionId]) {
+            if (remoteWindow.closingConnections[deviceId]) {
                 return
             }
             
             // Update connection state
-            remoteWindow.updateConnectionState(connectionId, state, 0)
+            remoteWindow.updateConnectionState(deviceId, state, 0)
             
             // Auto-close tab when connection is disconnected or failed
             // needDisconnect=false: the connection is already gone, just remove the tab
             if (state === "disconnected" || state === "failed") {
-                var connIdCopy = connectionId
+                var deviceIdCopy = deviceId
                 Qt.callLater(function() {
-                    var idx = connectionModel.indexOf(connIdCopy)
+                    var idx = connectionModel.indexOf(deviceIdCopy)
                     if (idx >= 0) {
-                        console.log("Auto-closing tab for", state, "connection:", connIdCopy, "at index:", idx)
+                        console.log("Auto-closing tab for", state, "connection:", deviceIdCopy, "at index:", idx)
                         remoteWindow.closeConnection(idx, false)
                     }
                 })
@@ -564,17 +565,17 @@ Window {
     Connections {
         target: remoteWindow.clientManager
         
-        function onConnectionRemoved(connectionId) {
+        function onConnectionRemoved(deviceId) {
             if (!remoteWindow || !remoteWindow.closingConnections) return
-            if (remoteWindow.closingConnections[connectionId]) {
+            if (remoteWindow.closingConnections[deviceId]) {
                 return
             }
             
-            var connIdCopy = connectionId
+            var deviceIdCopy = deviceId
             Qt.callLater(function() {
-                var idx = connectionModel.indexOf(connIdCopy)
+                var idx = connectionModel.indexOf(deviceIdCopy)
                 if (idx >= 0) {
-                    console.log("Fallback: removing orphan tab for removed connection:", connIdCopy)
+                    console.log("Fallback: removing orphan tab for removed connection:", deviceIdCopy)
                     remoteWindow.closeConnection(idx, false)
                 }
             })
@@ -585,25 +586,25 @@ Window {
     Connections {
         target: remoteWindow.clientManager
         
-        function onPerformanceStatsUpdated(connectionId, detailedStats) {
+        function onPerformanceStatsUpdated(deviceId, detailedStats) {
             var totalLatencyMs = detailedStats.totalLatencyMs || 0
             var frameRate = detailedStats.frameRate || 0
             
             // Update connection latency value (for tab bar display)
-            remoteWindow.updateConnectionState(connectionId, "", totalLatencyMs)
+            remoteWindow.updateConnectionState(deviceId, "", totalLatencyMs)
             
             // Update frameRate and merge detailed stats
-            var existing = remoteWindow.getPerformanceStats(connectionId)
+            var existing = remoteWindow.getPerformanceStats(deviceId)
             if (existing && existing.frameWidth > 0 && existing.frameHeight > 0) {
-                remoteWindow.updatePerformanceStats(connectionId,
+                remoteWindow.updatePerformanceStats(deviceId,
                     existing.frameWidth, existing.frameHeight, frameRate, totalLatencyMs)
             }
             
             // Merge detailed timing/codec stats into performanceStatsMap
-            var current = remoteWindow.performanceStatsMap[connectionId]
+            var current = remoteWindow.performanceStatsMap[deviceId]
             if (current) {
                 var newStatsMap = Object.assign({}, remoteWindow.performanceStatsMap)
-                newStatsMap[connectionId] = Object.assign({}, current, {
+                newStatsMap[deviceId] = Object.assign({}, current, {
                     captureMs:         detailedStats.captureMs || 0,
                     encodeMs:          detailedStats.encodeMs || 0,
                     networkDelayMs:    detailedStats.networkDelayMs || 0,
@@ -627,10 +628,10 @@ Window {
     Connections {
         target: remoteWindow.clientManager
 
-        function onHostCapabilitiesChanged(connectionId, supportsSendAttentionSequence, supportsLockWorkstation, supportsFileTransfer) {
-            var current = remoteWindow.performanceStatsMap[connectionId] || {}
+        function onHostCapabilitiesChanged(deviceId, supportsSendAttentionSequence, supportsLockWorkstation, supportsFileTransfer) {
+            var current = remoteWindow.performanceStatsMap[deviceId] || {}
             var newStatsMap = Object.assign({}, remoteWindow.performanceStatsMap)
-            newStatsMap[connectionId] = Object.assign({}, current, {
+            newStatsMap[deviceId] = Object.assign({}, current, {
                 supportsSendAttentionSequence: supportsSendAttentionSequence,
                 supportsLockWorkstation: supportsLockWorkstation,
                 supportsFileTransfer: supportsFileTransfer
@@ -643,11 +644,11 @@ Window {
     Connections {
         target: remoteWindow.clientManager
 
-        function onRouteChanged(connectionId, routeInfo) {
-            var current = remoteWindow.performanceStatsMap[connectionId]
+        function onRouteChanged(deviceId, routeInfo) {
+            var current = remoteWindow.performanceStatsMap[deviceId]
             if (current) {
                 var newStatsMap = Object.assign({}, remoteWindow.performanceStatsMap)
-                newStatsMap[connectionId] = Object.assign({}, current, {
+                newStatsMap[deviceId] = Object.assign({}, current, {
                     routeType: routeInfo.routeType || "",
                     transportProtocol: routeInfo.transportProtocol || "",
                     localCandidateType: routeInfo.localCandidateType || "",
@@ -668,15 +669,15 @@ Window {
         title: qsTr("Select Files to Upload")
         fileMode: FileDialog.OpenFiles
         onAccepted: {
-            var connId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count
-                ? connectionModel.connectionIdAt(currentTabIndex) : ""
-            if (connId && remoteWindow.clientManager) {
+            var devId = currentTabIndex >= 0 && currentTabIndex < connectionModel.count
+                ? connectionModel.deviceIdAt(currentTabIndex) : ""
+            if (devId && remoteWindow.clientManager) {
                 for (var i = 0; i < selectedFiles.length; i++) {
-                    remoteWindow.clientManager.startFileUpload(connId, selectedFiles[i])
+                    remoteWindow.clientManager.startFileUpload(devId, selectedFiles[i])
                     var fname = selectedFiles[i].toString().split('/').pop()
                     transferModel.append({
                         transferId: "",
-                        connectionId: connId,
+                        deviceId: devId,
                         filename: decodeURIComponent(fname),
                         progress: 0,
                         status: "uploading",
@@ -723,7 +724,7 @@ Window {
     Connections {
         target: remoteWindow.clientManager
 
-        function onFileTransferProgress(connectionId, transferId, filename, bytesSent, totalBytes) {
+        function onFileTransferProgress(deviceId, transferId, filename, bytesSent, totalBytes) {
             var idx = remoteWindow.findTransferIndex(transferId)
             if (idx < 0) {
                 idx = remoteWindow.findTransferByFilename(filename)
@@ -732,7 +733,7 @@ Window {
                 } else {
                     transferModel.append({
                         transferId: transferId,
-                        connectionId: connectionId,
+                        deviceId: deviceId,
                         filename: filename,
                         progress: 0,
                         status: "uploading",
@@ -747,7 +748,7 @@ Window {
             transferModel.setProperty(idx, "progress", pct)
         }
 
-        function onFileTransferComplete(connectionId, transferId, filename) {
+        function onFileTransferComplete(deviceId, transferId, filename) {
             var idx = remoteWindow.findTransferIndex(transferId)
             if (idx < 0) idx = remoteWindow.findTransferByFilename(filename)
             if (idx >= 0) {
@@ -759,7 +760,7 @@ Window {
             toast.show(qsTr("Upload complete: %1").arg(filename), QDToast.Type.Success)
         }
 
-        function onFileTransferError(connectionId, transferId, errorMessage) {
+        function onFileTransferError(deviceId, transferId, errorMessage) {
             var idx = remoteWindow.findTransferIndex(transferId)
             if (idx < 0) {
                 for (var i = transferModel.count - 1; i >= 0; i--) {
@@ -778,10 +779,10 @@ Window {
             toast.show(qsTr("Upload failed: %1").arg(errorMessage), QDToast.Type.Error)
         }
 
-        function onFileDownloadStarted(connectionId, transferId, filename, totalBytes) {
+        function onFileDownloadStarted(deviceId, transferId, filename, totalBytes) {
             transferModel.append({
                 transferId: transferId,
-                connectionId: connectionId,
+                deviceId: deviceId,
                 filename: filename,
                 progress: 0,
                 status: "downloading",
@@ -792,7 +793,7 @@ Window {
             fileTransferDrawer.open()
         }
 
-        function onFileDownloadProgress(connectionId, transferId, filename, bytesReceived, totalBytes) {
+        function onFileDownloadProgress(deviceId, transferId, filename, bytesReceived, totalBytes) {
             var idx = remoteWindow.findTransferIndex(transferId)
             if (idx >= 0) {
                 var pct = totalBytes > 0 ? bytesReceived / totalBytes : 0
@@ -800,7 +801,7 @@ Window {
             }
         }
 
-        function onFileDownloadComplete(connectionId, transferId, filename, savePath) {
+        function onFileDownloadComplete(deviceId, transferId, filename, savePath) {
             var idx = remoteWindow.findTransferIndex(transferId)
             if (idx >= 0) {
                 transferModel.setProperty(idx, "status", "complete")
@@ -810,7 +811,7 @@ Window {
             toast.show(qsTr("Download complete: %1").arg(filename), QDToast.Type.Success)
         }
 
-        function onFileDownloadError(connectionId, transferId, errorMessage) {
+        function onFileDownloadError(deviceId, transferId, errorMessage) {
             var idx = remoteWindow.findTransferIndex(transferId)
             if (idx >= 0) {
                 transferModel.setProperty(idx, "status", "error")
@@ -914,10 +915,10 @@ Window {
                                     if (item.transferId && remoteWindow.clientManager) {
                                         if (item.direction === "download") {
                                             remoteWindow.clientManager.cancelFileDownload(
-                                                item.connectionId, item.transferId)
+                                                item.deviceId, item.transferId)
                                         } else {
                                             remoteWindow.clientManager.cancelFileUpload(
-                                                item.connectionId, item.transferId)
+                                                item.deviceId, item.transferId)
                                         }
                                     }
                                     transferModel.setProperty(index, "status", "cancelled")
@@ -1041,11 +1042,11 @@ Window {
 
     Connections {
         target: mainController
-        function onTrustConfirmationRequested(confirmationId, connectionId, toolName,
+        function onTrustConfirmationRequested(confirmationId, deviceId, toolName,
                                                argumentsJson, riskLevel, reasons, timeoutSecs) {
             var parsedArgs = {}
             try { parsedArgs = JSON.parse(argumentsJson) } catch(e) {}
-            trustDialog.showConfirmation(confirmationId, connectionId, toolName,
+            trustDialog.showConfirmation(confirmationId, deviceId, toolName,
                                           parsedArgs, riskLevel, reasons, timeoutSecs)
         }
         function onTrustEmergencyStopActivated(reason) {

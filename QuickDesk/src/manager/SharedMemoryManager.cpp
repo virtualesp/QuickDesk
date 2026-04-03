@@ -20,65 +20,55 @@ SharedMemoryManager::~SharedMemoryManager()
     detachAll();
 }
 
-bool SharedMemoryManager::attach(const QString& connectionId, 
+bool SharedMemoryManager::attach(const QString& deviceId, 
                                   const QString& sharedMemoryName)
 {
-    std::string key = connectionId.toStdString();
+    std::string key = deviceId.toStdString();
     
-    // Already attached?
     auto it = m_handles.find(key);
     if (it != m_handles.end()) {
         auto& existing = it->second;
         if (existing->sharedMemoryName == sharedMemoryName && 
             existing->sharedMemory && existing->sharedMemory->isAttached()) {
-            return true;  // Already attached to same memory
+            return true;
         }
-        // Different memory name - detach first
-        detach(connectionId);
+        detach(deviceId);
     }
 
-    // Create new QSharedMemory instance
     auto shm = std::make_unique<QSharedMemory>();
     
-    // Use setNativeKey() to directly use the platform-specific name.
-    // On macOS/Linux, the C++ client uses POSIX shm_open/sem_open, so we must
-    // explicitly specify PosixRealtime to match. Qt may default to SystemV
-    // (which uses ftok and requires real filesystem paths) if QT_POSIX_IPC
-    // was not defined at Qt build time.
 #ifdef Q_OS_WIN
     shm->setNativeKey(sharedMemoryName);
 #else
     shm->setNativeKey(QNativeIpcKey(sharedMemoryName, QNativeIpcKey::Type::PosixRealtime));
 #endif
 
-    // Attach to existing shared memory (created by C++ client)
     if (!shm->attach(QSharedMemory::ReadOnly)) {
-        LOG_WARN("Failed to attach to shared memory '{}' for connection {}: {}",
-                 sharedMemoryName.toStdString(), connectionId.toStdString(),
+        LOG_WARN("Failed to attach to shared memory '{}' for device {}: {}",
+                 sharedMemoryName.toStdString(), deviceId.toStdString(),
                  shm->errorString().toStdString());
-        emit frameReadError(connectionId, 
+        emit frameReadError(deviceId, 
                             QString("Failed to attach: %1").arg(shm->errorString()));
         return false;
     }
 
-    // Create handle entry
     auto handle = std::make_unique<SharedMemoryHandle>();
-    handle->connectionId = connectionId;
+    handle->deviceId = deviceId;
     handle->sharedMemoryName = sharedMemoryName;
     handle->lastFrameIndex = 0;
     handle->sharedMemory = std::move(shm);
 
     m_handles[key] = std::move(handle);
 
-    LOG_INFO("Attached to shared memory '{}' for connection {}",
-             sharedMemoryName.toStdString(), connectionId.toStdString());
-    emit attachmentChanged(connectionId, true);
+    LOG_INFO("Attached to shared memory '{}' for device {}",
+             sharedMemoryName.toStdString(), deviceId.toStdString());
+    emit attachmentChanged(deviceId, true);
     return true;
 }
 
-void SharedMemoryManager::detach(const QString& connectionId)
+void SharedMemoryManager::detach(const QString& deviceId)
 {
-    std::string key = connectionId.toStdString();
+    std::string key = deviceId.toStdString();
     auto it = m_handles.find(key);
     if (it == m_handles.end()) {
         return;
@@ -87,24 +77,24 @@ void SharedMemoryManager::detach(const QString& connectionId)
     closeHandle(*it->second);
     m_handles.erase(it);
 
-    LOG_INFO("Detached from shared memory for connection {}", 
-             connectionId.toStdString());
-    emit attachmentChanged(connectionId, false);
+    LOG_INFO("Detached from shared memory for device {}", 
+             deviceId.toStdString());
+    emit attachmentChanged(deviceId, false);
 }
 
 void SharedMemoryManager::detachAll()
 {
     for (auto& pair : m_handles) {
         closeHandle(*pair.second);
-        emit attachmentChanged(pair.second->connectionId, false);
+        emit attachmentChanged(pair.second->deviceId, false);
     }
     m_handles.clear();
     LOG_INFO("Detached from all shared memory regions");
 }
 
-bool SharedMemoryManager::isAttached(const QString& connectionId) const
+bool SharedMemoryManager::isAttached(const QString& deviceId) const
 {
-    std::string key = connectionId.toStdString();
+    std::string key = deviceId.toStdString();
     auto it = m_handles.find(key);
     if (it == m_handles.end()) {
         return false;
@@ -112,9 +102,9 @@ bool SharedMemoryManager::isAttached(const QString& connectionId) const
     return it->second->sharedMemory && it->second->sharedMemory->isAttached();
 }
 
-QVideoFrame SharedMemoryManager::readVideoFrame(const QString& connectionId)
+QVideoFrame SharedMemoryManager::readVideoFrame(const QString& deviceId)
 {
-    std::string key = connectionId.toStdString();
+    std::string key = deviceId.toStdString();
     auto it = m_handles.find(key);
     if (it == m_handles.end()) {
         return QVideoFrame();
@@ -125,10 +115,9 @@ QVideoFrame SharedMemoryManager::readVideoFrame(const QString& connectionId)
         return QVideoFrame();
     }
 
-    // Lock shared memory for reading
     if (!handle->sharedMemory->lock()) {
-        LOG_WARN("Failed to lock shared memory for connection {}: {}",
-                 connectionId.toStdString(), 
+        LOG_WARN("Failed to lock shared memory for device {}: {}",
+                 deviceId.toStdString(), 
                  handle->sharedMemory->errorString().toStdString());
         return QVideoFrame();
     }
@@ -140,7 +129,6 @@ QVideoFrame SharedMemoryManager::readVideoFrame(const QString& connectionId)
         const SharedFrameHeader* header = 
             static_cast<const SharedFrameHeader*>(data);
 
-        // Validate header
         if (header->magic == kSharedFrameMagic && 
             header->version == kSharedFrameVersion) {
             
@@ -156,40 +144,31 @@ QVideoFrame SharedMemoryManager::readVideoFrame(const QString& connectionId)
                 const uchar* frameData = static_cast<const uchar*>(data) + 
                                          sizeof(SharedFrameHeader);
 
-                // Read stride information from header
                 quint32 ySrcStride = header->y_stride;
                 quint32 uSrcStride = header->u_stride;
                 quint32 vSrcStride = header->v_stride;
                 
-                // Calculate expected data size with stride
                 quint32 expectedSize = ySrcStride * height + 
                                       uSrcStride * (height / 2) + 
                                       vSrcStride * (height / 2);
                 
                 if (dataSize == expectedSize) {
-                    // Create QVideoFrameFormat for YUV420P
                     QVideoFrameFormat format(QSize(static_cast<int>(width), static_cast<int>(height)),
                                             QVideoFrameFormat::Format_YUV420P);
-                    // Set correct color space for HD content (>= 720p uses BT.709)
-                    // H.264 hardware encoder outputs BT.709 limited range by default
                     format.setColorSpace(QVideoFrameFormat::ColorSpace_BT709);
                     format.setColorRange(QVideoFrameFormat::ColorRange_Video);
 
-                    // 🚀 Use custom YUVPlanarVideoBuffer to control stride (Qt 6.8)
                     auto planarBuffer = std::make_unique<YUVPlanarVideoBuffer>(format);
                     
-                    // Y plane: Single copy with stride
                     int sizeY = ySrcStride * height;
                     planarBuffer->m_data[0] = QByteArray(reinterpret_cast<const char*>(frameData), sizeY);
                     planarBuffer->m_bytesPerLine[0] = ySrcStride;
                     
-                    // U plane: Single copy with stride
                     const uchar* uSrc = frameData + ySrcStride * height;
                     int sizeU = uSrcStride * (height / 2);
                     planarBuffer->m_data[1] = QByteArray(reinterpret_cast<const char*>(uSrc), sizeU);
                     planarBuffer->m_bytesPerLine[1] = uSrcStride;
                     
-                    // V plane: Single copy with stride
                     const uchar* vSrc = frameData + ySrcStride * height + uSrcStride * (height / 2);
                     int sizeV = vSrcStride * (height / 2);
                     planarBuffer->m_data[2] = QByteArray(reinterpret_cast<const char*>(vSrc), sizeV);
@@ -197,11 +176,10 @@ QVideoFrame SharedMemoryManager::readVideoFrame(const QString& connectionId)
                     
                     planarBuffer->m_planeCount = 3;
                     
-                    // Create QVideoFrame with custom buffer (Qt 6.8 requires unique_ptr)
                     result = QVideoFrame(std::move(planarBuffer));
                 } else {
-                    LOG_WARN("YUV I420 data size mismatch for connection {}: {} vs expected {}",
-                             connectionId.toStdString(), dataSize, expectedSize);
+                    LOG_WARN("YUV I420 data size mismatch for device {}: {} vs expected {}",
+                             deviceId.toStdString(), dataSize, expectedSize);
                 }
             }
         }
@@ -211,10 +189,10 @@ QVideoFrame SharedMemoryManager::readVideoFrame(const QString& connectionId)
     return result;
 }
 
-FrameData SharedMemoryManager::lockFrame(const QString& connectionId)
+FrameData SharedMemoryManager::lockFrame(const QString& deviceId)
 {
     FrameData frameData;
-    std::string key = connectionId.toStdString();
+    std::string key = deviceId.toStdString();
     auto it = m_handles.find(key);
     if (it == m_handles.end()) {
         return frameData;
@@ -225,16 +203,15 @@ FrameData SharedMemoryManager::lockFrame(const QString& connectionId)
         return frameData;
     }
 
-    // Already locked?
     if (handle->isLocked) {
-        LOG_WARN("Shared memory already locked for connection {}", 
-                 connectionId.toStdString());
+        LOG_WARN("Shared memory already locked for device {}", 
+                 deviceId.toStdString());
         return frameData;
     }
 
     if (!handle->sharedMemory->lock()) {
-        LOG_WARN("Failed to lock shared memory for connection {}: {}",
-                 connectionId.toStdString(), 
+        LOG_WARN("Failed to lock shared memory for device {}: {}",
+                 deviceId.toStdString(), 
                  handle->sharedMemory->errorString().toStdString());
         return frameData;
     }
@@ -251,7 +228,6 @@ FrameData SharedMemoryManager::lockFrame(const QString& connectionId)
     const SharedFrameHeader* header = 
         static_cast<const SharedFrameHeader*>(data);
 
-    // Validate header
     if (header->magic != kSharedFrameMagic || 
         header->version != kSharedFrameVersion) {
         handle->sharedMemory->unlock();
@@ -262,7 +238,7 @@ FrameData SharedMemoryManager::lockFrame(const QString& connectionId)
     quint32 width = header->width;
     quint32 height = header->height;
     quint32 dataSize = header->data_size;
-    quint32 expectedSize = width * height + (width / 2) * (height / 2) * 2;  // YUV I420
+    quint32 expectedSize = width * height + (width / 2) * (height / 2) * 2;
 
     if (width == 0 || height == 0 || width > 8192 || height > 8192 ||
         dataSize != expectedSize) {
@@ -271,10 +247,8 @@ FrameData SharedMemoryManager::lockFrame(const QString& connectionId)
         return frameData;
     }
 
-    // Update last frame index
     handle->lastFrameIndex = header->frame_index;
 
-    // Fill frame data
     frameData.valid = true;
     frameData.width = width;
     frameData.height = height;
@@ -287,9 +261,9 @@ FrameData SharedMemoryManager::lockFrame(const QString& connectionId)
     return frameData;
 }
 
-void SharedMemoryManager::unlockFrame(const QString& connectionId)
+void SharedMemoryManager::unlockFrame(const QString& deviceId)
 {
-    std::string key = connectionId.toStdString();
+    std::string key = deviceId.toStdString();
     auto it = m_handles.find(key);
     if (it == m_handles.end()) {
         return;
@@ -302,17 +276,15 @@ void SharedMemoryManager::unlockFrame(const QString& connectionId)
     }
 }
 
-QSize SharedMemoryManager::frameSize(const QString& connectionId) const
+QSize SharedMemoryManager::frameSize(const QString& deviceId) const
 {
-    std::string key = connectionId.toStdString();
+    std::string key = deviceId.toStdString();
     auto it = m_handles.find(key);
     if (it == m_handles.end() || !it->second->sharedMemory || 
         !it->second->sharedMemory->isAttached()) {
         return QSize();
     }
 
-    // We need to read the header to get dimensions
-    // This requires a const_cast since we need to lock
     auto& handle = *it->second;
     if (!const_cast<QSharedMemory*>(handle.sharedMemory.get())->lock()) {
         return QSize();
@@ -333,9 +305,9 @@ QSize SharedMemoryManager::frameSize(const QString& connectionId) const
     return result;
 }
 
-quint32 SharedMemoryManager::lastFrameIndex(const QString& connectionId) const
+quint32 SharedMemoryManager::lastFrameIndex(const QString& deviceId) const
 {
-    std::string key = connectionId.toStdString();
+    std::string key = deviceId.toStdString();
     auto it = m_handles.find(key);
     if (it == m_handles.end()) {
         return 0;
@@ -343,13 +315,13 @@ quint32 SharedMemoryManager::lastFrameIndex(const QString& connectionId) const
     return it->second->lastFrameIndex;
 }
 
-bool SharedMemoryManager::isNewFrame(const QString& connectionId, 
+bool SharedMemoryManager::isNewFrame(const QString& deviceId, 
                                       quint32 currentFrameIndex) const
 {
-    std::string key = connectionId.toStdString();
+    std::string key = deviceId.toStdString();
     auto it = m_handles.find(key);
     if (it == m_handles.end()) {
-        return true;  // Not tracking, assume new
+        return true;
     }
     return currentFrameIndex > it->second->lastFrameIndex;
 }

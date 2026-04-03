@@ -47,9 +47,9 @@ fn make_resource(uri: &str, name: &str, description: &str) -> Annotated<RawResou
 // ---- Parameter structs ----
 
 #[derive(Deserialize, JsonSchema)]
-struct ConnectionIdParam {
-    /// Connection ID
-    connection_id: String,
+struct DeviceIdParam {
+    /// Remote session id: `deviceId` from list_connections (distinct from the 9-digit id used in connect_device).
+    device_id: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -66,8 +66,8 @@ struct ConnectDeviceParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct ScreenshotParam {
-    /// Connection ID
-    connection_id: String,
+    /// Remote session id: `deviceId` from list_connections (distinct from the 9-digit id used in connect_device).
+    device_id: String,
     /// Maximum width of the screenshot in pixels. Image will be scaled down proportionally if wider than this value. Use this to reduce data transfer size.
     max_width: Option<i32>,
     /// Image format: "jpeg" (default) or "png"
@@ -78,8 +78,8 @@ struct ScreenshotParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct MouseClickParam {
-    /// Connection ID
-    connection_id: String,
+    /// Remote session id: `deviceId` from list_connections (distinct from the 9-digit id used in connect_device).
+    device_id: String,
     /// X coordinate
     x: f64,
     /// Y coordinate
@@ -90,8 +90,8 @@ struct MouseClickParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct MousePositionParam {
-    /// Connection ID
-    connection_id: String,
+    /// Remote session id: `deviceId` from list_connections (distinct from the 9-digit id used in connect_device).
+    device_id: String,
     /// X coordinate
     x: f64,
     /// Y coordinate
@@ -100,8 +100,8 @@ struct MousePositionParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct MouseScrollParam {
-    /// Connection ID
-    connection_id: String,
+    /// Remote session id: `deviceId` from list_connections (distinct from the 9-digit id used in connect_device).
+    device_id: String,
     /// X coordinate
     x: f64,
     /// Y coordinate
@@ -114,32 +114,32 @@ struct MouseScrollParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct KeyboardTypeParam {
-    /// Connection ID
-    connection_id: String,
+    /// Remote session id: `deviceId` from list_connections (distinct from the 9-digit id used in connect_device).
+    device_id: String,
     /// Text to type
     text: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
 struct KeyboardHotkeyParam {
-    /// Connection ID
-    connection_id: String,
+    /// Remote session id: `deviceId` from list_connections (distinct from the 9-digit id used in connect_device).
+    device_id: String,
     /// Key names to press together, e.g. ["ctrl","c"], ["win","r"], ["alt","f4"]
     keys: Vec<String>,
 }
 
 #[derive(Deserialize, JsonSchema)]
 struct SetClipboardParam {
-    /// Connection ID
-    connection_id: String,
+    /// Remote session id: `deviceId` from list_connections (distinct from the 9-digit id used in connect_device).
+    device_id: String,
     /// Text to set in remote clipboard
     text: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
 struct MouseDragParam {
-    /// Connection ID
-    connection_id: String,
+    /// Remote session id: `deviceId` from list_connections (distinct from the 9-digit id used in connect_device).
+    device_id: String,
     /// Start X coordinate
     start_x: f64,
     /// Start Y coordinate
@@ -154,8 +154,8 @@ struct MouseDragParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct KeyParam {
-    /// Connection ID
-    connection_id: String,
+    /// Remote session id: `deviceId` from list_connections (distinct from the 9-digit id used in connect_device).
+    device_id: String,
     /// Key name, e.g. "shift", "ctrl", "a", "enter". Same key names as keyboard_hotkey.
     key: String,
 }
@@ -164,30 +164,30 @@ struct KeyParam {
 struct FindAndClickArgs {
     /// Description of the UI element to find, e.g. "the Save button", "the search input field"
     element_description: String,
-    /// Connection ID of the remote desktop
-    connection_id: String,
+    /// Remote session (`deviceId` from list_connections)
+    device_id: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
 struct RunCommandArgs {
     /// The command to run, e.g. "dir C:\\", "ipconfig /all"
     command: String,
-    /// Connection ID of the remote desktop
-    connection_id: String,
+    /// Remote session (`deviceId` from list_connections)
+    device_id: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
-struct ConnectionIdArg {
-    /// Connection ID of the remote desktop
-    connection_id: String,
+struct DeviceIdArg {
+    /// Remote session id (`deviceId` from list_connections).
+    device_id: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
 struct DiagnoseIssueArgs {
     /// Description of the problem to diagnose, e.g. "computer is very slow", "internet not working", "application crashes"
     issue_description: String,
-    /// Connection ID of the remote desktop
-    connection_id: String,
+    /// Remote session (`deviceId` from list_connections)
+    device_id: String,
 }
 
 // ---- Event-related parameter structs ----
@@ -204,8 +204,8 @@ struct WaitForEventParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct WaitForConnectionStateParam {
-    /// Connection ID to monitor
-    connection_id: String,
+    /// Remote session to filter events for (`deviceId`)
+    device_id: String,
     /// Target state to wait for, e.g. "connected", "disconnected", "failed"
     state: String,
     /// Maximum time to wait in milliseconds (default: 30000)
@@ -214,8 +214,8 @@ struct WaitForConnectionStateParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct WaitForClipboardChangeParam {
-    /// Connection ID to monitor
-    connection_id: String,
+    /// Remote session to filter events for (`deviceId`)
+    device_id: String,
     /// Maximum time to wait in milliseconds (default: 10000)
     timeout_ms: Option<u64>,
 }
@@ -230,8 +230,8 @@ struct GetRecentEventsParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct WaitForScreenChangeParam {
-    /// Connection ID to monitor
-    connection_id: String,
+    /// Remote session to filter events for (`deviceId`)
+    device_id: String,
     /// Maximum time to wait in milliseconds (default: 5000)
     timeout_ms: Option<u64>,
 }
@@ -248,8 +248,8 @@ struct RetryAttempt {
 
 #[derive(Deserialize, JsonSchema)]
 struct RetryWithAlternativeParam {
-    /// Connection ID of the remote desktop
-    connection_id: String,
+    /// Remote session (`deviceId` from list_connections)
+    device_id: String,
     /// Ordered list of attempts to try. The first one that passes success_conditions wins.
     attempts: Vec<RetryAttempt>,
     /// Conditions checked after each attempt (same format as verify_action_result).
@@ -261,14 +261,14 @@ struct RetryWithAlternativeParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct GetScreenTextParam {
-    /// Connection ID of the remote desktop
-    connection_id: String,
+    /// Remote session (`deviceId` from list_connections)
+    device_id: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
 struct FindElementParam {
-    /// Connection ID of the remote desktop
-    connection_id: String,
+    /// Remote session (`deviceId` from list_connections)
+    device_id: String,
     /// Text to search for on screen (supports partial match by default)
     text: String,
     /// If true, require exact text match. Default: false (partial match)
@@ -279,8 +279,8 @@ struct FindElementParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct ClickTextParam {
-    /// Connection ID of the remote desktop
-    connection_id: String,
+    /// Remote session (`deviceId` from list_connections)
+    device_id: String,
     /// Text to find and click. Clicks the center of the first matched text block.
     text: String,
     /// If true, require exact text match. Default: false
@@ -301,22 +301,22 @@ struct MultiDeviceTaskArgs {
 struct DocumentProcedureArgs {
     /// Description of the procedure to document, e.g. "how to deploy the application", "how to configure the firewall"
     procedure_name: String,
-    /// Connection ID of the remote desktop
-    connection_id: String,
+    /// Remote session (`deviceId` from list_connections)
+    device_id: String,
 }
 
 // ---- UI state param structs ----
 
 #[derive(Deserialize, JsonSchema)]
 struct GetUiStateParam {
-    /// Connection ID of the remote desktop
-    connection_id: String,
+    /// Remote session (`deviceId` from list_connections)
+    device_id: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
 struct WaitForTextParam {
-    /// Connection ID of the remote desktop
-    connection_id: String,
+    /// Remote session (`deviceId` from list_connections)
+    device_id: String,
     /// Text to wait for on screen (supports partial match by default)
     text: String,
     /// If true, require exact text match. Default: false
@@ -329,8 +329,8 @@ struct WaitForTextParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct AssertTextPresentParam {
-    /// Connection ID of the remote desktop
-    connection_id: String,
+    /// Remote session (`deviceId` from list_connections)
+    device_id: String,
     /// Text to assert is present on screen (supports partial match by default)
     text: String,
     /// If true, require exact text match. Default: false
@@ -353,8 +353,8 @@ struct VerificationCondition {
 
 #[derive(Deserialize, JsonSchema)]
 struct VerifyActionResultParam {
-    /// Connection ID of the remote desktop
-    connection_id: String,
+    /// Remote session (`deviceId` from list_connections)
+    device_id: String,
     /// List of conditions that must all pass
     expectations: Vec<VerificationCondition>,
     /// Maximum time to poll in milliseconds (default: 3000)
@@ -363,8 +363,8 @@ struct VerifyActionResultParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct ScreenDiffParam {
-    /// Connection ID of the remote desktop
-    connection_id: String,
+    /// Remote session (`deviceId` from list_connections)
+    device_id: String,
     /// Frame hash from a previous get_ui_state or screen_diff_summary call.
     /// Leave empty to compare against an empty baseline (shows all current text as "added").
     from_hash: Option<String>,
@@ -372,8 +372,8 @@ struct ScreenDiffParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct AssertScreenStateParam {
-    /// Connection ID of the remote desktop
-    connection_id: String,
+    /// Remote session (`deviceId` from list_connections)
+    device_id: String,
     /// List of conditions to assert simultaneously (no polling)
     expectations: Vec<VerificationCondition>,
 }
@@ -381,8 +381,8 @@ struct AssertScreenStateParam {
 #[derive(Deserialize, JsonSchema)]
 #[allow(dead_code)]
 struct AgentExecParam {
-    /// Connection ID of the remote host
-    connection_id: String,
+    /// Remote session on the host (`deviceId`)
+    device_id: String,
     /// Tool name to invoke on the remote agent (e.g. "run_shell", "list_processes")
     tool: String,
     /// Arguments to pass to the tool as a JSON object
@@ -410,8 +410,8 @@ where
 #[derive(Deserialize, JsonSchema)]
 #[allow(dead_code)]
 struct AgentListToolsParam {
-    /// Connection ID of the remote host
-    connection_id: String,
+    /// Remote session on the host (`deviceId`)
+    device_id: String,
 }
 
 // ---- Device Memory parameter structs ----
@@ -466,16 +466,14 @@ struct DeviceSummaryParam {
 struct StartRecordingParam {
     /// Name for the workflow
     name: String,
-    /// Device ID being controlled
+    /// Remote session to record (`deviceId` from list_connections); must match other tools you call while recording.
     device_id: String,
-    /// Connection ID (used as recording session key)
-    connection_id: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
 struct StopRecordingParam {
-    /// Connection ID of the active recording
-    connection_id: String,
+    /// Same `device_id` passed to start_recording
+    device_id: String,
     /// Description of what the workflow does
     description: Option<String>,
     /// Tags for categorization
@@ -492,8 +490,8 @@ struct WorkflowIdParam {
 struct ReplayWorkflowParam {
     /// Workflow ID to replay
     workflow_id: String,
-    /// Connection ID of the remote host to replay on
-    connection_id: String,
+    /// Active remote session to run steps on (`deviceId` from list_connections)
+    device_id: String,
     /// Override specific argument values (key-value map)
     overrides: Option<HashMap<String, serde_json::Value>>,
 }
@@ -528,8 +526,8 @@ struct SetTrustPolicyParam {
 
 #[derive(Deserialize, JsonSchema)]
 struct AuditLogParam {
-    /// Filter by connection ID (optional)
-    connection_id: Option<String>,
+    /// Filter by device/session id (optional)
+    device_id: Option<String>,
     /// Maximum number of entries (default: 50)
     limit: Option<i64>,
 }
@@ -569,9 +567,9 @@ impl QuickDeskMcpServer {
         }
     }
 
-    fn maybe_record(&self, connection_id: &str, tool_name: &str, args: &serde_json::Value, result: &str, success: bool) {
-        if self.state.workflow.is_recording(connection_id) {
-            self.state.workflow.record_step(connection_id, tool_name, args, result, success);
+    fn maybe_record(&self, device_id: &str, tool_name: &str, args: &serde_json::Value, result: &str, success: bool) {
+        if self.state.workflow.is_recording(device_id) {
+            self.state.workflow.record_step(device_id, tool_name, args, result, success);
         }
     }
 
@@ -592,7 +590,7 @@ impl QuickDeskMcpServer {
 
 #[tool_router]
 impl QuickDeskMcpServer {
-    #[tool(description = "Get local host device ID, access code, signaling state, and client count. Use this to get credentials for connecting to the current computer.")]
+    #[tool(description = "Get the LOCAL computer's device ID, access code, and signaling state. Use the returned deviceId and accessCode with connect_device to control this machine remotely. No device_id parameter.")]
     async fn get_host_info(&self) -> String {
         match self.ws.request("getHostInfo", json!({})).await {
             Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
@@ -632,7 +630,7 @@ impl QuickDeskMcpServer {
         }
     }
 
-    #[tool(description = "List all active remote desktop connections.")]
+    #[tool(description = "List active remote desktop sessions. Each entry includes deviceId (use this as device_id on other tools) and state. Call this first whenever you need a session id.")]
     async fn list_connections(&self) -> String {
         match self.ws.request("listConnections", json!({})).await {
             Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
@@ -641,10 +639,10 @@ impl QuickDeskMcpServer {
     }
 
     #[tool(description = "Get detailed info for a specific remote connection.")]
-    async fn get_connection_info(&self, params: Parameters<ConnectionIdParam>) -> String {
+    async fn get_connection_info(&self, params: Parameters<DeviceIdParam>) -> String {
         match self
             .ws
-            .request("getConnectionInfo", json!({ "connectionId": params.0.connection_id }))
+            .request("getConnectionInfo", json!({ "deviceId": params.0.device_id }))
             .await
         {
             Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
@@ -652,7 +650,7 @@ impl QuickDeskMcpServer {
         }
     }
 
-    #[tool(description = "Connect to a remote device. Returns a connection ID. By default, a remote desktop viewer window is shown so the user can observe your operations. Set show_window=false for silent background automation. To control the current computer, first call get_host_info to get the device ID and access code, then pass them here.")]
+    #[tool(description = "Connect to a remote host by 9-digit device id and access code. Response includes the session deviceId to use on other tools. Opens a viewer window by default (set show_window=false for silent automation). For this machine, use get_host_info first, then pass its deviceId and accessCode here.")]
     async fn connect_device(&self, params: Parameters<ConnectDeviceParam>) -> String {
         let p = params.0;
         if let Err(e) = self.check_device_allowed(&p.device_id) {
@@ -678,10 +676,10 @@ impl QuickDeskMcpServer {
     }
 
     #[tool(description = "Disconnect from a remote device.")]
-    async fn disconnect_device(&self, params: Parameters<ConnectionIdParam>) -> String {
+    async fn disconnect_device(&self, params: Parameters<DeviceIdParam>) -> String {
         match self
             .ws
-            .request("disconnectFromHost", json!({ "connectionId": params.0.connection_id }))
+            .request("disconnectFromHost", json!({ "deviceId": params.0.device_id }))
             .await
         {
             Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
@@ -697,11 +695,11 @@ impl QuickDeskMcpServer {
         }
     }
 
-    #[tool(description = "Capture a screenshot of the remote desktop. Returns base64 JPEG image data with width and height. Use max_width to reduce image size for faster transfer.")]
+    #[tool(description = "Screenshot the remote desktop. Returns base64 image data plus width/height. Requires device_id from list_connections. Use max_width to shrink the image. Prefer get_screen_text or get_ui_state for text-only work (fewer tokens).")]
     async fn screenshot(&self, params: Parameters<ScreenshotParam>) -> String {
         let p = params.0;
         let mut req = json!({
-            "connectionId": p.connection_id,
+            "deviceId": p.device_id,
             "format": p.format.unwrap_or_else(|| "jpeg".to_string()),
             "quality": p.quality.unwrap_or(80),
         });
@@ -717,14 +715,14 @@ impl QuickDeskMcpServer {
     #[tool(description = "Click at coordinates on the remote desktop.")]
     async fn mouse_click(&self, params: Parameters<MouseClickParam>) -> String {
         let p = params.0;
-        let conn = p.connection_id.clone();
+        let conn = p.device_id.clone();
         let args = json!({"x": p.x, "y": p.y, "button": p.button.as_deref().unwrap_or("left")});
         match self
             .ws
             .request(
                 "mouseClick",
                 json!({
-                    "connectionId": conn,
+                    "deviceId": conn,
                     "x": p.x, "y": p.y,
                     "button": p.button.unwrap_or_else(|| "left".to_string()),
                 }),
@@ -743,13 +741,13 @@ impl QuickDeskMcpServer {
     #[tool(description = "Double-click at coordinates on the remote desktop.")]
     async fn mouse_double_click(&self, params: Parameters<MousePositionParam>) -> String {
         let p = params.0;
-        let conn = p.connection_id.clone();
+        let conn = p.device_id.clone();
         let args = json!({"x": p.x, "y": p.y});
         match self
             .ws
             .request(
                 "mouseDoubleClick",
-                json!({ "connectionId": conn, "x": p.x, "y": p.y }),
+                json!({ "deviceId": conn, "x": p.x, "y": p.y }),
             )
             .await
         {
@@ -765,13 +763,13 @@ impl QuickDeskMcpServer {
     #[tool(description = "Move the mouse cursor to coordinates on the remote desktop.")]
     async fn mouse_move(&self, params: Parameters<MousePositionParam>) -> String {
         let p = params.0;
-        let conn = p.connection_id.clone();
+        let conn = p.device_id.clone();
         let args = json!({"x": p.x, "y": p.y});
         match self
             .ws
             .request(
                 "mouseMove",
-                json!({ "connectionId": conn, "x": p.x, "y": p.y }),
+                json!({ "deviceId": conn, "x": p.x, "y": p.y }),
             )
             .await
         {
@@ -787,7 +785,7 @@ impl QuickDeskMcpServer {
     #[tool(description = "Scroll the mouse wheel on the remote desktop.")]
     async fn mouse_scroll(&self, params: Parameters<MouseScrollParam>) -> String {
         let p = params.0;
-        let conn = p.connection_id.clone();
+        let conn = p.device_id.clone();
         let dx = p.delta_x.unwrap_or(0.0);
         let dy = p.delta_y.unwrap_or(0.0);
         let args = json!({"x": p.x, "y": p.y, "delta_x": dx, "delta_y": dy});
@@ -795,7 +793,7 @@ impl QuickDeskMcpServer {
             .ws
             .request(
                 "mouseScroll",
-                json!({ "connectionId": conn, "x": p.x, "y": p.y, "deltaX": dx, "deltaY": dy }),
+                json!({ "deviceId": conn, "x": p.x, "y": p.y, "deltaX": dx, "deltaY": dy }),
             )
             .await
         {
@@ -810,11 +808,11 @@ impl QuickDeskMcpServer {
     #[tool(description = "Type text on the remote desktop. Uses clipboard paste for reliable unicode input.")]
     async fn keyboard_type(&self, params: Parameters<KeyboardTypeParam>) -> String {
         let p = params.0;
-        let conn = p.connection_id.clone();
+        let conn = p.device_id.clone();
         let args = json!({"text": p.text});
         match self
             .ws
-            .request("keyboardType", json!({"connectionId": conn, "text": p.text}))
+            .request("keyboardType", json!({"deviceId": conn, "text": p.text}))
             .await
         {
             Ok(_) => {
@@ -829,11 +827,11 @@ impl QuickDeskMcpServer {
     #[tool(description = "Send a keyboard shortcut (hotkey) on the remote desktop. Keys are pressed in order and released in reverse. Examples: [\"ctrl\",\"c\"], [\"ctrl\",\"shift\",\"esc\"], [\"win\",\"r\"], [\"alt\",\"f4\"]")]
     async fn keyboard_hotkey(&self, params: Parameters<KeyboardHotkeyParam>) -> String {
         let p = params.0;
-        let conn = p.connection_id.clone();
+        let conn = p.device_id.clone();
         let args = json!({"keys": p.keys});
         match self
             .ws
-            .request("keyboardHotkey", json!({"connectionId": conn, "keys": p.keys}))
+            .request("keyboardHotkey", json!({"deviceId": conn, "keys": p.keys}))
             .await
         {
             Ok(_) => {
@@ -846,11 +844,11 @@ impl QuickDeskMcpServer {
     }
 
     #[tool(description = "Get the last known clipboard content from the remote desktop. Clipboard is synced automatically when something is copied on the remote machine.")]
-    async fn get_clipboard(&self, params: Parameters<ConnectionIdParam>) -> String {
+    async fn get_clipboard(&self, params: Parameters<DeviceIdParam>) -> String {
         let p = params.0;
         match self
             .ws
-            .request("getClipboard", json!({"connectionId": p.connection_id}))
+            .request("getClipboard", json!({"deviceId": p.device_id}))
             .await
         {
             Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
@@ -861,11 +859,11 @@ impl QuickDeskMcpServer {
     #[tool(description = "Set remote clipboard content.")]
     async fn set_clipboard(&self, params: Parameters<SetClipboardParam>) -> String {
         let p = params.0;
-        let conn = p.connection_id.clone();
+        let conn = p.device_id.clone();
         let args = json!({"text": p.text});
         match self
             .ws
-            .request("setClipboard", json!({"connectionId": conn, "text": p.text}))
+            .request("setClipboard", json!({"deviceId": conn, "text": p.text}))
             .await
         {
             Ok(_) => {
@@ -879,14 +877,14 @@ impl QuickDeskMcpServer {
     #[tool(description = "Drag the mouse from one position to another on the remote desktop. Useful for drag-and-drop, text selection, resizing windows, and moving objects.")]
     async fn mouse_drag(&self, params: Parameters<MouseDragParam>) -> String {
         let p = params.0;
-        let conn = p.connection_id.clone();
+        let conn = p.device_id.clone();
         let args = json!({"start_x": p.start_x, "start_y": p.start_y, "end_x": p.end_x, "end_y": p.end_y});
         match self
             .ws
             .request(
                 "mouseDrag",
                 json!({
-                    "connectionId": conn,
+                    "deviceId": conn,
                     "startX": p.start_x, "startY": p.start_y,
                     "endX": p.end_x, "endY": p.end_y,
                     "button": p.button.unwrap_or_else(|| "left".to_string()),
@@ -906,11 +904,11 @@ impl QuickDeskMcpServer {
     #[tool(description = "Press and hold a key on the remote desktop. The key stays pressed until explicitly released with key_release. Useful for modifier keys (shift, ctrl, alt) while performing mouse operations like Ctrl+click for multi-select.")]
     async fn key_press(&self, params: Parameters<KeyParam>) -> String {
         let p = params.0;
-        let conn = p.connection_id.clone();
+        let conn = p.device_id.clone();
         let args = json!({"key": p.key});
         match self
             .ws
-            .request("keyPress", json!({"connectionId": conn, "key": p.key}))
+            .request("keyPress", json!({"deviceId": conn, "key": p.key}))
             .await
         {
             Ok(_) => {
@@ -925,11 +923,11 @@ impl QuickDeskMcpServer {
     #[tool(description = "Release a previously pressed key on the remote desktop. Must be paired with a prior key_press call.")]
     async fn key_release(&self, params: Parameters<KeyParam>) -> String {
         let p = params.0;
-        let conn = p.connection_id.clone();
+        let conn = p.device_id.clone();
         let args = json!({"key": p.key});
         match self
             .ws
-            .request("keyRelease", json!({"connectionId": conn, "key": p.key}))
+            .request("keyRelease", json!({"deviceId": conn, "key": p.key}))
             .await
         {
             Ok(_) => {
@@ -942,10 +940,10 @@ impl QuickDeskMcpServer {
     }
 
     #[tool(description = "Get the remote screen resolution.")]
-    async fn get_screen_size(&self, params: Parameters<ConnectionIdParam>) -> String {
+    async fn get_screen_size(&self, params: Parameters<DeviceIdParam>) -> String {
         match self
             .ws
-            .request("getScreenSize", json!({ "connectionId": params.0.connection_id }))
+            .request("getScreenSize", json!({ "deviceId": params.0.device_id }))
             .await
         {
             Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
@@ -977,10 +975,10 @@ impl QuickDeskMcpServer {
     ) -> String {
         let p = params.0;
         let timeout = p.timeout_ms.unwrap_or(30000);
-        let filter = json!({ "connectionId": p.connection_id, "state": p.state });
+        let filter = json!({ "deviceId": p.device_id, "state": p.state });
 
-        // check_history=true: safe because each connect_device creates a unique
-        // connection ID, so a stale match for the same ID cannot exist.
+        // check_history=true: safe because each connect_device yields a unique
+        // session deviceId, so a stale match for the same id cannot exist.
         match self
             .event_bus
             .wait_for("connectionStateChanged", Some(&filter), timeout, true)
@@ -998,7 +996,7 @@ impl QuickDeskMcpServer {
     ) -> String {
         let p = params.0;
         let timeout = p.timeout_ms.unwrap_or(10000);
-        let filter = json!({ "connectionId": p.connection_id });
+        let filter = json!({ "deviceId": p.device_id });
 
         // check_history=false: must wait for a NEW clipboard change, not return stale data
         match self
@@ -1034,7 +1032,7 @@ Use this instead of screenshot+vision for text-heavy tasks to reduce token cost 
         let p = params.0;
         match self
             .ws
-            .request("getScreenText", json!({ "connectionId": p.connection_id }))
+            .request("getScreenText", json!({ "deviceId": p.device_id }))
             .await
         {
             Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
@@ -1050,7 +1048,7 @@ without having to poll with repeated screenshots.")]
     async fn wait_for_screen_change(&self, params: Parameters<WaitForScreenChangeParam>) -> String {
         let p = params.0;
         let timeout = p.timeout_ms.unwrap_or(5000);
-        let filter = json!({ "connectionId": p.connection_id });
+        let filter = json!({ "deviceId": p.device_id });
 
         // check_history=false: we want a change AFTER this call, not a past event
         match self
@@ -1071,7 +1069,7 @@ Returns found=false if the text is not on screen.")]
     async fn find_element(&self, params: Parameters<FindElementParam>) -> String {
         let p = params.0;
         let mut req = json!({
-            "connectionId": p.connection_id,
+            "deviceId": p.device_id,
             "text": p.text,
         });
         if let Some(exact) = p.exact {
@@ -1093,9 +1091,9 @@ Returns success=true with the clicked text and coordinates, or found=false if no
 Prefer this over screenshot→find coordinates→click for text-based UI interactions.")]
     async fn click_text(&self, params: Parameters<ClickTextParam>) -> String {
         let p = params.0;
-        let conn = p.connection_id.clone();
+        let conn = p.device_id.clone();
         let args = json!({"text": &p.text, "exact": p.exact, "ignore_case": p.ignore_case, "button": p.button});
-        let mut req = json!({ "connectionId": conn, "text": p.text });
+        let mut req = json!({ "deviceId": conn, "text": p.text });
         if let Some(exact) = p.exact {
             req["exact"] = json!(exact);
         }
@@ -1116,13 +1114,14 @@ Prefer this over screenshot→find coordinates→click for text-based UI interac
     }
 
     #[tool(description = "Get a unified UI state snapshot: screen resolution, OCR text blocks, and active window title. \
-Returns structured data instead of a raw image, reducing token cost and enabling reliable text-based navigation. \
-Use this as a lightweight alternative to screenshot when you need to understand what is on screen without visual analysis. \
+Returns structured data instead of a raw image, reducing token cost. \
+Use this as a lightweight alternative to screenshot when you need to understand what is on screen. \
+Requires device_id from list_connections. \
 The `ocr.blocks` array contains every recognised text block with its coordinates.")]
     async fn get_ui_state(&self, params: Parameters<GetUiStateParam>) -> String {
         match self
             .ws
-            .request("getUiState", json!({ "connectionId": params.0.connection_id }))
+            .request("getUiState", json!({ "deviceId": params.0.device_id }))
             .await
         {
             Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
@@ -1137,7 +1136,7 @@ Prefer this over polling with screenshot in a loop.")]
     async fn wait_for_text(&self, params: Parameters<WaitForTextParam>) -> String {
         let p = params.0;
         let mut req = json!({
-            "connectionId": p.connection_id,
+            "deviceId": p.device_id,
             "text": p.text,
             "timeoutMs": p.timeout_ms.unwrap_or(5000),
         });
@@ -1160,7 +1159,7 @@ Unlike wait_for_text, this returns immediately without polling.")]
     async fn assert_text_present(&self, params: Parameters<AssertTextPresentParam>) -> String {
         let p = params.0;
         let mut req = json!({
-            "connectionId": p.connection_id,
+            "deviceId": p.device_id,
             "text": p.text,
         });
         if let Some(exact) = p.exact {
@@ -1188,7 +1187,7 @@ Supported condition types: \"text_present\", \"text_absent\", \"text_present_exa
             json!({ "type": c.condition_type, "value": c.value })
         }).collect();
         let req = json!({
-            "connectionId": p.connection_id,
+            "deviceId": p.device_id,
             "expectations": expectations,
             "timeoutMs": p.timeout_ms.unwrap_or(3000),
         });
@@ -1206,7 +1205,7 @@ screen_diff_summary afterwards to understand what changed.")]
     async fn screen_diff_summary(&self, params: Parameters<ScreenDiffParam>) -> String {
         let p = params.0;
         let req = json!({
-            "connectionId": p.connection_id,
+            "deviceId": p.device_id,
             "fromHash": p.from_hash.unwrap_or_default(),
         });
         match self.ws.request("screenDiffSummary", req).await {
@@ -1225,7 +1224,7 @@ before clicking OK). For post-action verification with retries, use verify_actio
             json!({ "type": c.condition_type, "value": c.value })
         }).collect();
         let req = json!({
-            "connectionId": p.connection_id,
+            "deviceId": p.device_id,
             "expectations": expectations,
         });
         match self.ws.request("assertScreenState", req).await {
@@ -1249,11 +1248,11 @@ If no attempt succeeds, returns a summary of all failures.")]
         let mut results = Vec::new();
 
         for (i, attempt) in p.attempts.iter().enumerate() {
-            // Inject connectionId into params if not already present
+            // Inject deviceId into params if not already present
             let mut req_params = attempt.params.clone();
             if let Some(obj) = req_params.as_object_mut() {
-                obj.entry("connectionId")
-                    .or_insert_with(|| json!(p.connection_id));
+                obj.entry("deviceId")
+                    .or_insert_with(|| json!(p.device_id));
             }
 
             // Execute the attempt
@@ -1291,7 +1290,7 @@ If no attempt succeeds, returns a summary of all failures.")]
                 json!({ "type": c.condition_type, "value": c.value })
             }).collect();
             let verify_req = json!({
-                "connectionId": p.connection_id,
+                "deviceId": p.device_id,
                 "expectations": expectations,
                 "timeoutMs": timeout_ms,
             });
@@ -1342,32 +1341,32 @@ If no attempt succeeds, returns a summary of all failures.")]
             {
                 "event": "connectionStateChanged",
                 "description": "Fired when a remote connection changes state (connecting, connected, disconnected, failed)",
-                "data_fields": ["connectionId", "state", "hostInfo"]
+                "data_fields": ["deviceId", "state", "hostInfo"]
             },
             {
                 "event": "clipboardChanged",
                 "description": "Fired when the remote clipboard content changes",
-                "data_fields": ["connectionId", "text"]
+                "data_fields": ["deviceId", "text"]
             },
             {
                 "event": "connectionAdded",
                 "description": "Fired when a new outgoing connection is created",
-                "data_fields": ["connectionId", "deviceId"]
+                "data_fields": ["deviceId"]
             },
             {
                 "event": "connectionRemoved",
                 "description": "Fired when an outgoing connection is removed",
-                "data_fields": ["connectionId"]
+                "data_fields": ["deviceId"]
             },
             {
                 "event": "videoLayoutChanged",
                 "description": "Fired when the remote desktop video resolution changes",
-                "data_fields": ["connectionId", "width", "height"]
+                "data_fields": ["deviceId", "width", "height"]
             },
             {
                 "event": "screenChanged",
                 "description": "Fired when the remote desktop screen content visually changes (at most 5×/s per connection, based on frame hash diff). Use wait_for_screen_change to wait for this event.",
-                "data_fields": ["connectionId", "frameHash", "timestamp"]
+                "data_fields": ["deviceId", "frameHash", "timestamp"]
             },
             {
                 "event": "hostReady",
@@ -1382,12 +1381,12 @@ If no attempt succeeds, returns a summary of all failures.")]
             {
                 "event": "hostClientConnected",
                 "description": "Fired when a remote client connects to this host",
-                "data_fields": ["connectionId"]
+                "data_fields": ["deviceId"]
             },
             {
                 "event": "hostClientDisconnected",
                 "description": "Fired when a remote client disconnects from this host",
-                "data_fields": ["connectionId", "reason"]
+                "data_fields": ["deviceId", "reason"]
             },
             {
                 "event": "hostSignalingStateChanged",
@@ -1411,11 +1410,11 @@ If no attempt succeeds, returns a summary of all failures.")]
     // ---- Agent bridge tools ----
 
     async fn check_trust_and_confirm(
-        &self, connection_id: &str, tool: &str, args: &serde_json::Value,
+        &self, device_id: &str, tool: &str, args: &serde_json::Value,
     ) -> Result<(), String> {
         if self.state.trust.is_emergency_active() {
             self.state.trust.log_audit(
-                connection_id, tool, args,
+                device_id, tool, args,
                 crate::trust::RiskLevel::High, "blocked", "emergency_stop_active", "",
             );
             return Err("emergency stop is active — all operations are halted".into());
@@ -1424,7 +1423,7 @@ If no attempt succeeds, returns a summary of all failures.")]
         let risk = self.state.trust.assess_risk(tool, args);
         if risk.risk_level.is_blocked(&self.state.trust.get_policy()) {
             self.state.trust.log_audit(
-                connection_id, tool, args,
+                device_id, tool, args,
                 risk.risk_level, "blocked", "policy_blocked", "",
             );
             return Err("operation blocked by trust policy".into());
@@ -1433,7 +1432,7 @@ If no attempt succeeds, returns a summary of all failures.")]
         if risk.risk_level.requires_confirmation(&self.state.trust.get_policy()) {
             let args_obj = if args.is_object() { args.clone() } else { json!({}) };
             let confirm_req = json!({
-                "connection_id": connection_id,
+                "deviceId": device_id,
                 "tool_name": tool,
                 "arguments": args_obj,
                 "risk_level": format!("{:?}", risk.risk_level).to_lowercase(),
@@ -1453,7 +1452,7 @@ If no attempt succeeds, returns a summary of all failures.")]
                             .and_then(|r| r.as_str())
                             .unwrap_or("rejected");
                         self.state.trust.log_audit(
-                            connection_id, tool, args,
+                            device_id, tool, args,
                             risk.risk_level, "rejected", reason, "user",
                         );
                         return Err(format!("operation rejected by user: {reason}"));
@@ -1461,7 +1460,7 @@ If no attempt succeeds, returns a summary of all failures.")]
                 }
                 Err(e) => {
                     self.state.trust.log_audit(
-                        connection_id, tool, args,
+                        device_id, tool, args,
                         risk.risk_level, "error", &e, "",
                     );
                     return Err(format!("confirmation failed: {e}"));
@@ -1477,14 +1476,14 @@ Use agent_list_tools first to discover available tools and their parameters.")]
     async fn agent_exec(&self, params: Parameters<AgentExecParam>) -> String {
         let p = params.0;
         let args = p.args.unwrap_or(json!({}));
-        if let Err(e) = self.check_trust_and_confirm(&p.connection_id, &p.tool, &args).await {
+        if let Err(e) = self.check_trust_and_confirm(&p.device_id, &p.tool, &args).await {
             return json!({"error": e}).to_string();
         }
 
         let risk = self.state.trust.assess_risk(&p.tool, &args);
         let start = std::time::Instant::now();
         let req = json!({
-            "connection_id": p.connection_id,
+            "deviceId": p.device_id,
             "tool": p.tool,
             "args": args,
         });
@@ -1498,20 +1497,20 @@ Use agent_list_tools first to discover available tools and their parameters.")]
         let duration_ms = start.elapsed().as_millis() as i64;
 
         self.state.trust.log_audit(
-            &p.connection_id, &p.tool, &args,
+            &p.device_id, &p.tool, &args,
             risk.risk_level, "executed",
             if success { "success" } else { &error_msg }, "",
         );
 
-        let session_id = format!("session-{}", &p.connection_id);
+        let session_id = format!("session-{}", &p.device_id);
         self.state.memory.log_operation(
-            &session_id, &p.connection_id, &p.tool, &args,
+            &session_id, &p.device_id, &p.tool, &args,
             &result_str, success, duration_ms, &error_msg,
         );
 
-        if self.state.workflow.is_recording(&p.connection_id) {
+        if self.state.workflow.is_recording(&p.device_id) {
             self.state.workflow.record_step(
-                &p.connection_id, &p.tool, &args, &result_str, success,
+                &p.device_id, &p.tool, &args, &result_str, success,
             );
         }
 
@@ -1524,7 +1523,7 @@ with agent_exec.")]
     async fn agent_list_tools(&self, params: Parameters<AgentListToolsParam>) -> String {
         let p = params.0;
         let req = json!({
-            "connection_id": p.connection_id,
+            "deviceId": p.device_id,
         });
         match self.ws.request("agentListTools", req).await {
             Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_default(),
@@ -1591,7 +1590,7 @@ most-used tools, common failures, and session count.")]
 will be captured as workflow steps until stop_recording is called.")]
     async fn start_recording(&self, params: Parameters<StartRecordingParam>) -> String {
         let p = params.0;
-        match self.state.workflow.start_recording(&p.name, &p.device_id, &p.connection_id) {
+        match self.state.workflow.start_recording(&p.name, &p.device_id) {
             Ok(id) => json!({"workflow_id": id, "status": "recording"}).to_string(),
             Err(e) => json!({"error": e}).to_string(),
         }
@@ -1603,7 +1602,7 @@ recorded steps.")]
         let p = params.0;
         let tags = p.tags.unwrap_or_default();
         match self.state.workflow.stop_recording(
-            &p.connection_id,
+            &p.device_id,
             &p.description.unwrap_or_default(),
             &tags,
         ) {
@@ -1657,7 +1656,7 @@ via the QuickDesk WebSocket API. Supports argument overrides for parameterized s
                 })).unwrap_or_default();
             }
 
-            if let Err(e) = self.check_trust_and_confirm(&p.connection_id, tool_name, args).await {
+            if let Err(e) = self.check_trust_and_confirm(&p.device_id, tool_name, args).await {
                 step_results.push(json!({
                     "seq": seq, "tool_name": tool_name,
                     "success": false, "error": e,
@@ -1673,7 +1672,7 @@ via the QuickDesk WebSocket API. Supports argument overrides for parameterized s
             }
 
             let req = json!({
-                "connection_id": p.connection_id,
+                "deviceId": p.device_id,
                 "tool": tool_name,
                 "args": args,
             });
@@ -1792,12 +1791,11 @@ blocked tools, and dangerous patterns.")]
         }
     }
 
-    #[tool(description = "Get the audit log of tool executions with risk assessments and user decisions. \
-Optionally filter by connection ID.")]
+    #[tool(description = "Audit log of tool executions with risk level and user decisions. Optional device_id filter limits rows to one session.")]
     async fn get_audit_log(&self, params: Parameters<AuditLogParam>) -> String {
         let p = params.0;
         let entries = self.state.trust.get_audit_log(
-            p.connection_id.as_deref(),
+            p.device_id.as_deref(),
             p.limit.unwrap_or(50),
         );
         serde_json::to_string_pretty(&entries).unwrap_or_default()
@@ -1877,11 +1875,11 @@ impl QuickDeskMcpServer {
             PromptMessageRole::User,
             format!(
                 "Find and click the following element on the remote desktop: \"{}\"\n\
-                Connection ID: {}\n\
+                Device / session id: {}\n\
                 \n\
                 Follow these steps:\n\
                 \n\
-                1. Call `screenshot` with connection_id=\"{}\" and max_width=1280 to see the current screen.\n\
+                1. Call `screenshot` with device_id=\"{}\" and max_width=1280 to see the current screen.\n\
                 2. Analyze the screenshot to locate \"{}\".\n\
                    - Look for text labels, icons, or visual cues that match the description.\n\
                    - If the element is not visible, you may need to scroll or navigate to find it.\n\
@@ -1897,8 +1895,8 @@ impl QuickDeskMcpServer {
                 - Click the CENTER of the element, not the edge.\n\
                 - For small elements (checkboxes, radio buttons), be extra precise with coordinates.\n\
                 - If the element is in a scrollable area and not visible, use mouse_scroll first.",
-                args.element_description, args.connection_id,
-                args.connection_id, args.element_description
+                args.element_description, args.device_id,
+                args.device_id, args.element_description
             ),
         )])
     }
@@ -1914,7 +1912,7 @@ impl QuickDeskMcpServer {
             PromptMessageRole::User,
             format!(
                 "Run the following command on the remote desktop: `{}`\n\
-                Connection ID: {}\n\
+                Device / session id: {}\n\
                 \n\
                 Follow these steps:\n\
                 \n\
@@ -1935,7 +1933,7 @@ impl QuickDeskMcpServer {
                 - For long-running commands, take multiple screenshots to monitor progress.\n\
                 - If the command requires elevated privileges, you may need to run as administrator.\n\
                 - Use `get_clipboard` after selecting output text (Ctrl+A in terminal, then Ctrl+C) to get the text content.",
-                args.command, args.connection_id, args.command
+                args.command, args.device_id, args.command
             ),
         )])
     }
@@ -1944,14 +1942,14 @@ impl QuickDeskMcpServer {
     #[prompt(name = "server_health_check")]
     async fn server_health_check(
         &self,
-        params: Parameters<ConnectionIdArg>,
+        params: Parameters<DeviceIdArg>,
     ) -> Result<Vec<PromptMessage>, ErrorData> {
-        let conn = params.0.connection_id;
+        let conn = params.0.device_id;
         Ok(vec![PromptMessage::new_text(
             PromptMessageRole::User,
             format!(
                 "Perform a comprehensive health check on the remote server.\n\
-                Connection ID: {conn}\n\
+                Device / session id: {conn}\n\
                 \n\
                 ## Procedure\n\
                 \n\
@@ -2055,7 +2053,7 @@ impl QuickDeskMcpServer {
             PromptMessageRole::User,
             format!(
                 "Diagnose the following issue on the remote desktop: \"{}\"\n\
-                Connection ID: {}\n\
+                Device / session id: {}\n\
                 \n\
                 ## Diagnostic Procedure\n\
                 \n\
@@ -2103,7 +2101,7 @@ impl QuickDeskMcpServer {
                 - Always screenshot before and after any remediation.\n\
                 - For destructive actions (killing processes, deleting files), explicitly ask for user confirmation.\n\
                 - If unsure, suggest the user consult a professional.",
-                args.issue_description, args.connection_id
+                args.issue_description, args.device_id
             ),
         )])
     }
@@ -2112,14 +2110,14 @@ impl QuickDeskMcpServer {
     #[prompt(name = "analyze_screen_content")]
     async fn analyze_screen_content(
         &self,
-        params: Parameters<ConnectionIdArg>,
+        params: Parameters<DeviceIdArg>,
     ) -> Result<Vec<PromptMessage>, ErrorData> {
-        let conn = params.0.connection_id;
+        let conn = params.0.device_id;
         Ok(vec![PromptMessage::new_text(
             PromptMessageRole::User,
             format!(
                 "Analyze and describe the current screen content of the remote desktop in detail.\n\
-                Connection ID: {conn}\n\
+                Device / session id: {conn}\n\
                 \n\
                 ## Procedure\n\
                 \n\
@@ -2190,7 +2188,7 @@ impl QuickDeskMcpServer {
                 ### Phase 2: Connection\n\
                 1. Connect to all required devices using `connect_device`.\n\
                    - Use `show_window=false` for background automation.\n\
-                   - Track each `connection_id` with its device identity.\n\
+                   - Track each session `device_id` with its device identity.\n\
                 2. Verify each connection with a screenshot.\n\
                 3. Call `get_screen_size` for each device to understand their coordinate spaces.\n\
                 \n\
@@ -2220,7 +2218,7 @@ impl QuickDeskMcpServer {
                 - Any issues that need manual attention\n\
                 \n\
                 ## Tips\n\
-                - Always include the correct `connection_id` in every tool call — mixing up devices is the most common error.\n\
+                - Always pass the correct `device_id` on every tool call — mixing up sessions is the most common error.\n\
                 - Name or label your connections clearly (e.g. \"conn_server\", \"conn_client\") in your reasoning.\n\
                 - If a cross-device operation fails, check both devices for error state.\n\
                 - Disconnect all devices when the workflow is complete."
@@ -2239,7 +2237,7 @@ impl QuickDeskMcpServer {
             PromptMessageRole::User,
             format!(
                 "Document the following procedure on the remote desktop: \"{}\"\n\
-                Connection ID: {}\n\
+                Device / session id: {}\n\
                 \n\
                 ## Documentation Workflow\n\
                 \n\
@@ -2290,7 +2288,7 @@ impl QuickDeskMcpServer {
                 - Note any delays or waiting periods between steps.\n\
                 - If a step can fail, document the failure mode and recovery action.\n\
                 - Use `get_clipboard` to capture exact text output from terminals.",
-                args.procedure_name, args.connection_id, args.procedure_name
+                args.procedure_name, args.device_id, args.procedure_name
             ),
         )])
     }
@@ -2350,19 +2348,13 @@ impl ServerHandler for QuickDeskMcpServer {
             if let Some(conns) = v.get("connections").and_then(|c| c.as_array()) {
                 for conn in conns {
                     let id = conn
-                        .get("connectionId")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("unknown");
-                    let device_id = conn
                         .get("deviceId")
                         .and_then(|v| v.as_str())
                         .unwrap_or("unknown");
                     resources.push(make_resource(
-                        &format!("quickdesk://connection/{id}"),
-                        &format!("Connection {id} (device {device_id})"),
-                        &format!(
-                            "Detailed info for remote connection {id} to device {device_id}"
-                        ),
+                        &format!("quickdesk://device/{id}"),
+                        &format!("Remote session {id}"),
+                        &format!("Connection info for remote session {id}"),
                     ));
                 }
             }
@@ -2383,11 +2375,11 @@ impl ServerHandler for QuickDeskMcpServer {
         Ok(ListResourceTemplatesResult {
             resource_templates: vec![Annotated {
                 raw: RawResourceTemplate {
-                    uri_template: "quickdesk://connection/{connectionId}".to_string(),
-                    name: "Connection Info".to_string(),
+                    uri_template: "quickdesk://device/{deviceId}".to_string(),
+                    name: "Remote session info".to_string(),
                     title: None,
                     description: Some(
-                        "Detailed info for a specific remote connection by connection ID"
+                        "Detailed info for a remote session by deviceId (from list_connections)"
                             .to_string(),
                     ),
                     mime_type: Some("application/json".to_string()),
@@ -2411,9 +2403,9 @@ impl ServerHandler for QuickDeskMcpServer {
             self.ws.request("getHostInfo", json!({})).await
         } else if uri == "quickdesk://status" {
             self.ws.request("getStatus", json!({})).await
-        } else if let Some(conn_id) = uri.strip_prefix("quickdesk://connection/") {
+        } else if let Some(device_id) = uri.strip_prefix("quickdesk://device/") {
             self.ws
-                .request("getConnectionInfo", json!({ "connectionId": conn_id }))
+                .request("getConnectionInfo", json!({ "deviceId": device_id }))
                 .await
         } else {
             return Err(ErrorData::invalid_params(

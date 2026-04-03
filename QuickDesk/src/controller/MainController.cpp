@@ -99,25 +99,22 @@ MainController::MainController(QObject* parent)
         emit hostServerStatusChanged();
     });
     
-    // Listen to Client signaling state to update client server status (with connectionId)
+    // Listen to Client signaling state to update client server status
     connect(m_clientManager.get(), &ClientManager::signalingStateChanged,
             this, &MainController::onClientSignalingStateChanged);
     
-    // Listen to Client connection removed to update primary connection
+    // Listen to Client connection removed to update primary device
     connect(m_clientManager.get(), &ClientManager::connectionRemoved,
-            this, [this](const QString& connectionId) {
-        // If the removed connection was primary, reset and pick new primary
-        if (connectionId == m_primaryConnectionId) {
-            m_primaryConnectionId.clear();
+            this, [this](const QString& deviceId) {
+        if (deviceId == m_primaryDeviceId) {
+            m_primaryDeviceId.clear();
             
-            // If there are other connections, pick the first one as new primary
-            QStringList connIds = m_clientManager->connectionIds();
-            if (!connIds.isEmpty()) {
-                QString newPrimary = connIds.first();
-                m_primaryConnectionId = newPrimary;
-                LOG_INFO("Primary connection removed, new primary: {}", newPrimary.toStdString());
+            QStringList devIds = m_clientManager->connectedDeviceIds();
+            if (!devIds.isEmpty()) {
+                QString newPrimary = devIds.first();
+                m_primaryDeviceId = newPrimary;
+                LOG_INFO("Primary device removed, new primary: {}", newPrimary.toStdString());
                 
-                // Update status with new primary's signaling state
                 QString state = m_clientManager->getSignalingState(newPrimary);
                 if (state == "connected") {
                     m_clientServerStatus = ServerStatus::Connected;
@@ -132,8 +129,7 @@ MainController::MainController(QObject* parent)
                 }
                 emit clientServerStatusChanged();
             } else {
-                // No connections left, set to disconnected
-                LOG_INFO("Primary connection removed, no more connections");
+                LOG_INFO("Primary device removed, no more connections");
                 m_clientServerStatus = ServerStatus::Disconnected;
                 emit clientServerStatusChanged();
             }
@@ -313,23 +309,22 @@ QString MainController::connectToRemoteHost(const QString& deviceId,
 {
     QString url = serverUrl.isEmpty() ? getDefaultServerUrl() : serverUrl;
     LOG_INFO("Connecting to remote host: {} on {}", deviceId.toStdString(), url.toStdString());
-    QString connId = m_clientManager->connectToHost(deviceId, accessCode, url);
+    QString result = m_clientManager->connectToHost(deviceId, accessCode, url);
 
-    // Track connection for record API
-    if (!connId.isEmpty()) {
-        m_connectionTracks[connId] = { deviceId, QDateTime::currentMSecsSinceEpoch() };
+    if (!result.isEmpty()) {
+        m_connectionTracks[deviceId] = { QDateTime::currentMSecsSinceEpoch() };
     }
-    return connId;
+    return result;
 }
 
-void MainController::disconnectFromRemoteHost(const QString& connectionId)
+void MainController::disconnectFromRemoteHost(const QString& deviceId)
 {
-    m_clientManager->disconnectFromHost(connectionId);
+    m_clientManager->disconnectFromHost(deviceId);
 }
 
-void MainController::showRemoteWindowForConnection(const QString& connectionId, const QString& deviceId)
+void MainController::showRemoteWindowForDevice(const QString& deviceId)
 {
-    emit requestShowRemoteWindow(connectionId, deviceId);
+    emit requestShowRemoteWindow(deviceId);
 }
 
 void MainController::refreshAccessCode()
@@ -686,7 +681,7 @@ void MainController::onClientProcessRestarting(int retryCount, int maxRetries)
     LOG_INFO("Client process restarting, attempt {} of {}", retryCount, maxRetries);
 }
 
-void MainController::onClientSignalingStateChanged(const QString& connectionId,
+void MainController::onClientSignalingStateChanged(const QString& deviceId,
                                                     const QString& state,
                                                     int retryCount,
                                                     int nextRetryIn,
@@ -695,20 +690,19 @@ void MainController::onClientSignalingStateChanged(const QString& connectionId,
     Q_UNUSED(retryCount);
     Q_UNUSED(nextRetryIn);
 
-    LOG_INFO("Client signaling state changed: connection={}, state={}",
-             connectionId.toStdString(), state.toStdString());
+    LOG_INFO("Client signaling state changed: device={}, state={}",
+             deviceId.toStdString(), state.toStdString());
 
-    // Record connection result to server
     if (state == "connected" || state == "failed" || state == "disconnected") {
-        auto it = m_connectionTracks.find(connectionId);
+        auto it = m_connectionTracks.find(deviceId);
         if (it != m_connectionTracks.end()) {
             int durationSec = 0;
             if (state == "disconnected" && it->startTimeMs > 0) {
                 durationSec = static_cast<int>((QDateTime::currentMSecsSinceEpoch() - it->startTimeMs) / 1000);
             }
             QString status = (state == "connected") ? "success" : "failed";
-            if (state == "disconnected") status = "success";  // disconnected means session ended normally
-            m_cloudDeviceManager->recordConnection(it->deviceId, durationSec, status, error);
+            if (state == "disconnected") status = "success";
+            m_cloudDeviceManager->recordConnection(deviceId, durationSec, status, error);
 
             if (state == "failed" || state == "disconnected") {
                 m_connectionTracks.erase(it);
@@ -716,14 +710,12 @@ void MainController::onClientSignalingStateChanged(const QString& connectionId,
         }
     }
 
-    // If this is the first connection, set it as primary
-    if (m_primaryConnectionId.isEmpty() && !connectionId.isEmpty()) {
-        m_primaryConnectionId = connectionId;
-        LOG_INFO("Set primary connection for client signaling status: {}", connectionId.toStdString());
+    if (m_primaryDeviceId.isEmpty() && !deviceId.isEmpty()) {
+        m_primaryDeviceId = deviceId;
+        LOG_INFO("Set primary device for client signaling status: {}", deviceId.toStdString());
     }
 
-    // Only update global client server status if it's the primary connection
-    if (connectionId == m_primaryConnectionId) {
+    if (deviceId == m_primaryDeviceId) {
         if (state == "connected") {
             m_clientServerStatus = ServerStatus::Connected;
         } else if (state == "connecting") {
@@ -767,9 +759,17 @@ void MainController::onHostReady(const QString& deviceId, const QString& accessC
         }
     }
 
-    QTimer::singleShot(0, this, [this]() {
+    QTimer::singleShot(0, this, [this, deviceId, accessCode]() {
         emit deviceIdChanged();
         emit accessCodeChanged();
+
+        // Auto-bind if user is already logged in (loginSuccess may have fired before hostReady)
+        if (m_authManager->isLoggedIn() && !deviceId.isEmpty()) {
+            m_cloudDeviceManager->autoBindDevice(deviceId);
+            if (!accessCode.isEmpty()) {
+                m_cloudDeviceManager->syncAccessCode(deviceId, accessCode);
+            }
+        }
     });
 }
 
@@ -869,38 +869,36 @@ void MainController::setupWebSocketApiEvents() {
 
     // Client events → WebSocket broadcast
     connect(m_clientManager.get(), &ClientManager::connectionAdded,
-            this, [this](const QString& connectionId) {
-        auto info = m_clientManager->getConnection(connectionId);
+            this, [this](const QString& deviceId) {
         m_wsApiServer->broadcastEvent("connectionAdded", {
-            {"connectionId", connectionId},
-            {"deviceId", info.deviceId}
+            {"deviceId", deviceId}
         });
     });
     connect(m_clientManager.get(), &ClientManager::connectionRemoved,
-            this, [this](const QString& connectionId) {
+            this, [this](const QString& deviceId) {
         m_wsApiServer->broadcastEvent("connectionRemoved", {
-            {"connectionId", connectionId}
+            {"deviceId", deviceId}
         });
     });
     connect(m_clientManager.get(), &ClientManager::connectionStateChanged,
-            this, [this](const QString& connectionId, const QString& state,
+            this, [this](const QString& deviceId, const QString& state,
                          const QJsonObject& hostInfo) {
         QJsonObject data;
-        data["connectionId"] = connectionId;
+        data["deviceId"] = deviceId;
         data["state"] = state;
         data["hostInfo"] = hostInfo;
         m_wsApiServer->broadcastEvent("connectionStateChanged", data);
     });
     connect(m_clientManager.get(), &ClientManager::clipboardReceived,
-            this, [this](const QString& connectionId, const QString& text) {
+            this, [this](const QString& deviceId, const QString& text) {
         m_wsApiServer->broadcastEvent("clipboardChanged", {
-            {"connectionId", connectionId}, {"text", text}
+            {"deviceId", deviceId}, {"text", text}
         });
     });
     connect(m_clientManager.get(), &ClientManager::videoLayoutChanged,
-            this, [this](const QString& connectionId, int w, int h) {
+            this, [this](const QString& deviceId, int w, int h) {
         m_wsApiServer->broadcastEvent("videoLayoutChanged", {
-            {"connectionId", connectionId},
+            {"deviceId", deviceId},
             {"width", w}, {"height", h}
         });
     });
@@ -909,42 +907,38 @@ void MainController::setupWebSocketApiEvents() {
     // Strategy: rate-limit check + QImage read on UI thread (fast),
     // then MD5 hash computation offloaded to Qt global thread pool.
     connect(m_clientManager.get(), &ClientManager::videoFrameReady,
-            this, [this](const QString& connectionId, int /*frameIndex*/) {
-        // ① Rate-limit: skip if last broadcast for this connection was < 200ms ago
+            this, [this](const QString& deviceId, int /*frameIndex*/) {
         const qint64 now = QDateTime::currentMSecsSinceEpoch();
         {
             QMutexLocker locker(&m_screenChangeMutex);
-            if (now - m_screenChangeState[connectionId].lastBroadcastMs < 200)
+            if (now - m_screenChangeState[deviceId].lastBroadcastMs < 200)
                 return;
         }
 
-        // ② Read the current frame on UI thread (shared-memory copy, ~1ms)
         auto* shm = m_clientManager->sharedMemoryManager();
-        if (!shm || !shm->isAttached(connectionId)) return;
-        QImage img = shm->readVideoFrame(connectionId).toImage();
+        if (!shm || !shm->isAttached(deviceId)) return;
+        QImage img = shm->readVideoFrame(deviceId).toImage();
         if (img.isNull()) return;
 
-        // ③ Offload MD5 computation to thread pool; capture QImage by move
         QPointer<MainController> self(this);
-        QThreadPool::globalInstance()->start([self, connectionId, img = std::move(img), now]() {
+        QThreadPool::globalInstance()->start([self, deviceId, img = std::move(img), now]() {
             if (!self) return;
 
             const QString hash = OcrEngine::computeFrameHash(img);
 
-            // ④ Back on UI thread: compare hash, broadcast if changed
-            QMetaObject::invokeMethod(self, [self, connectionId, hash, now]() {
+            QMetaObject::invokeMethod(self, [self, deviceId, hash, now]() {
                 if (!self) return;
                 QMutexLocker locker(&self->m_screenChangeMutex);
-                auto& state = self->m_screenChangeState[connectionId];
+                auto& state = self->m_screenChangeState[deviceId];
 
-                if (hash == state.lastBroadcastHash) return;   // no visual change
-                if (now - state.lastBroadcastMs < 200) return;  // lost race
+                if (hash == state.lastBroadcastHash) return;
+                if (now - state.lastBroadcastMs < 200) return;
 
                 state.lastBroadcastHash = hash;
                 state.lastBroadcastMs   = now;
 
                 self->m_wsApiServer->broadcastEvent("screenChanged", {
-                    {"connectionId", connectionId},
+                    {"deviceId", deviceId},
                     {"frameHash",    hash},
                     {"timestamp",    now}
                 });
@@ -952,11 +946,10 @@ void MainController::setupWebSocketApiEvents() {
         });
     }, Qt::QueuedConnection);
 
-    // Clean up per-connection throttle state when a connection is removed
     connect(m_clientManager.get(), &ClientManager::connectionRemoved,
-            this, [this](const QString& connectionId) {
+            this, [this](const QString& deviceId) {
         QMutexLocker locker(&m_screenChangeMutex);
-        m_screenChangeState.remove(connectionId);
+        m_screenChangeState.remove(deviceId);
     });
 
     // Process events → WebSocket broadcast

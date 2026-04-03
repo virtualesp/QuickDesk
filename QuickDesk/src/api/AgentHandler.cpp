@@ -19,8 +19,8 @@ AgentHandler::AgentHandler(MainController* controller, QObject* parent)
     connect(m_controller->clientManager(),
             &ClientManager::agentBridgeResponseReceived,
             this,
-            [this](const QString& connectionId, const QJsonObject& response) {
-                onAgentResponse(connectionId, response);
+            [this](const QString& deviceId, const QJsonObject& response) {
+                onAgentResponse(deviceId, response);
             });
 }
 
@@ -28,16 +28,16 @@ AgentHandler::AgentHandler(MainController* controller, QObject* parent)
 
 QJsonObject AgentHandler::handleAgentExec(const QJsonObject& params)
 {
-    QString connectionId = params["connection_id"].toString();
-    QString tool         = params["tool"].toString();
-    QJsonValue args      = params.value("args");
+    QString deviceId = params["deviceId"].toString();
+    QString tool     = params["tool"].toString();
+    QJsonValue args  = params.value("args");
 
-    if (connectionId.isEmpty() || tool.isEmpty()) {
-        return {{"error", "agentExec: connection_id and tool are required"}};
+    if (deviceId.isEmpty() || tool.isEmpty()) {
+        return {{"error", "agentExec: device_id and tool are required"}};
     }
 
-    if (!isConnectionValid(connectionId)) {
-        return {{"error", QString("agentExec: connection '%1' not found").arg(connectionId)}};
+    if (!isConnectionValid(deviceId)) {
+        return {{"error", QString("agentExec: device '%1' not found").arg(deviceId)}};
     }
 
     QJsonObject payload;
@@ -46,31 +46,31 @@ QJsonObject AgentHandler::handleAgentExec(const QJsonObject& params)
     payload["tool"] = tool;
     payload["args"] = args.isUndefined() ? QJsonValue(QJsonObject{}) : args;
 
-    return sendAndWait(connectionId, payload);
+    return sendAndWait(deviceId, payload);
 }
 
 QJsonObject AgentHandler::handleAgentListTools(const QJsonObject& params)
 {
-    QString connectionId = params["connection_id"].toString();
+    QString deviceId = params["deviceId"].toString();
 
-    if (connectionId.isEmpty()) {
-        return {{"error", "agentListTools: connection_id is required"}};
+    if (deviceId.isEmpty()) {
+        return {{"error", "agentListTools: device_id is required"}};
     }
 
-    if (!isConnectionValid(connectionId)) {
-        return {{"error", QString("agentListTools: connection '%1' not found").arg(connectionId)}};
+    if (!isConnectionValid(deviceId)) {
+        return {{"error", QString("agentListTools: device '%1' not found").arg(deviceId)}};
     }
 
     QJsonObject payload;
     payload["id"]   = nextRequestId();
     payload["type"] = "listTools";
 
-    return sendAndWait(connectionId, payload);
+    return sendAndWait(deviceId, payload);
 }
 
 // ---- Callback from ClientManager (main thread) ----
 
-void AgentHandler::onAgentResponse(const QString& /*connectionId*/,
+void AgentHandler::onAgentResponse(const QString& /*deviceId*/,
                                    const QJsonObject& response)
 {
     QString id = response["id"].toString();
@@ -89,13 +89,13 @@ void AgentHandler::onAgentResponse(const QString& /*connectionId*/,
 
 // ---- Private helpers ----
 
-bool AgentHandler::isConnectionValid(const QString& connectionId) const
+bool AgentHandler::isConnectionValid(const QString& deviceId) const
 {
     auto* cm = m_controller->clientManager();
-    return cm && cm->connectionIds().contains(connectionId);
+    return cm && cm->connectedDeviceIds().contains(deviceId);
 }
 
-QJsonObject AgentHandler::sendAndWait(const QString& connectionId,
+QJsonObject AgentHandler::sendAndWait(const QString& deviceId,
                                       const QJsonObject& payload,
                                       int timeoutMs)
 {
@@ -115,8 +115,8 @@ QJsonObject AgentHandler::sendAndWait(const QString& connectionId,
 
     // NativeMessaging is not thread-safe — send from the main thread.
     auto* cm = m_controller->clientManager();
-    QMetaObject::invokeMethod(cm, [cm, connectionId, jsonData]() {
-        cm->sendAgentCommand(connectionId, jsonData);
+    QMetaObject::invokeMethod(cm, [cm, deviceId, jsonData]() {
+        cm->sendAgentCommand(deviceId, jsonData);
     }, Qt::QueuedConnection);
 
     // Block the *worker thread* (not the main thread) until response or timeout.

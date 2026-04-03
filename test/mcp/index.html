@@ -180,7 +180,7 @@ let tools = [];
 let currentTool = null;
 let sseSource = null;
 let agentTools = [];
-let agentConnectionId = '';
+let agentDeviceId = '';
 let connectionsRefreshInterval = null;
 
 function getMcpUrl() { return document.getElementById('mcpUrl').value.replace(/\/+$/, ''); }
@@ -194,7 +194,7 @@ function clearConnectionsRefreshInterval() {
 
 function syncConnectionIdParams() {
   const v = document.getElementById('connSelect').value;
-  document.querySelectorAll('#paramsArea [data-param="connection_id"]').forEach(el => {
+  document.querySelectorAll('#paramsArea [data-param="device_id"]').forEach(el => {
     el.value = v;
   });
 }
@@ -223,11 +223,11 @@ async function refreshConnections() {
   if (connections.length === 0) {
     const opt = document.createElement('option');
     opt.value = '';
-    opt.textContent = 'No connections';
+    opt.textContent = 'No devices';
     sel.appendChild(opt);
   } else {
     for (const c of connections) {
-      const id = c.connectionId;
+      const id = c.deviceId;
       if (id == null || id === '') continue;
       const opt = document.createElement('option');
       opt.value = String(id);
@@ -433,15 +433,15 @@ async function doListTools() {
 }
 
 async function loadAgentSkills() {
-  const connId = document.getElementById('connSelect').value.trim();
-  if (!connId) {
-    logMsg('error', 'Select a connection first (refresh runs list_connections automatically)');
+  const deviceId = document.getElementById('connSelect').value.trim();
+  if (!deviceId) {
+    logMsg('error', 'Select a device first (refresh runs list_connections automatically)');
     return;
   }
-  agentConnectionId = connId;
+  agentDeviceId = deviceId;
 
-  logMsg('info', `Loading agent skills for connection: ${connId}`);
-  const result = await mcpRequest('tools/call', { name: 'agent_list_tools', arguments: { connection_id: connId } });
+  logMsg('info', `Loading agent skills for device: ${deviceId}`);
+  const result = await mcpRequest('tools/call', { name: 'agent_list_tools', arguments: { device_id: deviceId } });
   if (!result || result.error) {
     logMsg('error', 'Failed to load agent skills');
     if (result) showResult(result, true);
@@ -478,14 +478,14 @@ async function sendToolCall() {
   const args = collectArgs();
 
   if (currentTool._agentSkill) {
-    const connId = document.getElementById('connSelect').value.trim() || agentConnectionId;
-    if (!connId) {
-      logMsg('error', 'Select a connection first');
+    const deviceId = document.getElementById('connSelect').value.trim() || agentDeviceId;
+    if (!deviceId) {
+      logMsg('error', 'Select a device first');
       return;
     }
     const result = await mcpRequest('tools/call', {
       name: 'agent_exec',
-      arguments: { connection_id: connId, tool: currentTool._agentToolName, args }
+      arguments: { device_id: deviceId, tool: currentTool._agentToolName, args }
     });
     if (result) showResult(result, !!result.error);
   } else {
@@ -684,7 +684,7 @@ function selectTool(tool) {
     label.innerHTML += `<span class="type-tag">${esc(typeStr)}</span>`;
     row.appendChild(label);
 
-    if (key === 'connection_id') {
+    if (key === 'device_id') {
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.dataset.param = key;
@@ -739,9 +739,9 @@ function selectTool(tool) {
   // Update raw JSON tab
   const sampleArgs = {};
   for (const [key, prop] of Object.entries(schema.properties)) {
-    if (key === 'connection_id') {
-      const cid = document.getElementById('connSelect').value;
-      if (cid) sampleArgs[key] = cid;
+    if (key === 'device_id') {
+      const did = document.getElementById('connSelect').value;
+      if (did) sampleArgs[key] = did;
     } else if (prop.default !== undefined) sampleArgs[key] = prop.default;
   }
   document.getElementById('rawJson').value = JSON.stringify({
@@ -785,7 +785,7 @@ function selectAgentSkillTool(agentTool) {
       label.innerHTML += `<span class="type-tag">${esc(typeStr)}</span>`;
       row.appendChild(label);
 
-      if (key === 'connection_id') {
+      if (key === 'device_id') {
         const inp = document.createElement('input');
         inp.type = 'text';
         inp.dataset.param = key;
@@ -837,19 +837,19 @@ function selectAgentSkillTool(agentTool) {
     }
   }
 
-  const connId = document.getElementById('connSelect').value.trim() || agentConnectionId;
+  const deviceId = document.getElementById('connSelect').value.trim() || agentDeviceId;
   const sampleArgs = {};
   if (schema && schema.properties) {
     for (const [key, prop] of Object.entries(schema.properties)) {
-      if (key === 'connection_id') {
-        const cid = document.getElementById('connSelect').value;
-        if (cid) sampleArgs[key] = cid;
+      if (key === 'device_id') {
+        const did = document.getElementById('connSelect').value;
+        if (did) sampleArgs[key] = did;
       } else if (prop.default !== undefined) sampleArgs[key] = prop.default;
     }
   }
   document.getElementById('rawJson').value = JSON.stringify({
     jsonrpc: '2.0', id: reqCounter + 1, method: 'tools/call',
-    params: { name: 'agent_exec', arguments: { connection_id: connId, tool: agentTool.name, args: sampleArgs } }
+    params: { name: 'agent_exec', arguments: { device_id: deviceId, tool: agentTool.name, args: sampleArgs } }
   }, null, 2);
 
   switchTab('form');

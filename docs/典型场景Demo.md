@@ -24,22 +24,22 @@
 ```
 步骤 1: connect_device
   → device_id: "999888777", access_code: "123456", show_window: true
-  ← { connectionId: "conn_1" }
+  ← { deviceId: "999888777" }
 
 步骤 2: wait_for_connection_state          ← 事件驱动，无需截图
-  → connection_id: "conn_1", state: "connected", timeout_ms: 15000
+  → device_id: "999888777", state: "connected", timeout_ms: 15000
   ← { event: "connectionStateChanged", data: { state: "connected" } }
 
 步骤 3: get_ui_state                       ← 结构化状态，无需视觉模型
-  → connection_id: "conn_1"
+  → device_id: "999888777"
   ← { screen: {width:1920,height:1080}, activeWindow: {title:"桌面"},
       ocr: { blocks: [...] } }
 
 步骤 4: keyboard_hotkey                    ← 打开任务管理器
-  → connection_id: "conn_1", keys: ["ctrl","shift","esc"]
+  → device_id: "999888777", keys: ["ctrl","shift","esc"]
 
 步骤 5: wait_for_text                      ← 等待任务管理器出现，不截图
-  → connection_id: "conn_1", text: "任务管理器", timeout_ms: 5000
+  → device_id: "999888777", text: "任务管理器", timeout_ms: 5000
   ← { found: true, match: { text: "任务管理器", center: {x:960,y:20} } }
 
 步骤 6: get_ui_state                       ← 通过 OCR 读取 CPU/内存数值
@@ -49,31 +49,33 @@
      ]}}
 
 步骤 7: click_text                         ← 按内存排序，无需猜坐标
-  → connection_id: "conn_1", text: "内存"
+  → device_id: "999888777", text: "内存"
   ← { success: true, clickedText: "内存", x: 480, y: 340 }
 
 步骤 8: wait_for_screen_change             ← 等待列表重排完成
-  → connection_id: "conn_1", timeout_ms: 3000
+  → device_id: "999888777", timeout_ms: 3000
   ← { event: "screenChanged", data: { frameHash: "a1b2c3..." } }
 
 步骤 9: get_screen_text                    ← OCR 读取进程内存占用
+  → device_id: "999888777"
   ← { blocks: [
        {text:"chrome.exe"}, {text:"8.3 GB"},
        {text:"Teams.exe"},   {text:"2.1 GB"},
        {text:"outlook.exe"}, {text:"1.8 GB"}
      ]}
 
-步骤 10: click_text → text: "磁盘"
+步骤 10: click_text → device_id: "999888777", text: "磁盘"
 
-步骤 11: wait_for_screen_change → timeout_ms: 3000
+步骤 11: wait_for_screen_change → device_id: "999888777", timeout_ms: 3000
 
 步骤 12: get_screen_text                   ← 读取磁盘占用排行
+  → device_id: "999888777"
   ← { blocks: [
        {text:"SearchIndexer.exe"}, {text:"100%"},
        {text:"MsMpEng.exe"},       {text:"50%"}
      ]}
 
-步骤 13: disconnect_device → connection_id: "conn_1"
+步骤 13: disconnect_device → device_id: "999888777"
 ```
 
 **截图次数**：0（旧版工作流需 8 次）
@@ -106,10 +108,10 @@
 
 步骤 1: connect_device
   → device_id: "111222333", access_code: "111111", show_window: false
-  ← { connectionId: "conn_a" }
+  ← { deviceId: "111222333" }
 
 步骤 2: wait_for_connection_state
-  → connection_id: "conn_a", state: "connected", timeout_ms: 20000
+  → device_id: "111222333", state: "connected", timeout_ms: 20000
   ← 已连接
 
 步骤 3: keyboard_hotkey → keys: ["win","r"]
@@ -130,7 +132,7 @@
 步骤 9: keyboard_hotkey → keys: ["enter"]
 
 步骤 10: wait_for_screen_change            ← 等待命令输出刷新
-  → connection_id: "conn_a", timeout_ms: 10000
+  → device_id: "111222333", timeout_ms: 10000
 
 步骤 11: get_screen_text                   ← OCR 读取磁盘数值
   ← { blocks: [
@@ -142,7 +144,7 @@
   → expectations: [{"type":"text_present","value":"GB"}]
   ← { allPassed: true }
 
-步骤 13: disconnect_device → connection_id: "conn_a"
+步骤 13: disconnect_device → device_id: "111222333"
 
 ── 服务器 B、C 重复以上流程 ──────────────────────────────
 ```
@@ -174,7 +176,7 @@
 ```
 步骤 1: connect_device
   → device_id: "555444333", access_code: "999111", show_window: true
-  ← { connectionId: "conn_erp" }
+  ← { deviceId: "555444333" }
 
 步骤 2: wait_for_connection_state → state: "connected"
 
@@ -267,7 +269,7 @@
 # 备选 2：键盘快捷键 Ctrl+S（与 UI 状态无关，总是有效）
 
 步骤: retry_with_alternative
-  → connection_id: "conn_1"
+  → device_id: "123456789"
   → attempts: [
       { method: "clickText",      params: { text: "保存", exact: true } },
       { method: "clickText",      params: { text: "保存", exact: false } },
@@ -294,50 +296,50 @@
 > **用户**：把办公电脑（111111111 / 999999）桌面的"Q4_Report.xlsx"复制到家里电脑（222222222 / 888888）。
 
 ```
-步骤 1: connect_device("111111111", "999999", show_window=true) → conn_办公
-步骤 2: wait_for_connection_state → conn_办公, state: "connected"
+步骤 1: connect_device("111111111", "999999", show_window=true) → { deviceId: "111111111" }
+步骤 2: wait_for_connection_state → device_id: "111111111", state: "connected"
 
-步骤 3: connect_device("222222222", "888888", show_window=true) → conn_家里
-步骤 4: wait_for_connection_state → conn_家里, state: "connected"
+步骤 3: connect_device("222222222", "888888", show_window=true) → { deviceId: "222222222" }
+步骤 4: wait_for_connection_state → device_id: "222222222", state: "connected"
 
 ── 办公电脑 ──────────────────────────────────────────────
 
-步骤 5: find_element → conn_办公, text: "Q4_Report"
+步骤 5: find_element → device_id: "111111111", text: "Q4_Report"
   ← { found: true, matches: [{center:{x:150,y:320}}] }
 
-步骤 6: mouse_click → conn_办公, button: "right", x: 150, y: 320
+步骤 6: mouse_click → device_id: "111111111", button: "right", x: 150, y: 320
 
-步骤 7: wait_for_text → text: "复制", timeout_ms: 2000
+步骤 7: wait_for_text → device_id: "111111111", text: "复制", timeout_ms: 2000
 
-步骤 8: click_text → conn_办公, text: "复制为路径"
+步骤 8: click_text → device_id: "111111111", text: "复制为路径"
 
-步骤 9: wait_for_clipboard_change → conn_办公, timeout_ms: 3000
+步骤 9: wait_for_clipboard_change → device_id: "111111111", timeout_ms: 3000
   ← { data: { text: "\"C:\\Users\\user\\Desktop\\Q4_Report.xlsx\"" } }
 
-步骤 10: keyboard_hotkey → conn_办公, keys: ["win","r"]
-步骤 11: wait_for_text   → text: "运行", timeout_ms: 3000
-步骤 12: keyboard_type   → text: "powershell"
-步骤 13: keyboard_hotkey → keys: ["enter"]
-步骤 14: wait_for_text   → text: "PS C:\\", timeout_ms: 8000
+步骤 10: keyboard_hotkey → device_id: "111111111", keys: ["win","r"]
+步骤 11: wait_for_text   → device_id: "111111111", text: "运行", timeout_ms: 3000
+步骤 12: keyboard_type   → device_id: "111111111", text: "powershell"
+步骤 13: keyboard_hotkey → device_id: "111111111", keys: ["enter"]
+步骤 14: wait_for_text   → device_id: "111111111", text: "PS C:\\", timeout_ms: 8000
 
 步骤 15: keyboard_type
-  → "Copy-Item 'C:\\Users\\user\\Desktop\\Q4_Report.xlsx' '\\\\home-pc\\shared\\'"
-步骤 16: keyboard_hotkey → keys: ["enter"]
-步骤 17: wait_for_screen_change → conn_办公, timeout_ms: 15000
+  → device_id: "111111111", text: "Copy-Item 'C:\\Users\\user\\Desktop\\Q4_Report.xlsx' '\\\\home-pc\\shared\\'"
+步骤 16: keyboard_hotkey → device_id: "111111111", keys: ["enter"]
+步骤 17: wait_for_screen_change → device_id: "111111111", timeout_ms: 15000
 
 ── 家里电脑 ──────────────────────────────────────────────
 
-步骤 18: keyboard_hotkey → conn_家里, keys: ["win","e"]
-步骤 19: wait_for_text   → conn_家里, text: "文件资源管理器", timeout_ms: 5000
-步骤 20: find_element    → conn_家里, text: "Q4_Report"
+步骤 18: keyboard_hotkey → device_id: "222222222", keys: ["win","e"]
+步骤 19: wait_for_text   → device_id: "222222222", text: "文件资源管理器", timeout_ms: 5000
+步骤 20: find_element    → device_id: "222222222", text: "Q4_Report"
   ← { found: true }
 
 步骤 21: verify_action_result
-  → conn_家里, expectations: [{"type":"text_present","value":"Q4_Report"}]
+  → device_id: "222222222", expectations: [{"type":"text_present","value":"Q4_Report"}]
   ← { allPassed: true }
 
-步骤 22: disconnect_device(conn_办公)
-步骤 23: disconnect_device(conn_家里)
+步骤 22: disconnect_device(device_id: "111111111")
+步骤 23: disconnect_device(device_id: "222222222")
 ```
 
 ---
@@ -351,12 +353,15 @@
 > **用户**：审计一下开发工作站上是否有敏感信息暴露（ID: 555666777，访问码: 444444）。
 
 ```
-步骤 1: connect_device → wait_for_connection_state
+步骤 1: connect_device → device_id: "555666777", access_code: "444444"
+步骤 2: wait_for_connection_state → device_id: "555666777", state: "connected"
 
-步骤 2: screenshot（全分辨率，不加 max_width）
+步骤 3: screenshot（全分辨率，不加 max_width）
+  → device_id: "555666777"
   ← [图片：完整桌面截图，保留所有文字细节]
 
-步骤 3: get_screen_text                    ← OCR 提取全屏文字，便于精确检索
+步骤 4: get_screen_text                    ← OCR 提取全屏文字，便于精确检索
+  → device_id: "555666777"
   ← { blocks: [所有可见文字块] }
 
   （AI 结合图片和文字块进行安全分析）

@@ -26,7 +26,7 @@ UiStateService::UiStateService(MainController* controller)
     : m_controller(controller)
 {}
 
-bool UiStateService::runOcr(const QString& connectionId,
+bool UiStateService::runOcr(const QString& deviceId,
                              OcrResult& result,
                              bool& fromCache,
                              QString& errorOut)
@@ -37,12 +37,12 @@ bool UiStateService::runOcr(const QString& connectionId,
     }
 
     auto* shm = m_controller->clientManager()->sharedMemoryManager();
-    if (!shm || !shm->isAttached(connectionId)) {
-        errorOut = QString("No video frame available for: %1").arg(connectionId);
+    if (!shm || !shm->isAttached(deviceId)) {
+        errorOut = QString("No video frame available for: %1").arg(deviceId);
         return false;
     }
 
-    QVideoFrame vf = shm->readVideoFrame(connectionId);
+    QVideoFrame vf = shm->readVideoFrame(deviceId);
     if (!vf.isValid()) {
         errorOut = "Failed to read video frame";
         return false;
@@ -106,26 +106,25 @@ static QString getActiveWindowTitle()
 // Public API
 // ---------------------------------------------------------------------------
 
-bool UiStateService::getUiState(const QString& connectionId,
+bool UiStateService::getUiState(const QString& deviceId,
                                  UiState& out,
                                  QString& errorOut)
 {
     auto* client = m_controller->clientManager();
-    auto info = client->getConnection(connectionId);
-    if (info.connectionId.isEmpty()) {
-        errorOut = QString("Connection not found: %1").arg(connectionId);
+    auto info = client->getConnection(deviceId);
+    if (info.deviceId.isEmpty()) {
+        errorOut = QString("Device not found: %1").arg(deviceId);
         return false;
     }
 
-    out.connectionId  = connectionId;
+    out.deviceId      = deviceId;
     out.screenWidth   = info.width;
     out.screenHeight  = info.height;
     out.activeWindowTitle = getActiveWindowTitle();
 
-    // OCR is best-effort: populate if available, but don't fail the whole call.
     QString ocrError;
     bool fromCache = false;
-    if (!runOcr(connectionId, out.ocr, fromCache, ocrError)) {
+    if (!runOcr(deviceId, out.ocr, fromCache, ocrError)) {
         LOG_WARN("UiStateService::getUiState: OCR skipped: %s", qPrintable(ocrError));
         // Leave out.ocr empty — caller gets partial state
     }
@@ -133,7 +132,7 @@ bool UiStateService::getUiState(const QString& connectionId,
     return true;
 }
 
-bool UiStateService::waitForText(const QString& connectionId,
+bool UiStateService::waitForText(const QString& deviceId,
                                   const QString& text,
                                   bool exact,
                                   bool ignoreCase,
@@ -147,7 +146,7 @@ bool UiStateService::waitForText(const QString& connectionId,
     while (elapsed <= timeoutMs) {
         OcrResult result;
         bool fromCache = false;
-        if (!runOcr(connectionId, result, fromCache, errorOut)) {
+        if (!runOcr(deviceId, result, fromCache, errorOut)) {
             return false;
         }
 
@@ -168,7 +167,7 @@ bool UiStateService::waitForText(const QString& connectionId,
     return false;
 }
 
-bool UiStateService::assertTextPresent(const QString& connectionId,
+bool UiStateService::assertTextPresent(const QString& deviceId,
                                         const QString& text,
                                         bool exact,
                                         bool ignoreCase,
@@ -177,7 +176,7 @@ bool UiStateService::assertTextPresent(const QString& connectionId,
 {
     OcrResult result;
     bool fromCache = false;
-    if (!runOcr(connectionId, result, fromCache, errorOut)) {
+    if (!runOcr(deviceId, result, fromCache, errorOut)) {
         return false;
     }
 
@@ -229,7 +228,7 @@ QJsonObject uiStateToJson(const UiState& state)
     activeWindowObj["title"] = state.activeWindowTitle;
 
     QJsonObject obj;
-    obj["connectionId"]  = state.connectionId;
+    obj["deviceId"]      = state.deviceId;
     obj["screen"]        = screenObj;
     obj["ocr"]           = ocrObj;
     obj["activeWindow"]  = activeWindowObj;

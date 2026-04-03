@@ -51,13 +51,13 @@ ApiHandler::ApiHandler(MainController* controller, QObject* parent)
     registerHandlers();
 
     connect(m_controller->clientManager(), &ClientManager::clipboardReceived,
-            this, [this](const QString& connectionId, const QString& text) {
-                m_clipboardCache[connectionId] = text;
+            this, [this](const QString& deviceId, const QString& text) {
+                m_clipboardCache[deviceId] = text;
             });
 
     connect(m_controller->clientManager(), &ClientManager::connectionRemoved,
-            this, [this](const QString& connectionId) {
-                m_clipboardCache.remove(connectionId);
+            this, [this](const QString& deviceId) {
+                m_clipboardCache.remove(deviceId);
             });
 
     // 在后台初始化 OCR 引擎（加载 ONNX 模型，约 500ms~1s）
@@ -290,7 +290,7 @@ QJsonObject ApiHandler::handleGetStatus(const QJsonObject&) {
     clientObj["processStatus"] =
         processStatusToString(m_controller->clientProcessStatus());
     clientObj["connectionCount"] = client->connectionCount();
-    clientObj["activeConnectionId"] = client->activeConnectionId();
+    clientObj["activeDeviceId"] = client->activeDeviceId();
 
     QJsonObject serverObj;
     serverObj["url"] = server->serverUrl();
@@ -322,7 +322,6 @@ QJsonObject ApiHandler::handleGetSignalingStatus(const QJsonObject&) {
 
 static QJsonObject connectionInfoToJson(const ConnectionInfo& info) {
     QJsonObject obj;
-    obj["connectionId"] = info.connectionId;
     obj["deviceId"] = info.deviceId;
     obj["deviceName"] = info.deviceName;
     obj["rtcState"] = rtcStatusToString(info.rtcState);
@@ -344,19 +343,19 @@ QJsonObject ApiHandler::handleListConnections(const QJsonObject&) {
     }
     QJsonObject data;
     data["connections"] = arr;
-    data["activeConnectionId"] = client->activeConnectionId();
+    data["activeDeviceId"] = client->activeDeviceId();
     return makeResult(data);
 }
 
 QJsonObject ApiHandler::handleGetConnectionInfo(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
     auto* client = m_controller->clientManager();
-    auto info = client->getConnection(connectionId);
-    if (info.connectionId.isEmpty()) {
-        return makeError(404, QString("Connection not found: %1").arg(connectionId));
+    auto info = client->getConnection(deviceId);
+    if (info.deviceId.isEmpty()) {
+        return makeError(404, QString("Device not found: %1").arg(deviceId));
     }
     return makeResult(connectionInfoToJson(info));
 }
@@ -369,25 +368,25 @@ QJsonObject ApiHandler::handleConnectToHost(const QJsonObject& params) {
     }
 
     auto serverUrl = params["serverUrl"].toString();
-    auto connectionId = m_controller->connectToRemoteHost(
+    auto result = m_controller->connectToRemoteHost(
         deviceId, accessCode, serverUrl);
 
     bool showWindow = params["showWindow"].toBool(true);
-    if (showWindow && !connectionId.isEmpty()) {
-        m_controller->showRemoteWindowForConnection(connectionId, deviceId);
+    if (showWindow && !result.isEmpty()) {
+        m_controller->showRemoteWindowForDevice(deviceId);
     }
 
     QJsonObject data;
-    data["connectionId"] = connectionId;
+    data["deviceId"] = result;
     return makeResult(data);
 }
 
 QJsonObject ApiHandler::handleDisconnectFromHost(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
-    m_controller->disconnectFromRemoteHost(connectionId);
+    m_controller->disconnectFromRemoteHost(deviceId);
     QJsonObject data;
     data["success"] = true;
     return makeResult(data);
@@ -403,17 +402,17 @@ QJsonObject ApiHandler::handleDisconnectAll(const QJsonObject&) {
 // --- Remote Desktop Operations ---
 
 QJsonObject ApiHandler::handleScreenshot(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
 
     auto* shm = m_controller->clientManager()->sharedMemoryManager();
-    if (!shm || !shm->isAttached(connectionId)) {
-        return makeError(404, QString("No video frame available for: %1").arg(connectionId));
+    if (!shm || !shm->isAttached(deviceId)) {
+        return makeError(404, QString("No video frame available for: %1").arg(deviceId));
     }
 
-    QVideoFrame videoFrame = shm->readVideoFrame(connectionId);
+    QVideoFrame videoFrame = shm->readVideoFrame(deviceId);
     if (!videoFrame.isValid()) {
         return makeError(500, "Failed to read video frame");
     }
@@ -452,23 +451,23 @@ QJsonObject ApiHandler::handleScreenshot(const QJsonObject& params) {
 }
 
 QJsonObject ApiHandler::handleMouseClick(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
 
     int x = params["x"].toInt();
     int y = params["y"].toInt();
     auto buttonStr = params["button"].toString("left");
 
-    int button = 1; // left
+    int button = 1;
     if (buttonStr == "right") button = 2;
     else if (buttonStr == "middle") button = 4;
 
     auto* client = m_controller->clientManager();
-    client->sendMouseMove(connectionId, x, y);
-    client->sendMousePress(connectionId, x, y, button);
-    client->sendMouseRelease(connectionId, x, y, button);
+    client->sendMouseMove(deviceId, x, y);
+    client->sendMousePress(deviceId, x, y, button);
+    client->sendMouseRelease(deviceId, x, y, button);
 
     QJsonObject data;
     data["success"] = true;
@@ -476,9 +475,9 @@ QJsonObject ApiHandler::handleMouseClick(const QJsonObject& params) {
 }
 
 QJsonObject ApiHandler::handleMouseDoubleClick(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
 
     int x = params["x"].toInt();
@@ -486,11 +485,11 @@ QJsonObject ApiHandler::handleMouseDoubleClick(const QJsonObject& params) {
     int button = 1;
 
     auto* client = m_controller->clientManager();
-    client->sendMouseMove(connectionId, x, y);
-    client->sendMousePress(connectionId, x, y, button);
-    client->sendMouseRelease(connectionId, x, y, button);
-    client->sendMousePress(connectionId, x, y, button);
-    client->sendMouseRelease(connectionId, x, y, button);
+    client->sendMouseMove(deviceId, x, y);
+    client->sendMousePress(deviceId, x, y, button);
+    client->sendMouseRelease(deviceId, x, y, button);
+    client->sendMousePress(deviceId, x, y, button);
+    client->sendMouseRelease(deviceId, x, y, button);
 
     QJsonObject data;
     data["success"] = true;
@@ -498,14 +497,14 @@ QJsonObject ApiHandler::handleMouseDoubleClick(const QJsonObject& params) {
 }
 
 QJsonObject ApiHandler::handleMouseMove(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
 
     int x = params["x"].toInt();
     int y = params["y"].toInt();
-    m_controller->clientManager()->sendMouseMove(connectionId, x, y);
+    m_controller->clientManager()->sendMouseMove(deviceId, x, y);
 
     QJsonObject data;
     data["success"] = true;
@@ -513,16 +512,16 @@ QJsonObject ApiHandler::handleMouseMove(const QJsonObject& params) {
 }
 
 QJsonObject ApiHandler::handleMouseScroll(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
 
     int x = params["x"].toInt();
     int y = params["y"].toInt();
     int deltaX = params["deltaX"].toInt(0);
     int deltaY = params["deltaY"].toInt(0);
-    m_controller->clientManager()->sendMouseWheel(connectionId, x, y, deltaX, deltaY);
+    m_controller->clientManager()->sendMouseWheel(deviceId, x, y, deltaX, deltaY);
 
     QJsonObject data;
     data["success"] = true;
@@ -530,9 +529,9 @@ QJsonObject ApiHandler::handleMouseScroll(const QJsonObject& params) {
 }
 
 QJsonObject ApiHandler::handleKeyboardType(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
 
     auto text = params["text"].toString();
@@ -541,17 +540,13 @@ QJsonObject ApiHandler::handleKeyboardType(const QJsonObject& params) {
     }
 
     auto* client = m_controller->clientManager();
-    // Chromium remoting has clipboard-based text injection via syncClipboard + Ctrl+V,
-    // which is the most reliable method for arbitrary text including unicode.
-    client->syncClipboard(connectionId, text);
+    client->syncClipboard(deviceId, text);
 
-    // Send Ctrl+V to paste
-    // Windows scan codes: LCtrl=0x1D, V=0x2F
     int lockStates = 0;
-    client->sendKeyPress(connectionId, 0x1D, lockStates);   // Ctrl down
-    client->sendKeyPress(connectionId, 0x2F, lockStates);   // V down
-    client->sendKeyRelease(connectionId, 0x2F, lockStates); // V up
-    client->sendKeyRelease(connectionId, 0x1D, lockStates); // Ctrl up
+    client->sendKeyPress(deviceId, 0x1D, lockStates);
+    client->sendKeyPress(deviceId, 0x2F, lockStates);
+    client->sendKeyRelease(deviceId, 0x2F, lockStates);
+    client->sendKeyRelease(deviceId, 0x1D, lockStates);
 
     QJsonObject data;
     data["success"] = true;
@@ -622,9 +617,9 @@ int ApiHandler::keyNameToScanCode(const QString& keyName) {
 }
 
 QJsonObject ApiHandler::handleKeyboardHotkey(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
 
     auto keysArray = params["keys"].toArray();
@@ -645,10 +640,10 @@ QJsonObject ApiHandler::handleKeyboardHotkey(const QJsonObject& params) {
     int lockStates = 0;
 
     for (int sc : scanCodes) {
-        client->sendKeyPress(connectionId, sc, lockStates);
+        client->sendKeyPress(deviceId, sc, lockStates);
     }
     for (int i = scanCodes.size() - 1; i >= 0; --i) {
-        client->sendKeyRelease(connectionId, scanCodes[i], lockStates);
+        client->sendKeyRelease(deviceId, scanCodes[i], lockStates);
     }
 
     QJsonObject data;
@@ -657,9 +652,9 @@ QJsonObject ApiHandler::handleKeyboardHotkey(const QJsonObject& params) {
 }
 
 QJsonObject ApiHandler::handleMouseDrag(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
 
     int startX = params["startX"].toInt();
@@ -673,10 +668,10 @@ QJsonObject ApiHandler::handleMouseDrag(const QJsonObject& params) {
     else if (buttonStr == "middle") button = 4;
 
     auto* client = m_controller->clientManager();
-    client->sendMouseMove(connectionId, startX, startY);
-    client->sendMousePress(connectionId, startX, startY, button);
-    client->sendMouseMove(connectionId, endX, endY);
-    client->sendMouseRelease(connectionId, endX, endY, button);
+    client->sendMouseMove(deviceId, startX, startY);
+    client->sendMousePress(deviceId, startX, startY, button);
+    client->sendMouseMove(deviceId, endX, endY);
+    client->sendMouseRelease(deviceId, endX, endY, button);
 
     QJsonObject data;
     data["success"] = true;
@@ -684,9 +679,9 @@ QJsonObject ApiHandler::handleMouseDrag(const QJsonObject& params) {
 }
 
 QJsonObject ApiHandler::handleKeyPress(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
 
     auto keyName = params["key"].toString();
@@ -699,7 +694,7 @@ QJsonObject ApiHandler::handleKeyPress(const QJsonObject& params) {
         return makeError(400, QString("Unknown key: '%1'").arg(keyName));
     }
 
-    m_controller->clientManager()->sendKeyPress(connectionId, sc, 0);
+    m_controller->clientManager()->sendKeyPress(deviceId, sc, 0);
 
     QJsonObject data;
     data["success"] = true;
@@ -707,9 +702,9 @@ QJsonObject ApiHandler::handleKeyPress(const QJsonObject& params) {
 }
 
 QJsonObject ApiHandler::handleKeyRelease(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
 
     auto keyName = params["key"].toString();
@@ -722,7 +717,7 @@ QJsonObject ApiHandler::handleKeyRelease(const QJsonObject& params) {
         return makeError(400, QString("Unknown key: '%1'").arg(keyName));
     }
 
-    m_controller->clientManager()->sendKeyRelease(connectionId, sc, 0);
+    m_controller->clientManager()->sendKeyRelease(deviceId, sc, 0);
 
     QJsonObject data;
     data["success"] = true;
@@ -730,14 +725,14 @@ QJsonObject ApiHandler::handleKeyRelease(const QJsonObject& params) {
 }
 
 QJsonObject ApiHandler::handleGetClipboard(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
 
     QJsonObject data;
-    if (m_clipboardCache.contains(connectionId)) {
-        data["text"] = m_clipboardCache[connectionId];
+    if (m_clipboardCache.contains(deviceId)) {
+        data["text"] = m_clipboardCache[deviceId];
     } else {
         data["text"] = "";
         data["note"] = "No clipboard content received yet from remote. "
@@ -747,13 +742,13 @@ QJsonObject ApiHandler::handleGetClipboard(const QJsonObject& params) {
 }
 
 QJsonObject ApiHandler::handleSetClipboard(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
 
     auto text = params["text"].toString();
-    m_controller->clientManager()->syncClipboard(connectionId, text);
+    m_controller->clientManager()->syncClipboard(deviceId, text);
 
     QJsonObject data;
     data["success"] = true;
@@ -761,14 +756,14 @@ QJsonObject ApiHandler::handleSetClipboard(const QJsonObject& params) {
 }
 
 QJsonObject ApiHandler::handleGetScreenSize(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty()) {
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty()) {
+        return makeError(400, "Missing 'deviceId'");
     }
 
-    auto info = m_controller->clientManager()->getConnection(connectionId);
-    if (info.connectionId.isEmpty()) {
-        return makeError(404, QString("Connection not found: %1").arg(connectionId));
+    auto info = m_controller->clientManager()->getConnection(deviceId);
+    if (info.deviceId.isEmpty()) {
+        return makeError(404, QString("Device not found: %1").arg(deviceId));
     }
 
     QJsonObject data;
@@ -780,7 +775,7 @@ QJsonObject ApiHandler::handleGetScreenSize(const QJsonObject& params) {
 // --- OCR / UI 状态 ---
 
 // 辅助函数：将 OcrResult 序列化为 QJsonObject
-static QJsonObject ocrResultToJson(const OcrResult& result, const QString& connectionId) {
+static QJsonObject ocrResultToJson(const OcrResult& result, const QString& deviceId) {
     QJsonArray blocksArr;
     for (const auto& blk : result.blocks) {
         QJsonObject b;
@@ -796,7 +791,7 @@ static QJsonObject ocrResultToJson(const OcrResult& result, const QString& conne
         blocksArr.append(b);
     }
     QJsonObject data;
-    data["connectionId"] = connectionId;
+    data["deviceId"]     = deviceId;
     data["width"]        = result.imageSize.width();
     data["height"]       = result.imageSize.height();
     data["blocks"]       = blocksArr;
@@ -804,14 +799,13 @@ static QJsonObject ocrResultToJson(const OcrResult& result, const QString& conne
     return data;
 }
 
-// 辅助函数：从共享内存读取视频帧并转换为 QImage
-static QImage readCurrentFrame(MainController* ctrl, const QString& connectionId, QString& err) {
+static QImage readCurrentFrame(MainController* ctrl, const QString& deviceId, QString& err) {
     auto* shm = ctrl->clientManager()->sharedMemoryManager();
-    if (!shm || !shm->isAttached(connectionId)) {
-        err = QString("No video frame available for: %1").arg(connectionId);
+    if (!shm || !shm->isAttached(deviceId)) {
+        err = QString("No video frame available for: %1").arg(deviceId);
         return {};
     }
-    QVideoFrame vf = shm->readVideoFrame(connectionId);
+    QVideoFrame vf = shm->readVideoFrame(deviceId);
     if (!vf.isValid()) {
         err = "Failed to read video frame";
         return {};
@@ -824,37 +818,35 @@ static QImage readCurrentFrame(MainController* ctrl, const QString& connectionId
 }
 
 QJsonObject ApiHandler::handleGetScreenText(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty())
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty())
+        return makeError(400, "Missing 'deviceId'");
 
     if (!OcrEngine::instance().isInitialized())
         return makeError(503, "OCR engine not ready. Check that model files are present in the models/ directory.");
 
     QString err;
-    QImage image = readCurrentFrame(m_controller, connectionId, err);
+    QImage image = readCurrentFrame(m_controller, deviceId, err);
     if (image.isNull())
         return makeError(404, err);
 
-    // 先查缓存
     QString frameHash = OcrEngine::computeFrameHash(image);
     OcrResult cached;
     if (OcrCache::instance().get(frameHash, cached)) {
-        return makeResult(ocrResultToJson(cached, connectionId));
+        return makeResult(ocrResultToJson(cached, deviceId));
     }
 
-    // 缓存未命中，执行 OCR（同步，约 100~300ms）
     OcrResult result = OcrEngine::instance().recognize(image);
     result.frameHash = frameHash;
 
     OcrCache::instance().put(frameHash, result);
-    return makeResult(ocrResultToJson(result, connectionId));
+    return makeResult(ocrResultToJson(result, deviceId));
 }
 
 QJsonObject ApiHandler::handleFindElement(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty())
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty())
+        return makeError(400, "Missing 'deviceId'");
 
     auto text = params["text"].toString().trimmed();
     if (text.isEmpty())
@@ -867,11 +859,10 @@ QJsonObject ApiHandler::handleFindElement(const QJsonObject& params) {
         return makeError(503, "OCR engine not ready");
 
     QString err;
-    QImage image = readCurrentFrame(m_controller, connectionId, err);
+    QImage image = readCurrentFrame(m_controller, deviceId, err);
     if (image.isNull())
         return makeError(404, err);
 
-    // 查缓存或识别
     QString frameHash = OcrEngine::computeFrameHash(image);
     OcrResult result;
     if (!OcrCache::instance().get(frameHash, result)) {
@@ -880,7 +871,6 @@ QJsonObject ApiHandler::handleFindElement(const QJsonObject& params) {
         OcrCache::instance().put(frameHash, result);
     }
 
-    // 搜索匹配的文本块
     Qt::CaseSensitivity cs = ignoreCase ? Qt::CaseInsensitive : Qt::CaseSensitive;
     QJsonArray matches;
     for (const auto& blk : result.blocks) {
@@ -902,7 +892,7 @@ QJsonObject ApiHandler::handleFindElement(const QJsonObject& params) {
     }
 
     QJsonObject data;
-    data["connectionId"] = connectionId;
+    data["deviceId"]     = deviceId;
     data["query"]        = text;
     data["found"]        = !matches.isEmpty();
     data["matches"]      = matches;
@@ -911,11 +901,10 @@ QJsonObject ApiHandler::handleFindElement(const QJsonObject& params) {
 }
 
 QJsonObject ApiHandler::handleClickText(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty())
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty())
+        return makeError(400, "Missing 'deviceId'");
 
-    // 1. 先查找文本
     QJsonObject findResult = handleFindElement(params);
     if (findResult.contains("error"))
         return findResult;
@@ -930,22 +919,20 @@ QJsonObject ApiHandler::handleClickText(const QJsonObject& params) {
         return makeResult(errData);
     }
 
-    // 2. 取第一个匹配（最高置信度由 OCR 引擎保证顺序）
     QJsonObject first  = matches[0].toObject();
     QJsonObject center = first["center"].toObject();
     int x = center["x"].toInt();
     int y = center["y"].toInt();
 
-    // 3. 执行鼠标点击
     auto buttonStr = params["button"].toString("left");
     int button = 1;
     if (buttonStr == "right") button = 2;
     else if (buttonStr == "middle") button = 4;
 
     auto* client = m_controller->clientManager();
-    client->sendMouseMove(connectionId, x, y);
-    client->sendMousePress(connectionId, x, y, button);
-    client->sendMouseRelease(connectionId, x, y, button);
+    client->sendMouseMove(deviceId, x, y);
+    client->sendMousePress(deviceId, x, y, button);
+    client->sendMouseRelease(deviceId, x, y, button);
 
     QJsonObject data;
     data["success"]      = true;
@@ -959,22 +946,22 @@ QJsonObject ApiHandler::handleClickText(const QJsonObject& params) {
 // --- UI 状态 ---
 
 QJsonObject ApiHandler::handleGetUiState(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty())
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty())
+        return makeError(400, "Missing 'deviceId'");
 
     UiState state;
     QString err;
-    if (!m_uiState.getUiState(connectionId, state, err))
+    if (!m_uiState.getUiState(deviceId, state, err))
         return makeError(404, err);
 
     return makeResult(uiStateToJson(state));
 }
 
 QJsonObject ApiHandler::handleWaitForText(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty())
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty())
+        return makeError(400, "Missing 'deviceId'");
 
     auto text = params["text"].toString().trimmed();
     if (text.isEmpty())
@@ -986,11 +973,11 @@ QJsonObject ApiHandler::handleWaitForText(const QJsonObject& params) {
 
     OcrTextBlock found;
     QString err;
-    bool ok = m_uiState.waitForText(connectionId, text, exact, ignoreCase,
+    bool ok = m_uiState.waitForText(deviceId, text, exact, ignoreCase,
                                     timeoutMs, found, err);
 
     QJsonObject data;
-    data["connectionId"] = connectionId;
+    data["deviceId"]     = deviceId;
     data["query"]        = text;
     data["found"]        = ok;
     if (ok) {
@@ -1002,9 +989,9 @@ QJsonObject ApiHandler::handleWaitForText(const QJsonObject& params) {
 }
 
 QJsonObject ApiHandler::handleAssertTextPresent(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty())
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty())
+        return makeError(400, "Missing 'deviceId'");
 
     auto text = params["text"].toString().trimmed();
     if (text.isEmpty())
@@ -1015,14 +1002,14 @@ QJsonObject ApiHandler::handleAssertTextPresent(const QJsonObject& params) {
 
     OcrTextBlock found;
     QString err;
-    bool ok = m_uiState.assertTextPresent(connectionId, text, exact, ignoreCase,
+    bool ok = m_uiState.assertTextPresent(deviceId, text, exact, ignoreCase,
                                           found, err);
 
     if (!err.isEmpty())
-        return makeError(503, err);  // OCR/frame error
+        return makeError(503, err);
 
     QJsonObject data;
-    data["connectionId"] = connectionId;
+    data["deviceId"]     = deviceId;
     data["query"]        = text;
     data["present"]      = ok;
     if (ok) {
@@ -1045,45 +1032,9 @@ static QList<VerificationCondition> parseConditions(const QJsonArray& arr) {
 }
 
 QJsonObject ApiHandler::handleVerifyActionResult(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty())
-        return makeError(400, "Missing 'connectionId'");
-
-    auto condArr = params["expectations"].toArray();
-    if (condArr.isEmpty())
-        condArr = params["conditions"].toArray();  // 兼容两种字段名
-    if (condArr.isEmpty())
-        return makeError(400, "Missing 'expectations' array");
-
-    auto conditions = parseConditions(condArr);
-    if (conditions.isEmpty())
-        return makeError(400, "No valid conditions in 'expectations'");
-
-    int timeoutMs = params["timeoutMs"].toInt(3000);
-
-    auto vr = m_verification.verifyActionResult(connectionId, conditions, timeoutMs);
-    return makeResult(VerificationService::verificationResultToJson(vr));
-}
-
-QJsonObject ApiHandler::handleScreenDiffSummary(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty())
-        return makeError(400, "Missing 'connectionId'");
-
-    auto fromHash = params["fromHash"].toString();  // empty = no baseline
-
-    QString err;
-    auto diff = m_verification.screenDiffSummary(connectionId, fromHash, err);
-    if (!err.isEmpty())
-        return makeError(500, err);
-
-    return makeResult(VerificationService::screenDiffToJson(diff));
-}
-
-QJsonObject ApiHandler::handleAssertScreenState(const QJsonObject& params) {
-    auto connectionId = params["connectionId"].toString();
-    if (connectionId.isEmpty())
-        return makeError(400, "Missing 'connectionId'");
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty())
+        return makeError(400, "Missing 'deviceId'");
 
     auto condArr = params["expectations"].toArray();
     if (condArr.isEmpty())
@@ -1095,7 +1046,43 @@ QJsonObject ApiHandler::handleAssertScreenState(const QJsonObject& params) {
     if (conditions.isEmpty())
         return makeError(400, "No valid conditions in 'expectations'");
 
-    auto vr = m_verification.assertScreenState(connectionId, conditions);
+    int timeoutMs = params["timeoutMs"].toInt(3000);
+
+    auto vr = m_verification.verifyActionResult(deviceId, conditions, timeoutMs);
+    return makeResult(VerificationService::verificationResultToJson(vr));
+}
+
+QJsonObject ApiHandler::handleScreenDiffSummary(const QJsonObject& params) {
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty())
+        return makeError(400, "Missing 'deviceId'");
+
+    auto fromHash = params["fromHash"].toString();
+
+    QString err;
+    auto diff = m_verification.screenDiffSummary(deviceId, fromHash, err);
+    if (!err.isEmpty())
+        return makeError(500, err);
+
+    return makeResult(VerificationService::screenDiffToJson(diff));
+}
+
+QJsonObject ApiHandler::handleAssertScreenState(const QJsonObject& params) {
+    auto deviceId = params["deviceId"].toString();
+    if (deviceId.isEmpty())
+        return makeError(400, "Missing 'deviceId'");
+
+    auto condArr = params["expectations"].toArray();
+    if (condArr.isEmpty())
+        condArr = params["conditions"].toArray();
+    if (condArr.isEmpty())
+        return makeError(400, "Missing 'expectations' array");
+
+    auto conditions = parseConditions(condArr);
+    if (conditions.isEmpty())
+        return makeError(400, "No valid conditions in 'expectations'");
+
+    auto vr = m_verification.assertScreenState(deviceId, conditions);
     return makeResult(VerificationService::verificationResultToJson(vr));
 }
 

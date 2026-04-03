@@ -99,7 +99,7 @@ public:
 
     /**
      * @brief Connect to a remote host
-     * @return Connection ID
+     * @return deviceId on success, empty on failure
      */
     Q_INVOKABLE QString connectToRemoteHost(const QString& deviceId,
                                             const QString& accessCode,
@@ -108,7 +108,7 @@ public:
     /**
      * @brief Disconnect from a remote host
      */
-    Q_INVOKABLE void disconnectFromRemoteHost(const QString& connectionId);
+    Q_INVOKABLE void disconnectFromRemoteHost(const QString& deviceId);
 
     /**
      * @brief Refresh access code
@@ -172,7 +172,7 @@ public:
     // Access code auto-refresh info
     QString nextAccessCodeRefreshTime() const;
 
-    Q_INVOKABLE void showRemoteWindowForConnection(const QString& connectionId, const QString& deviceId);
+    Q_INVOKABLE void showRemoteWindowForDevice(const QString& deviceId);
 
     // AI Agent control
     bool agentEnabled() const;
@@ -215,7 +215,7 @@ signals:
     void nextAccessCodeRefreshTimeChanged();
     void presetLoadFailed(const QString& error);
     void forceUpgradeRequired(const QString& minVersion);
-    void requestShowRemoteWindow(const QString& connectionId, const QString& deviceId);
+    void requestShowRemoteWindow(const QString& deviceId);
     void mcpServiceRunningChanged();
     void mcpConnectedClientsChanged();
     void mcpTransportModeChanged();
@@ -226,7 +226,7 @@ signals:
 
     // Trust layer signals for QML
     void trustConfirmationRequested(const QString& confirmationId,
-                                    const QString& connectionId,
+                                    const QString& deviceId,
                                     const QString& toolName,
                                     const QString& argumentsJson,
                                     const QString& riskLevel,
@@ -245,7 +245,7 @@ private slots:
     void onClientProcessStopped(int exitCode);
     void onClientProcessError(const QString& error);
     void onClientProcessRestarting(int retryCount, int maxRetries);
-    void onClientSignalingStateChanged(const QString& connectionId,
+    void onClientSignalingStateChanged(const QString& deviceId,
                                        const QString& state,
                                        int retryCount,
                                        int nextRetryIn,
@@ -272,7 +272,7 @@ private:
     // Server status (managed by MainController)
     ServerStatus::Status m_hostServerStatus = ServerStatus::Disconnected;
     ServerStatus::Status m_clientServerStatus = ServerStatus::Disconnected;
-    QString m_primaryConnectionId;  // Track primary connection for client signaling status
+    QString m_primaryDeviceId;  // Track primary device for client signaling status
     
     // Access code auto-refresh timer
     QTimer m_accessCodeRefreshTimer;
@@ -294,17 +294,16 @@ private:
     int m_mcpHttpPort = 18080;
     bool m_isShutdown = false;
 
-    // screenChanged event: per-connection throttle state
+    // screenChanged event: per-device throttle state
     struct ScreenChangeState {
         QString lastBroadcastHash;
         qint64  lastBroadcastMs = 0;
     };
-    QHash<QString, ScreenChangeState> m_screenChangeState;
+    QHash<QString, ScreenChangeState> m_screenChangeState;  // key = deviceId
     QMutex m_screenChangeMutex;
 
-    // Connection tracking for record API
+    // Connection tracking for record API (key = deviceId)
     struct ConnectionTrack {
-        QString deviceId;
         qint64 startTimeMs = 0;
     };
     QHash<QString, ConnectionTrack> m_connectionTracks;

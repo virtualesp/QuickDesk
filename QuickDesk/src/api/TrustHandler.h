@@ -31,7 +31,7 @@ public:
 
 signals:
     void confirmationRequested(const QString& confirmationId,
-                               const QString& connectionId,
+                               const QString& deviceId,
                                const QString& toolName,
                                const QString& argumentsJson,
                                const QString& riskLevel,

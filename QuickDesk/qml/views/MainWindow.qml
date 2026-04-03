@@ -72,9 +72,9 @@ ApplicationWindow {
     Connections {
         target: mainController
 
-        function onRequestShowRemoteWindow(connectionId, deviceId) {
-            console.log("API requested showRemoteWindow:", connectionId, deviceId)
-            root.showRemoteWindow(connectionId, deviceId)
+        function onRequestShowRemoteWindow(deviceId) {
+            console.log("API requested showRemoteWindow:", deviceId)
+            root.showRemoteWindow(deviceId)
         }
     }
 
@@ -82,26 +82,26 @@ ApplicationWindow {
     Connections {
         target: mainController.clientManager
         
-        function onConnectionStateChanged(connectionId, state, hostInfo) {
-            console.log("MainWindow: Connection state changed:", connectionId, "->", state)
+        function onConnectionStateChanged(deviceId, state, hostInfo) {
+            console.log("MainWindow: Connection state changed:", deviceId, "->", state)
             
             // Handle aborted connections (window creation failed)
-            if (root.abortedConnections[connectionId]) {
+            if (root.abortedConnections[deviceId]) {
                 if (state === "connected") {
                     // Initial disconnect was too early (race condition) — retry now
-                    console.log("Retrying disconnect for aborted connection:", connectionId)
-                    mainController.clientManager.disconnectFromHost(connectionId)
+                    console.log("Retrying disconnect for aborted connection:", deviceId)
+                    mainController.clientManager.disconnectFromHost(deviceId)
                 } else if (state === "disconnected" || state === "failed") {
                     var cleaned = Object.assign({}, root.abortedConnections)
-                    delete cleaned[connectionId]
+                    delete cleaned[deviceId]
                     root.abortedConnections = cleaned
                 }
                 return
             }
             
             // Save device credentials when connection is successfully established
-            if (state === "connected" && root.pendingDeviceCredentials[connectionId]) {
-                var credentials = root.pendingDeviceCredentials[connectionId]
+            if (state === "connected" && root.pendingDeviceCredentials[deviceId]) {
+                var credentials = root.pendingDeviceCredentials[deviceId]
                 console.log("Saving device to history:", credentials.deviceId)
                 
                 mainController.remoteDeviceManager.saveDevice(
@@ -110,12 +110,12 @@ ApplicationWindow {
                 )
                 
                 // Clean up pending credentials
-                delete root.pendingDeviceCredentials[connectionId]
+                delete root.pendingDeviceCredentials[deviceId]
             }
             
             // Clean up pending credentials on failure
-            if (state === "failed" && root.pendingDeviceCredentials[connectionId]) {
-                delete root.pendingDeviceCredentials[connectionId]
+            if (state === "failed" && root.pendingDeviceCredentials[deviceId]) {
+                delete root.pendingDeviceCredentials[deviceId]
             }
         }
     }
@@ -142,12 +142,12 @@ ApplicationWindow {
     
     // Unified function to show or switch to a device connection
     // This handles both connecting to a new device and viewing existing connections
-    function showOrSwitchToDevice(deviceId, connectionId) {
-        console.log("showOrSwitchToDevice called - deviceId:", deviceId, "connectionId:", connectionId)
+    function showOrSwitchToDevice(deviceId) {
+        console.log("showOrSwitchToDevice called - deviceId:", deviceId)
         
         // Step 1: Check if RemoteWindow exists and has a connection to this device
         if (remoteWindow) {
-            var idx = remoteWindow.connectionModel.indexOfDeviceId(deviceId)
+            var idx = remoteWindow.connectionModel.indexOf(deviceId)
             if (idx >= 0) {
                 console.log("Already connected to device:", deviceId, "- switching to existing tab:", idx)
                 remoteWindow.currentTabIndex = idx
@@ -158,39 +158,32 @@ ApplicationWindow {
             }
         }
         
-        // Step 2: If connectionId provided, show that specific connection
-        if (connectionId) {
-            return showRemoteWindow(connectionId, deviceId)
-        }
-        
-        // Step 3: Device not connected and no connectionId provided
-        console.warn("Device not connected and no connectionId provided:", deviceId)
-        toast.show(qsTr("Device not connected: ") + deviceId, QDToast.Type.Error)
-        return false
+        // Step 2: Show remote window for this device if connected
+        return showRemoteWindow(deviceId)
     }
     
     // Function to create or show remote window
-    function showRemoteWindow(connectionId, deviceId) {
-        console.log("showRemoteWindow called:", connectionId, deviceId)
+    function showRemoteWindow(deviceId) {
+        console.log("showRemoteWindow called:", deviceId)
         
         // Validate connection exists (silently fail if not, may be connecting or failed quickly)
-        var connectionIds = mainController.clientManager.connectionIds
+        var connectedDeviceIds = mainController.clientManager.connectedDeviceIds
         var connectionExists = false
-        for (var i = 0; i < connectionIds.length; i++) {
-            if (connectionIds[i] === connectionId) {
+        for (var i = 0; i < connectedDeviceIds.length; i++) {
+            if (connectedDeviceIds[i] === deviceId) {
                 connectionExists = true
                 break
             }
         }
         
         if (!connectionExists) {
-            console.log("Connection not found (may be connecting or failed):", connectionId)
+            console.log("Connection not found (may be connecting or failed):", deviceId)
             return false
         }
         
         // If RemoteWindow exists, check if connection is already there
         if (remoteWindow) {
-            var idx = remoteWindow.connectionModel.indexOf(connectionId)
+            var idx = remoteWindow.connectionModel.indexOf(deviceId)
             if (idx >= 0) {
                 console.log("Connection already in RemoteWindow, switching to tab:", idx)
                 remoteWindow.currentTabIndex = idx
@@ -237,11 +230,11 @@ ApplicationWindow {
         
         // Add connection to window
         if (remoteWindow) {
-            remoteWindow.addConnection(connectionId, deviceId)
+            remoteWindow.addConnection(deviceId)
             remoteWindow.show()
             remoteWindow.raise()
             remoteWindow.requestActivate()
-            console.log("Added connection to remote window:", connectionId)
+            console.log("Added connection to remote window:", deviceId)
             return true
         }
         
@@ -253,12 +246,12 @@ ApplicationWindow {
     // - Clicking disconnect in connection list
     // - Clicking tab close in RemoteWindow
     // - Clicking disconnect in floating tool button
-    function disconnectFromRemoteHost(connectionId) {
-        console.log("MainWindow: Disconnect requested for:", connectionId)
+    function disconnectFromRemoteHost(deviceId) {
+        console.log("MainWindow: Disconnect requested for:", deviceId)
         
         // If RemoteWindow exists, find the connection and close it properly
         if (remoteWindow) {
-            var idx = remoteWindow.connectionModel.indexOf(connectionId)
+            var idx = remoteWindow.connectionModel.indexOf(deviceId)
             if (idx >= 0) {
                 console.log("Found connection at index:", idx, "- calling RemoteWindow.closeConnection()")
                 remoteWindow.closeConnection(idx)
@@ -267,9 +260,9 @@ ApplicationWindow {
         }
         
         // Fallback: directly disconnect when RemoteWindow is null or connection not found
-        console.log("Disconnecting directly via clientManager:", connectionId)
+        console.log("Disconnecting directly via clientManager:", deviceId)
         if (mainController && mainController.clientManager) {
-            mainController.clientManager.disconnectFromHost(connectionId)
+            mainController.clientManager.disconnectFromHost(deviceId)
         }
     }
     
@@ -531,7 +524,7 @@ ApplicationWindow {
                         console.log("Connect requested:", deviceId)
                         
                         // Check if already connected to this device
-                        if (root.showOrSwitchToDevice(deviceId, null)) {
+                        if (root.showOrSwitchToDevice(deviceId)) {
                             // Already connected, reset connecting state and show toast
                             remoteControlPage.resetConnectingState()
                             toast.show(qsTr("Already connected, switched to existing window"), QDToast.Type.Info)
@@ -540,53 +533,35 @@ ApplicationWindow {
                         
                         // Not connected yet, create new connection
                         toast.show(qsTr("Connecting..."), QDToast.Type.Info)
-                        var connId = root.mainController.connectToRemoteHost(deviceId, password)
-                        if (connId) {
+                        var connectedDeviceId = root.mainController.connectToRemoteHost(deviceId, password)
+                        if (connectedDeviceId) {
                             // Store password temporarily for saving after successful connection
-                            root.pendingDeviceCredentials[connId] = {
+                            root.pendingDeviceCredentials[connectedDeviceId] = {
                                 deviceId: deviceId,
                                 password: password
                             }
                             
                             // Create remote window immediately (it will handle connection states)
-                            if (!root.showRemoteWindow(connId, deviceId)) {
+                            if (!root.showRemoteWindow(connectedDeviceId)) {
                                 // Window creation failed — mark as aborted, disconnect and clean up
-                                console.error("Remote window creation failed, disconnecting:", connId)
-                                delete root.pendingDeviceCredentials[connId]
+                                console.error("Remote window creation failed, disconnecting:", connectedDeviceId)
+                                delete root.pendingDeviceCredentials[connectedDeviceId]
                                 var newAborted = Object.assign({}, root.abortedConnections)
-                                newAborted[connId] = true
+                                newAborted[connectedDeviceId] = true
                                 root.abortedConnections = newAborted
-                                root.mainController.clientManager.disconnectFromHost(connId)
+                                root.mainController.clientManager.disconnectFromHost(connectedDeviceId)
                                 remoteControlPage.resetConnectingState()
                             }
                         }
                     }
-                    onViewConnectionRequested: function(connectionId) {
-                        console.log("View connection requested:", connectionId)
-                        
-                        // Try to get deviceId from existing connection in RemoteWindow
-                        var deviceId = null
-                        if (root.remoteWindow) {
-                            var idx = root.remoteWindow.connectionModel.indexOf(connectionId)
-                            if (idx >= 0) {
-                                deviceId = root.remoteWindow.connectionModel.deviceIdAt(idx)
-                            }
-                        }
-                        
-                        // If not found, show error
-                        if (!deviceId) {
-                            console.error("Cannot find deviceId for connection:", connectionId)
-                            toast.show(qsTr("Cannot find device for connection: ") + connectionId, QDToast.Type.Error)
-                            return
-                        }
-                        
-                        // Use unified function to show or switch to device
-                        root.showOrSwitchToDevice(deviceId, connectionId)
+                    onViewConnectionRequested: function(deviceId) {
+                        console.log("View connection requested:", deviceId)
+                        root.showOrSwitchToDevice(deviceId)
                     }
-                    onDisconnectRequested: function(connectionId) {
-                        console.log("Disconnect requested from RemoteControlPage:", connectionId)
+                    onDisconnectRequested: function(deviceId) {
+                        console.log("Disconnect requested from RemoteControlPage:", deviceId)
                         // Use unified disconnect function
-                        root.disconnectFromRemoteHost(connectionId)
+                        root.disconnectFromRemoteHost(deviceId)
                     }
                 }
 
@@ -602,18 +577,18 @@ ApplicationWindow {
                         navigationView.currentIndex = 0
                         // Initiate connection
                         toast.show(qsTr("Connecting..."), QDToast.Type.Info)
-                        var connId = root.mainController.connectToRemoteHost(deviceId, accessCode)
-                        if (connId) {
-                            root.pendingDeviceCredentials[connId] = {
+                        var connectedDeviceId = root.mainController.connectToRemoteHost(deviceId, accessCode)
+                        if (connectedDeviceId) {
+                            root.pendingDeviceCredentials[connectedDeviceId] = {
                                 deviceId: deviceId,
                                 password: accessCode
                             }
-                            if (!root.showRemoteWindow(connId, deviceId)) {
-                                delete root.pendingDeviceCredentials[connId]
+                            if (!root.showRemoteWindow(connectedDeviceId)) {
+                                delete root.pendingDeviceCredentials[connectedDeviceId]
                                 var newAborted = Object.assign({}, root.abortedConnections)
-                                newAborted[connId] = true
+                                newAborted[connectedDeviceId] = true
                                 root.abortedConnections = newAborted
-                                root.mainController.clientManager.disconnectFromHost(connId)
+                                root.mainController.clientManager.disconnectFromHost(connectedDeviceId)
                             }
                         }
                     }
@@ -858,9 +833,9 @@ ApplicationWindow {
     Connections {
         target: root.mainController ? root.mainController.clientManager : null
         
-        function onConnectionStateChanged(connectionId, state, hostInfo) {
+        function onConnectionStateChanged(deviceId, state, hostInfo) {
             // Skip aborted connections
-            if (root.abortedConnections[connectionId]) return
+            if (root.abortedConnections[deviceId]) return
             
             // If connection is established, ensure the window is shown
             if (state === "connected") {

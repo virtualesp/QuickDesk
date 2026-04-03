@@ -11,7 +11,6 @@
 namespace quickdesk {
 
 struct ConnectionEntry {
-    QString connectionId;
     QString deviceId;
     QString name;
     QString state;
@@ -23,8 +22,7 @@ class ConnectionListModel : public QAbstractListModel {
 
 public:
     enum Roles {
-        ConnectionIdRole = Qt::UserRole + 1,
-        DeviceIdRole,
+        DeviceIdRole = Qt::UserRole + 1,
         NameRole,
         StateRole,
     };
@@ -33,24 +31,18 @@ public:
     explicit ConnectionListModel(QObject* parent = nullptr);
     ~ConnectionListModel() override = default;
 
-    // QAbstractListModel interface
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
 
-    // Properties
     int count() const { return m_connections.size(); }
 
-    // Mutation methods — each emits proper beginInsertRows / beginRemoveRows / dataChanged
-    Q_INVOKABLE int addConnection(const QString& connectionId, const QString& deviceId);
+    Q_INVOKABLE int addConnection(const QString& deviceId);
     Q_INVOKABLE void removeConnection(int index);
     Q_INVOKABLE void clear();
-    Q_INVOKABLE void updateState(const QString& connectionId, const QString& state);
+    Q_INVOKABLE void updateState(const QString& deviceId, const QString& state);
 
-    // Query methods
-    Q_INVOKABLE int indexOf(const QString& connectionId) const;
-    Q_INVOKABLE int indexOfDeviceId(const QString& deviceId) const;
-    Q_INVOKABLE QString connectionIdAt(int index) const;
+    Q_INVOKABLE int indexOf(const QString& deviceId) const;
     Q_INVOKABLE QString deviceIdAt(int index) const;
     Q_INVOKABLE QString stateAt(int index) const;
 

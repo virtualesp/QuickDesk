@@ -22,17 +22,17 @@ QImage CursorImageProvider::requestImage(const QString& id, QSize* size,
 {
     Q_UNUSED(requestedSize);
     
-    // Parse id: "connectionId/version"
+    // Parse id: "deviceId/version"
     QStringList parts = id.split('/');
     if (parts.isEmpty()) {
         return QImage();
     }
     
-    QString connectionId = parts.first();
+    QString deviceId = parts.first();
     
     QMutexLocker locker(&m_mutex);
     
-    auto it = m_cursors.find(connectionId);
+    auto it = m_cursors.find(deviceId);
     if (it == m_cursors.end()) {
         return QImage();
     }
@@ -45,7 +45,7 @@ QImage CursorImageProvider::requestImage(const QString& id, QSize* size,
     return image;
 }
 
-void CursorImageProvider::setCursor(const QString& connectionId, 
+void CursorImageProvider::setCursor(const QString& deviceId, 
                                     const QImage& image,
                                     const QPoint& hotspot)
 {
@@ -54,13 +54,13 @@ void CursorImageProvider::setCursor(const QString& connectionId,
     CursorData data;
     data.image = image;
     data.hotspot = hotspot;
-    m_cursors[connectionId] = data;
+    m_cursors[deviceId] = data;
 }
 
-void CursorImageProvider::clearCursor(const QString& connectionId)
+void CursorImageProvider::clearCursor(const QString& deviceId)
 {
     QMutexLocker locker(&m_mutex);
-    m_cursors.remove(connectionId);
+    m_cursors.remove(deviceId);
 }
 
 } // namespace quickdesk

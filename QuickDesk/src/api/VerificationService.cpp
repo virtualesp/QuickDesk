@@ -30,7 +30,7 @@ VerificationService::VerificationService(MainController* controller)
 // OCR helpers
 // ---------------------------------------------------------------------------
 
-bool VerificationService::runOcr(const QString& connectionId,
+bool VerificationService::runOcr(const QString& deviceId,
                                   OcrResult& result,
                                   QString& errorOut)
 {
@@ -40,12 +40,12 @@ bool VerificationService::runOcr(const QString& connectionId,
     }
 
     auto* shm = m_controller->clientManager()->sharedMemoryManager();
-    if (!shm || !shm->isAttached(connectionId)) {
-        errorOut = QString("No video frame available for: %1").arg(connectionId);
+    if (!shm || !shm->isAttached(deviceId)) {
+        errorOut = QString("No video frame available for: %1").arg(deviceId);
         return false;
     }
 
-    QVideoFrame vf = shm->readVideoFrame(connectionId);
+    QVideoFrame vf = shm->readVideoFrame(deviceId);
     if (!vf.isValid()) { errorOut = "Failed to read video frame"; return false; }
 
     QImage image = vf.toImage();
@@ -160,7 +160,7 @@ ConditionResult VerificationService::evaluate(const VerificationCondition& cond,
 // ---------------------------------------------------------------------------
 
 VerificationResult VerificationService::verifyActionResult(
-    const QString& connectionId,
+    const QString& deviceId,
     const QList<VerificationCondition>& conditions,
     int timeoutMs)
 {
@@ -171,7 +171,7 @@ VerificationResult VerificationService::verifyActionResult(
     while (true) {
         OcrResult ocr;
         QString err;
-        if (!runOcr(connectionId, ocr, err)) {
+        if (!runOcr(deviceId, ocr, err)) {
             vr.summary = QString("OCR error: %1").arg(err);
             return vr;
         }
@@ -213,13 +213,13 @@ VerificationResult VerificationService::verifyActionResult(
 // ---------------------------------------------------------------------------
 
 VerificationResult VerificationService::assertScreenState(
-    const QString& connectionId,
+    const QString& deviceId,
     const QList<VerificationCondition>& conditions)
 {
     VerificationResult vr;
     OcrResult ocr;
     QString err;
-    if (!runOcr(connectionId, ocr, err)) {
+    if (!runOcr(deviceId, ocr, err)) {
         vr.summary = QString("OCR error: %1").arg(err);
         return vr;
     }
@@ -250,16 +250,15 @@ VerificationResult VerificationService::assertScreenState(
 // ---------------------------------------------------------------------------
 
 ScreenDiff VerificationService::screenDiffSummary(
-    const QString& connectionId,
+    const QString& deviceId,
     const QString& fromHash,
     QString& errorOut)
 {
     ScreenDiff diff;
     diff.fromHash = fromHash;
 
-    // Fetch "to" state (current frame)
     OcrResult toOcr;
-    if (!runOcr(connectionId, toOcr, errorOut)) return diff;
+    if (!runOcr(deviceId, toOcr, errorOut)) return diff;
     diff.toHash = toOcr.frameHash;
 
     // Identical frame — nothing to diff

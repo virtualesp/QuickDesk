@@ -97,7 +97,7 @@ private:
 
     MainController* m_controller;
     QMap<QString, Handler> m_handlers;
-    QMap<QString, QString> m_clipboardCache;  // connectionId -> last received text
+    QMap<QString, QString> m_clipboardCache;  // deviceId -> last received text
     UiStateService       m_uiState;
     VerificationService  m_verification;
     AgentHandler         m_agent;

@@ -45,7 +45,6 @@ Rectangle {
             
             delegate: RemoteTab {
                 required property int index
-                required property string connectionId
                 required property string deviceId
                 required property string name
                 required property string state
@@ -57,7 +56,7 @@ Rectangle {
                 // Get performance stats from map
                 property var stats: {
                     var _ = control.statsVersion
-                    return control.performanceStatsMap[connectionId] || { ping: 0 }
+                    return control.performanceStatsMap[deviceId] || { ping: 0 }
                 }
                 ping: stats.ping
                 routeType: stats.routeType || ""

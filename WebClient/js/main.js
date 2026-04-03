@@ -775,7 +775,10 @@ class QuickDeskApp {
                     if (this._isFavorite(device.deviceId)) {
                         userApi.removeFavorite(device.deviceId).then(() => this._fetchMyFavorites());
                     } else {
-                        userApi.addFavorite(device.deviceId, '', '').then(() => this._fetchMyFavorites());
+                        const didInput = document.getElementById('deviceId');
+                        const codeInput = document.getElementById('accessCode');
+                        const pwd = (didInput && didInput.value === device.deviceId && codeInput) ? codeInput.value : '';
+                        userApi.addFavorite(device.deviceId, '', pwd).then(() => this._fetchMyFavorites());
                     }
                 });
             }

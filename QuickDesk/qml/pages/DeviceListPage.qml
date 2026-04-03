@@ -71,7 +71,7 @@ Item {
             Item {
                 width: parent.width
                 height: deviceRepeater.count === 0 ? emptyDevicesText.height
-                                                   : Math.min(deviceRepeater.count, 4) * 44
+                                                   : Math.min(deviceRepeater.count, 4) * 42
 
                 Text {
                     id: emptyDevicesText
@@ -81,93 +81,94 @@ Item {
                     color: Theme.textSecondary
                 }
 
-                ScrollView {
+                ListView {
+                    id: deviceRepeater
                     anchors.fill: parent
-                    visible: deviceRepeater.count > 0
+                    visible: count > 0
                     clip: true
-                    background: Rectangle { color: "transparent" }
-                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                    spacing: 2
+                    boundsBehavior: Flickable.StopAtBounds
                     ScrollBar.vertical: QDScrollBar {}
 
-                    Column {
-                        width: parent.width
-                        spacing: 2
+                    model: root.mainController && root.mainController.cloudDeviceManager
+                           ? root.mainController.cloudDeviceManager.myDevices : []
 
-                        Repeater {
-                            id: deviceRepeater
-                            model: root.mainController && root.mainController.cloudDeviceManager
-                                   ? root.mainController.cloudDeviceManager.myDevices : []
+                    delegate: Rectangle {
+                        required property var modelData
+                        required property int index
 
-                            delegate: Rectangle {
-                                required property var modelData
-                                required property int index
+                        width: deviceRepeater.width
+                        height: 40
+                        radius: Theme.radiusSmall
+                        color: deviceRowHover.hovered ? Theme.surfaceHover : "transparent"
 
-                                width: parent.width
-                                height: 40
-                                radius: Theme.radiusSmall
-                                color: deviceRowHover.hovered ? Theme.surfaceHover : "transparent"
+                        HoverHandler { id: deviceRowHover }
 
-                                HoverHandler { id: deviceRowHover }
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.animationDurationFast }
+                        }
 
-                                Behavior on color {
-                                    ColorAnimation { duration: Theme.animationDurationFast }
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: Theme.spacingSmall
+                            anchors.rightMargin: Theme.spacingSmall
+                            spacing: Theme.spacingSmall
+
+                            Rectangle {
+                                width: 8; height: 8; radius: 4
+                                color: modelData.online ? Theme.success : Theme.textDisabled
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: {
+                                    var name = modelData.remark || modelData.device_name || modelData.device_id|| qsTr("Device")
+                                    return name + " (" + (modelData.device_id || "") + ")"
                                 }
+                                font.pixelSize: Theme.fontSizeMedium
+                                color: Theme.text
+                                elide: Text.ElideRight
+                            }
 
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: Theme.spacingSmall
-                                    anchors.rightMargin: Theme.spacingSmall
-                                    spacing: Theme.spacingSmall
+                            QDIconButton {
+                                visible: modelData.online === true
+                                iconSource: FluentIconGlyph.remoteGlyph
+                                buttonSize: QDIconButton.Size.Small
 
-                                    Rectangle {
-                                        width: 8; height: 8; radius: 4
-                                        color: modelData.online ? Theme.success : Theme.textDisabled
-                                    }
+                                QDToolTip { visible: parent.hovered; text: qsTr("Connect") }
 
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: {
-                                            var name = modelData.remark || modelData.device_name || modelData.device_id|| qsTr("Device")
-                                            return name + " (" + (modelData.device_id || "") + ")"
-                                        }
-                                        font.pixelSize: Theme.fontSizeMedium
-                                        color: Theme.text
-                                        elide: Text.ElideRight
-                                    }
-
-                                    QDIconButton {
-                                        visible: modelData.online === true
-                                        iconSource: FluentIconGlyph.remoteGlyph
-                                        buttonSize: QDIconButton.Size.Small
-
-                                        QDToolTip { visible: parent.hovered; text: qsTr("Connect") }
-
-                                        onClicked: {
-                                            var accessCode = root.mainController.cloudDeviceManager.getDeviceAccessCode(modelData.device_id)
-                                            if (accessCode)
-                                                root.connectToDevice(modelData.device_id, accessCode)
-                                            else
-                                                root.showToast(qsTr("Access code not available"), 2)
-                                        }
-                                    }
+                                onClicked: {
+                                    var accessCode = root.mainController.cloudDeviceManager.getDeviceAccessCode(modelData.device_id)
+                                    if (accessCode)
+                                        root.connectToDevice(modelData.device_id, accessCode)
+                                    else
+                                        root.showToast(qsTr("Access code not available"), 2)
                                 }
+                            }
+                        }
 
-                                MouseArea {
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    acceptedButtons: Qt.RightButton
-                                    z: -1
-                                    onClicked: function(mouse) {
-                                        if (mouse.button === Qt.RightButton) {
-                                            deviceContextMenu.deviceId = modelData.device_id
-                                            deviceContextMenu.deviceRemark = modelData.remark || ""
-                                            var pos = mapToItem(root, mouse.x, mouse.y)
-                                            deviceContextMenu.x = pos.x
-                                            deviceContextMenu.y = pos.y
-                                            deviceContextMenu.open()
-                                        }
-                                    }
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            z: -1
+                            onClicked: function(mouse) {
+                                if (mouse.button === Qt.RightButton) {
+                                    deviceContextMenu.deviceId = modelData.device_id
+                                    deviceContextMenu.deviceRemark = modelData.remark || ""
+                                    var pos = mapToItem(root, mouse.x, mouse.y)
+                                    deviceContextMenu.x = pos.x
+                                    deviceContextMenu.y = pos.y
+                                    deviceContextMenu.open()
                                 }
+                            }
+                            onDoubleClicked: {
+                                if (modelData.online !== true) return
+                                var accessCode = root.mainController.cloudDeviceManager.getDeviceAccessCode(modelData.device_id)
+                                if (accessCode)
+                                    root.connectToDevice(modelData.device_id, accessCode)
+                                else
+                                    root.showToast(qsTr("Access code not available"), 2)
                             }
                         }
                     }
@@ -185,7 +186,7 @@ Item {
             Item {
                 width: parent.width
                 height: favoriteRepeater.count === 0 ? emptyFavText.height
-                                                     : Math.min(favoriteRepeater.count, 4) * 44
+                                                     : Math.min(favoriteRepeater.count, 4) * 42
 
                 Text {
                     id: emptyFavText
@@ -195,94 +196,94 @@ Item {
                     color: Theme.textSecondary
                 }
 
-                ScrollView {
+                ListView {
+                    id: favoriteRepeater
                     anchors.fill: parent
-                    visible: favoriteRepeater.count > 0
+                    visible: count > 0
                     clip: true
-                    background: Rectangle { color: "transparent" }
-                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                    spacing: 2
+                    boundsBehavior: Flickable.StopAtBounds
                     ScrollBar.vertical: QDScrollBar {}
 
-                    Column {
-                        width: parent.width
-                        spacing: 2
+                    model: root.mainController && root.mainController.cloudDeviceManager
+                           ? root.mainController.cloudDeviceManager.myFavorites : []
 
-                        Repeater {
-                            id: favoriteRepeater
-                            model: root.mainController && root.mainController.cloudDeviceManager
-                                   ? root.mainController.cloudDeviceManager.myFavorites : []
+                    delegate: Rectangle {
+                        required property var modelData
+                        required property int index
 
-                            delegate: Rectangle {
-                                required property var modelData
-                                required property int index
+                        width: favoriteRepeater.width
+                        height: 40
+                        radius: Theme.radiusSmall
+                        color: favRowHover.hovered ? Theme.surfaceHover : "transparent"
 
-                                width: parent.width
-                                height: 40
-                                radius: Theme.radiusSmall
-                                color: favRowHover.hovered ? Theme.surfaceHover : "transparent"
+                        HoverHandler { id: favRowHover }
 
-                                HoverHandler { id: favRowHover }
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.animationDurationFast }
+                        }
 
-                                Behavior on color {
-                                    ColorAnimation { duration: Theme.animationDurationFast }
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: Theme.spacingSmall
+                            anchors.rightMargin: Theme.spacingSmall
+                            spacing: Theme.spacingSmall
+
+                            Text {
+                                text: FluentIconGlyph.favoriteStarFillGlyph
+                                font.family: "Segoe Fluent Icons"
+                                font.pixelSize: 12
+                                color: Theme.warning
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: {
+                                    var name = modelData.device_name || modelData.device_id || qsTr("Device")
+                                    return name + " (" + (modelData.device_id || "") + ")"
                                 }
+                                font.pixelSize: Theme.fontSizeMedium
+                                color: Theme.text
+                                elide: Text.ElideRight
+                            }
 
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: Theme.spacingSmall
-                                    anchors.rightMargin: Theme.spacingSmall
-                                    spacing: Theme.spacingSmall
+                            QDIconButton {
+                                iconSource: FluentIconGlyph.remoteGlyph
+                                buttonSize: QDIconButton.Size.Small
 
-                                    Text {
-                                        text: FluentIconGlyph.favoriteStarFillGlyph
-                                        font.family: "Segoe Fluent Icons"
-                                        font.pixelSize: 12
-                                        color: Theme.warning
-                                    }
+                                QDToolTip { visible: parent.hovered; text: qsTr("Connect") }
 
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: {
-                                            var name = modelData.device_name || modelData.device_id || qsTr("Device")
-                                            return name + " (" + (modelData.device_id || "") + ")"
-                                        }
-                                        font.pixelSize: Theme.fontSizeMedium
-                                        color: Theme.text
-                                        elide: Text.ElideRight
-                                    }
-
-                                    QDIconButton {
-                                        iconSource: FluentIconGlyph.remoteGlyph
-                                        buttonSize: QDIconButton.Size.Small
-
-                                        QDToolTip { visible: parent.hovered; text: qsTr("Connect") }
-
-                                        onClicked: {
-                                            var password = modelData.access_password || ""
-                                            if (password)
-                                                root.connectToDevice(modelData.device_id, password)
-                                            else
-                                                root.showToast(qsTr("No password saved for this device"), 2)
-                                        }
-                                    }
+                                onClicked: {
+                                    var password = modelData.access_password || ""
+                                    if (password)
+                                        root.connectToDevice(modelData.device_id, password)
+                                    else
+                                        root.showToast(qsTr("No password saved for this device"), 2)
                                 }
+                            }
+                        }
 
-                                MouseArea {
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    acceptedButtons: Qt.RightButton
-                                    z: -1
-                                    onClicked: function(mouse) {
-                                        if (mouse.button === Qt.RightButton) {
-                                            favContextMenu.deviceId = modelData.device_id
-                                            favContextMenu.deviceName = modelData.device_name || ""
-                                            var pos = mapToItem(root, mouse.x, mouse.y)
-                                            favContextMenu.x = pos.x
-                                            favContextMenu.y = pos.y
-                                            favContextMenu.open()
-                                        }
-                                    }
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            z: -1
+                            onClicked: function(mouse) {
+                                if (mouse.button === Qt.RightButton) {
+                                    favContextMenu.deviceId = modelData.device_id
+                                    favContextMenu.deviceName = modelData.device_name || ""
+                                    var pos = mapToItem(root, mouse.x, mouse.y)
+                                    favContextMenu.x = pos.x
+                                    favContextMenu.y = pos.y
+                                    favContextMenu.open()
                                 }
+                            }
+                            onDoubleClicked: {
+                                var password = modelData.access_password || ""
+                                if (password)
+                                    root.connectToDevice(modelData.device_id, password)
+                                else
+                                    root.showToast(qsTr("No password saved for this device"), 2)
                             }
                         }
                     }
@@ -300,7 +301,7 @@ Item {
 
             Item {
                 width: parent.width
-                height: logsRepeater.count === 0 ? emptyLogsText.height : Math.min(logsRepeater.count, 6) * 40
+                height: logsRepeater.count === 0 ? emptyLogsText.height : Math.min(logsRepeater.count, 6) * 42
 
                 Text {
                     id: emptyLogsText
@@ -310,64 +311,57 @@ Item {
                     color: Theme.textSecondary
                 }
 
-                ScrollView {
+                ListView {
+                    id: logsRepeater
                     anchors.fill: parent
-                    visible: logsRepeater.count > 0
+                    visible: count > 0
                     clip: true
-                    background: Rectangle { color: "transparent" }
-                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                    spacing: 2
+                    boundsBehavior: Flickable.StopAtBounds
                     ScrollBar.vertical: QDScrollBar {}
 
-                    Column {
-                        width: parent.width
-                        spacing: 2
+                    model: {
+                        var logs = root.mainController && root.mainController.cloudDeviceManager
+                                  ? root.mainController.cloudDeviceManager.connectionLogs : []
+                        return logs.length > 20 ? logs.slice(0, 20) : logs
+                    }
 
-                        Repeater {
-                            id: logsRepeater
-                            model: {
-                                var logs = root.mainController && root.mainController.cloudDeviceManager
-                                          ? root.mainController.cloudDeviceManager.connectionLogs : []
-                                return logs.length > 20 ? logs.slice(0, 20) : logs
+                    delegate: Rectangle {
+                        required property var modelData
+                        required property int index
+
+                        width: logsRepeater.width
+                        height: 40
+                        radius: Theme.radiusSmall
+                        color: "transparent"
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: Theme.spacingSmall
+                            anchors.rightMargin: Theme.spacingSmall
+                            spacing: Theme.spacingSmall
+
+                            Rectangle {
+                                width: 8; height: 8; radius: 4
+                                color: modelData.status === "success" ? Theme.success : Theme.error
                             }
 
-                            delegate: Rectangle {
-                                required property var modelData
-                                required property int index
-
-                                width: parent.width
-                                height: 40
-                                radius: Theme.radiusSmall
-                                color: "transparent"
-
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: Theme.spacingSmall
-                                    anchors.rightMargin: Theme.spacingSmall
-                                    spacing: Theme.spacingSmall
-
-                                    Rectangle {
-                                        width: 8; height: 8; radius: 4
-                                        color: modelData.status === "success" ? Theme.success : Theme.error
+                            Text {
+                                Layout.fillWidth: true
+                                text: {
+                                    var parts = [modelData.device_id || ""]
+                                    if (modelData.created_at) parts.push(new Date(modelData.created_at).toLocaleString())
+                                    if (modelData.duration > 0) {
+                                        var m = Math.floor(modelData.duration / 60)
+                                        var s = modelData.duration % 60
+                                        parts.push(m + "m" + s + "s")
                                     }
-
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: {
-                                            var parts = [modelData.device_id || ""]
-                                            if (modelData.created_at) parts.push(new Date(modelData.created_at).toLocaleString())
-                                            if (modelData.duration > 0) {
-                                                var m = Math.floor(modelData.duration / 60)
-                                                var s = modelData.duration % 60
-                                                parts.push(m + "m" + s + "s")
-                                            }
-                                            if (modelData.error_msg) parts.push(modelData.error_msg)
-                                            return parts.join(" · ")
-                                        }
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        color: Theme.textSecondary
-                                        elide: Text.ElideRight
-                                    }
+                                    if (modelData.error_msg) parts.push(modelData.error_msg)
+                                    return parts.join(" · ")
                                 }
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.textSecondary
+                                elide: Text.ElideRight
                             }
                         }
                     }

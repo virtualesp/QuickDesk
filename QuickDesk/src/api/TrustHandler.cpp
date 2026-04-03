@@ -20,7 +20,7 @@ TrustHandler::TrustHandler(MainController* controller, QObject* parent)
 
 QJsonObject TrustHandler::handleRequestConfirmation(const QJsonObject& params)
 {
-    QString connectionId = params["connection_id"].toString();
+    QString deviceId = params["deviceId"].toString();
     QString toolName     = params["tool_name"].toString();
     QString argumentsJson = QString::fromUtf8(
         QJsonDocument(params["arguments"].toObject()).toJson(QJsonDocument::Compact));
@@ -59,7 +59,7 @@ QJsonObject TrustHandler::handleRequestConfirmation(const QJsonObject& params)
     }
 
     emit confirmationRequested(
-        confirmId, connectionId, toolName, argumentsJson,
+        confirmId, deviceId, toolName, argumentsJson,
         riskLevel, reasons, timeoutSecs
     );
 

@@ -17,10 +17,10 @@ Item {
     signal connectRequested(string deviceId, string password)
     
     // Signal for viewing existing connection
-    signal viewConnectionRequested(string connectionId)
+    signal viewConnectionRequested(string deviceId)
     
     // Signal for disconnecting from remote host (unified)
-    signal disconnectRequested(string connectionId)
+    signal disconnectRequested(string deviceId)
     
     // Signal for showing toast (unified toast in MainWindow)
     signal showToast(string message, int toastType)
@@ -234,9 +234,9 @@ Item {
                 mainController: root.mainController
                 panelType: "clients"
                 
-                onViewConnectionRequested: function(connectionId) {
-                    console.log("View connection requested:", connectionId)
-                    root.viewConnectionRequested(connectionId)
+                onViewConnectionRequested: function(deviceId) {
+                    console.log("View connection requested:", deviceId)
+                    root.viewConnectionRequested(deviceId)
                 }
             }
             
@@ -429,17 +429,17 @@ Item {
                 mainController: root.mainController
                 panelType: "connections"
                 
-                onViewConnectionRequested: function(connectionId) {
-                    console.log("View connection requested:", connectionId)
+                onViewConnectionRequested: function(deviceId) {
+                    console.log("View connection requested:", deviceId)
                     // Emit signal to parent (MainWindow) to show remote window
                     // MainWindow will handle validation and error messages
-                    root.viewConnectionRequested(connectionId)
+                    root.viewConnectionRequested(deviceId)
                 }
                 
-                onDisconnectRequested: function(connectionId) {
-                    console.log("Disconnect requested:", connectionId)
+                onDisconnectRequested: function(deviceId) {
+                    console.log("Disconnect requested:", deviceId)
                     // Forward to MainWindow for unified handling
-                    root.disconnectRequested(connectionId)
+                    root.disconnectRequested(deviceId)
                 }
             }
         }
@@ -449,8 +449,8 @@ Item {
     Connections {
         target: mainController.clientManager
         
-        function onConnectionStateChanged(connectionId, state, hostInfo) {
-            console.log("Connection state changed:", connectionId, state)
+        function onConnectionStateChanged(deviceId, state, hostInfo) {
+            console.log("Connection state changed:", deviceId, state)
             
             // Reset connecting state (use id reference)
             if (connectBtn) {
@@ -458,7 +458,7 @@ Item {
             }
             
             // Skip toasts for aborted connections (window creation failed)
-            if (root.abortedConnections && root.abortedConnections[connectionId]) {
+            if (root.abortedConnections && root.abortedConnections[deviceId]) {
                 return
             }
             
@@ -472,8 +472,8 @@ Item {
             }
         }
         
-        function onErrorOccurred(connectionId, code, message) {
-            console.log("Connection error:", connectionId, code, message)
+        function onErrorOccurred(deviceId, code, message) {
+            console.log("Connection error:", deviceId, code, message)
             root.showToast(qsTr("Error: ") + message, 2) // Error type
             
             // Reset connecting state (use id reference)

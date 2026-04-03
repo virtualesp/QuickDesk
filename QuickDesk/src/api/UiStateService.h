@@ -18,7 +18,7 @@ class MainController;
 // UiState — snapshot of the full UI state for a connection
 // ---------------------------------------------------------------------------
 struct UiState {
-    QString connectionId;
+    QString deviceId;
 
     // Screen resolution (from ConnectionInfo)
     int screenWidth  = 0;
@@ -47,14 +47,14 @@ public:
 
     // Build a full UI state snapshot for the given connection.
     // Returns false and sets errorOut if the frame is unavailable or OCR is not ready.
-    bool getUiState(const QString& connectionId,
+    bool getUiState(const QString& deviceId,
                     UiState& out,
                     QString& errorOut);
 
     // Block (poll) until the given text appears on screen or timeoutMs elapses.
     // Returns true if text was found; errorOut is set on error (e.g. no frame).
     // ignoreCase and exact follow the same semantics as findElement.
-    bool waitForText(const QString& connectionId,
+    bool waitForText(const QString& deviceId,
                      const QString& text,
                      bool exact,
                      bool ignoreCase,
@@ -65,7 +65,7 @@ public:
     // Non-blocking: check if the given text is currently on screen.
     // Returns true if found, false if not found.
     // errorOut is set on OCR/frame error (distinct from "not found").
-    bool assertTextPresent(const QString& connectionId,
+    bool assertTextPresent(const QString& deviceId,
                            const QString& text,
                            bool exact,
                            bool ignoreCase,
@@ -75,7 +75,7 @@ public:
 private:
     // Run OCR on the current frame (uses cache).
     // Returns false if frame unavailable or OCR not ready.
-    bool runOcr(const QString& connectionId,
+    bool runOcr(const QString& deviceId,
                 OcrResult& result,
                 bool& fromCache,
                 QString& errorOut);

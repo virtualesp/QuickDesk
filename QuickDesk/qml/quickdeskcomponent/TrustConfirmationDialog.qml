@@ -8,7 +8,7 @@ Item {
     id: root
 
     property string confirmationId: ""
-    property string connectionId: ""
+    property string deviceId: ""
     property string toolName: ""
     property var toolArguments: ({})
     property string riskLevel: "medium"
@@ -24,9 +24,9 @@ Item {
     visible: showing
     z: Theme.zIndexModal + 10
 
-    function showConfirmation(confId, connId, tool, args, risk, reasonList, timeout) {
+    function showConfirmation(confId, devId, tool, args, risk, reasonList, timeout) {
         confirmationId = confId
-        connectionId = connId
+        deviceId = devId
         toolName = tool
         toolArguments = args
         riskLevel = risk

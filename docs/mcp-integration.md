@@ -179,15 +179,17 @@ Once configured, your AI agent can use QuickDesk tools directly. Example convers
 
 ## MCP Tools Reference
 
+**Single identifier — `deviceId` / `device_id`:** QuickDesk’s WebSocket API and MCP tools use one external identifier: the remote **device ID** (the stable id you pass to `connect_device` or read from `get_host_info`). After `connect_device`, the returned `device_id` is what you pass to every subsequent tool call. There is no separate connection/session id in the public API.
+
 ### Connection Management
 
 | Tool | Description |
 |------|-------------|
-| `connect_device` | Connect to a remote device by device ID + access code. Returns a `connection_id`. Set `show_window=false` for headless automation. |
-| `disconnect_device` | Disconnect a specific remote connection. |
+| `connect_device` | Connect to a remote device by device ID + access code. Returns `device_id` (the same stable device identifier). Use it for all later tool calls. Set `show_window=false` for headless automation. |
+| `disconnect_device` | Disconnect the remote session for a given `device_id`. |
 | `disconnect_all` | Disconnect all active remote connections. |
-| `list_connections` | List all active connections with their IDs and states. |
-| `get_connection_info` | Get detailed info for a specific connection. |
+| `list_connections` | List all active connections with their device IDs and states. |
+| `get_connection_info` | Get detailed info for a specific active connection (keyed by `device_id`). |
 
 ### Vision & Screen
 
@@ -209,9 +211,9 @@ Once configured, your AI agent can use QuickDesk tools directly. Example convers
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `connection_id` | string | ✅ | — | Connection ID of the remote desktop |
+| `device_id` | string | ✅ | — | Remote desktop device ID |
 
-**Returns:** `{ blocks, frameHash, width, height, connectionId }`
+**Returns:** `{ blocks, frameHash, width, height, deviceId }`
 
 Each block in `blocks`:
 
@@ -226,18 +228,18 @@ Each block in `blocks`:
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `connection_id` | string | ✅ | — | Connection ID of the remote desktop |
+| `device_id` | string | ✅ | — | Remote desktop device ID |
 | `text` | string | ✅ | — | Text to search for on screen |
 | `exact` | boolean | — | `false` | If true, require exact text match; false = partial/substring match |
 | `ignore_case` | boolean | — | `true` | Case-insensitive matching |
 
-**Returns:** `{ found, matches, query, frameHash, connectionId }`
+**Returns:** `{ found, matches, query, frameHash, deviceId }`
 
 #### `click_text`
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `connection_id` | string | ✅ | — | Connection ID of the remote desktop |
+| `device_id` | string | ✅ | — | Remote desktop device ID |
 | `text` | string | ✅ | — | Text to find and click |
 | `exact` | boolean | — | `false` | Exact match vs. partial match |
 | `ignore_case` | boolean | — | `true` | Case-insensitive matching |
@@ -251,13 +253,13 @@ Get a unified UI state snapshot combining screen resolution, OCR text blocks, an
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `connection_id` | string | ✅ | — | Connection ID of the remote desktop |
+| `device_id` | string | ✅ | — | Remote desktop device ID |
 
 **Returns:**
 
 ```json
 {
-  "connectionId": "conn_1",
+  "deviceId": "123456789",
   "screen": { "width": 1920, "height": 1080 },
   "ocr": {
     "blocks": [ ... ],
@@ -276,13 +278,13 @@ Block until the specified text appears on screen or the timeout elapses. Polls O
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `connection_id` | string | ✅ | — | Connection ID of the remote desktop |
+| `device_id` | string | ✅ | — | Remote desktop device ID |
 | `text` | string | ✅ | — | Text to wait for (supports partial match by default) |
 | `exact` | boolean | — | `false` | If true, require exact text match |
 | `ignore_case` | boolean | — | `true` | Case-insensitive matching |
 | `timeout_ms` | integer | — | `5000` | Maximum wait time in milliseconds |
 
-**Returns:** `{ found: true, match: { text, bbox, center, confidence }, query, connectionId }` on success, or an error string on timeout.
+**Returns:** `{ found: true, match: { text, bbox, center, confidence }, query, deviceId }` on success, or an error string on timeout.
 
 #### `assert_text_present`
 
@@ -290,12 +292,12 @@ Immediately check if the specified text is currently visible on screen. Does not
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `connection_id` | string | ✅ | — | Connection ID of the remote desktop |
+| `device_id` | string | ✅ | — | Remote desktop device ID |
 | `text` | string | ✅ | — | Text to assert is present (supports partial match by default) |
 | `exact` | boolean | — | `false` | If true, require exact text match |
 | `ignore_case` | boolean | — | `true` | Case-insensitive matching |
 
-**Returns:** `{ present: true, match: { text, bbox, center, confidence }, query, connectionId }` if found, or `{ present: false, query, connectionId }` if not found.
+**Returns:** `{ present: true, match: { text, bbox, center, confidence }, query, deviceId }` if found, or `{ present: false, query, deviceId }` if not found.
 
 ### Verification & Self-Healing
 
@@ -325,7 +327,7 @@ Poll until all conditions pass or the timeout elapses. Each failed poll waits 20
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `connection_id` | string | ✅ | — | Connection ID of the remote desktop |
+| `device_id` | string | ✅ | — | Remote desktop device ID |
 | `expectations` | array | ✅ | — | List of `{ type, value }` conditions that must all pass |
 | `timeout_ms` | integer | — | `3000` | Maximum polling time in milliseconds |
 
@@ -349,7 +351,7 @@ Compare the current frame against a previously recorded snapshot.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `connection_id` | string | ✅ | — | Connection ID of the remote desktop |
+| `device_id` | string | ✅ | — | Remote desktop device ID |
 | `from_hash` | string | — | `""` | Frame hash from a prior `get_ui_state` call. Leave empty to show all current blocks as "added". |
 
 **Returns:**
@@ -371,7 +373,7 @@ No polling — returns the current pass/fail status immediately.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `connection_id` | string | ✅ | — | Connection ID of the remote desktop |
+| `device_id` | string | ✅ | — | Remote desktop device ID |
 | `expectations` | array | ✅ | — | List of `{ type, value }` conditions to check |
 
 **Returns:** Same structure as `verify_action_result`.
@@ -399,20 +401,20 @@ Instead of analyzing screenshots with a vision model, these tools run on-device 
 #### Usage Pattern: Click a Button by Label
 
 ```
-click_text(connection_id=conn_id, text="OK")
+click_text(device_id=dev_id, text="OK")
          → finds "OK" button on screen and clicks it
 ```
 
 #### Usage Pattern: Read Text and Act
 
 ```
-get_screen_text(connection_id=conn_id)
+get_screen_text(device_id=dev_id)
     → returns all text blocks with coordinates
 
-find_element(connection_id=conn_id, text="Error", ignore_case=true)
+find_element(device_id=dev_id, text="Error", ignore_case=true)
     → check if any error message is visible
 
-click_text(connection_id=conn_id, text="Retry")
+click_text(device_id=dev_id, text="Retry")
     → click the retry button
 ```
 
@@ -421,7 +423,7 @@ click_text(connection_id=conn_id, text="Retry")
 ```
 keyboard_hotkey(keys=["ctrl", "s"])          → save the file
 // wait a moment, then verify
-elements = find_element(connection_id=conn_id, text="Saved")
+elements = find_element(device_id=dev_id, text="Saved")
 if elements.found:
     → file was saved successfully
 ```
@@ -429,7 +431,7 @@ if elements.found:
 #### Usage Pattern: Get UI State Without Screenshot
 
 ```
-state = get_ui_state(connection_id=conn_id)
+state = get_ui_state(device_id=dev_id)
     → state.screen.width / state.screen.height  — resolution
     → state.ocr.blocks                          — all visible text + coordinates
     → state.activeWindow.title                  — current foreground window
@@ -440,7 +442,7 @@ state = get_ui_state(connection_id=conn_id)
 ```
 keyboard_type(text="apt install nginx")
 keyboard_hotkey(keys=["enter"])
-wait_for_text(connection_id=conn_id, text="done", timeout_ms=60000)
+wait_for_text(device_id=dev_id, text="done", timeout_ms=60000)
     → blocks until "done" appears in terminal, or 60s elapses
 ```
 
@@ -448,7 +450,7 @@ wait_for_text(connection_id=conn_id, text="done", timeout_ms=60000)
 
 ```
 // Before clicking "Delete", assert the confirm dialog is showing
-assert_text_present(connection_id=conn_id, text="Are you sure")
+assert_text_present(device_id=dev_id, text="Are you sure")
     → present=true: safe to click "OK"
     → present=false: unexpected state, abort
 ```
@@ -528,20 +530,20 @@ The following tools are provided by built-in skills that ship with QuickDesk (ze
 
 ```
 // Discover available tools on the remote host
-agent_list_tools(connection_id=conn_id)
+agent_list_tools(device_id=dev_id)
     → returns all tools with descriptions and parameter schemas
 
 // Get system information
-agent_exec(connection_id=conn_id, tool="get_system_info", args={})
+agent_exec(device_id=dev_id, tool="get_system_info", args={})
     → OS, CPU, memory, disk, hostname, uptime
 
 // Run a command on the remote host
-agent_exec(connection_id=conn_id, tool="run_command",
+agent_exec(device_id=dev_id, tool="run_command",
            args={"command": "ipconfig /all"})
     → stdout, stderr, exit_code
 
 // Read a remote file
-agent_exec(connection_id=conn_id, tool="read_file",
+agent_exec(device_id=dev_id, tool="read_file",
            args={"path": "C:\\Users\\admin\\config.ini"})
     → file contents
 ```
@@ -578,7 +580,7 @@ Convenience wrapper for waiting on connection state transitions. Use after `conn
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `connection_id` | string | ✅ | — | Connection ID to monitor |
+| `device_id` | string | ✅ | — | Device ID to monitor |
 | `state` | string | ✅ | — | Target state: `connected`, `disconnected`, `failed` |
 | `timeout_ms` | integer | — | `30000` | Maximum wait time in milliseconds |
 
@@ -590,7 +592,7 @@ Wait for the remote clipboard to change. Use after sending Ctrl+C on the remote 
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `connection_id` | string | ✅ | — | Connection ID to monitor |
+| `device_id` | string | ✅ | — | Device ID to monitor |
 | `timeout_ms` | integer | — | `10000` | Maximum wait time in milliseconds |
 
 **Returns:** The `clipboardChanged` event including the new clipboard text, or an error on timeout.
@@ -614,15 +616,15 @@ Returns all supported event types and their data fields. No parameters.
 
 | Event Type | Description | Data Fields |
 |------------|-------------|-------------|
-| `connectionStateChanged` | Connection state transition | `connectionId`, `state`, `hostInfo` |
-| `clipboardChanged` | Remote clipboard content changed | `connectionId`, `text` |
-| `connectionAdded` | New outgoing connection created | `connectionId`, `deviceId` |
-| `connectionRemoved` | Outgoing connection removed | `connectionId` |
-| `videoLayoutChanged` | Remote desktop video resolution changed | `connectionId`, `width`, `height` |
+| `connectionStateChanged` | Connection state transition | `deviceId`, `state`, `hostInfo` |
+| `clipboardChanged` | Remote clipboard content changed | `deviceId`, `text` |
+| `connectionAdded` | New outgoing connection created | `deviceId` |
+| `connectionRemoved` | Outgoing connection removed | `deviceId` |
+| `videoLayoutChanged` | Remote desktop video resolution changed | `deviceId`, `width`, `height` |
 | `hostReady` | Local host service ready to accept connections | `deviceId`, `accessCode` |
 | `accessCodeChanged` | Local host access code refreshed | `accessCode` |
-| `hostClientConnected` | Remote client connected to this host | `connectionId`, ... |
-| `hostClientDisconnected` | Remote client disconnected from this host | `connectionId`, `reason` |
+| `hostClientConnected` | Remote client connected to this host | `deviceId`, ... |
+| `hostClientDisconnected` | Remote client disconnected from this host | `deviceId`, `reason` |
 | `hostSignalingStateChanged` | Host signaling connection state changed | `state`, `retryCount`, `nextRetryIn`, `error` |
 | `hostProcessStatusChanged` | Host process status changed | `status` |
 | `clientProcessStatusChanged` | Client process status changed | `status` |
@@ -635,7 +637,7 @@ Resources provide read-only real-time data about system state.
 |-----|-------------|
 | `quickdesk://host` | Local device ID, access code, signaling state |
 | `quickdesk://status` | Overall system status |
-| `quickdesk://connection/{connectionId}` | Detailed info for a specific connection |
+| `quickdesk://device/{deviceId}` | Detailed info for a specific remote device |
 
 ## MCP Prompts
 
@@ -646,27 +648,27 @@ Prompts are instruction templates that teach AI agents best practices for specif
 | Prompt | Description | Parameters |
 |--------|-------------|------------|
 | `operate_remote_desktop` | Complete guide for the screenshot→analyze→act→verify loop, coordinate system, and all available tools. | (none) |
-| `find_and_click` | Step-by-step instructions for locating and clicking a specific UI element. | `element_description`, `connection_id` |
-| `run_command` | Step-by-step instructions for opening a terminal and running a command. | `command`, `connection_id` |
+| `find_and_click` | Step-by-step instructions for locating and clicking a specific UI element. | `element_description`, `device_id` |
+| `run_command` | Step-by-step instructions for opening a terminal and running a command. | `command`, `device_id` |
 
 ### DevOps & Automation
 
 | Prompt | Description | Parameters |
 |--------|-------------|------------|
-| `server_health_check` | Comprehensive server health check — CPU, memory, disk, processes, services, error logs. Generates a structured health report. | `connection_id` |
+| `server_health_check` | Comprehensive server health check — CPU, memory, disk, processes, services, error logs. Generates a structured health report. | `device_id` |
 | `batch_operation` | Guide for executing the same task across multiple devices sequentially, with error handling and summary reporting. | `task_description` |
 
 ### Troubleshooting
 
 | Prompt | Description | Parameters |
 |--------|-------------|------------|
-| `diagnose_system_issue` | Systematic diagnosis of system problems (slow performance, crashes, network issues, disk full) with root cause analysis and remediation suggestions. | `issue_description`, `connection_id` |
+| `diagnose_system_issue` | Systematic diagnosis of system problems (slow performance, crashes, network issues, disk full) with root cause analysis and remediation suggestions. | `issue_description`, `device_id` |
 
 ### Screen Intelligence
 
 | Prompt | Description | Parameters |
 |--------|-------------|------------|
-| `analyze_screen_content` | Deep analysis of screen content — OS detection, open applications, text extraction, UI element inventory, and security scan for exposed sensitive information. | `connection_id` |
+| `analyze_screen_content` | Deep analysis of screen content — OS detection, open applications, text extraction, UI element inventory, and security scan for exposed sensitive information. | `device_id` |
 
 ### Multi-Device
 
@@ -678,7 +680,7 @@ Prompts are instruction templates that teach AI agents best practices for specif
 
 | Prompt | Description | Parameters |
 |--------|-------------|------------|
-| `document_procedure` | Observe or perform a procedure and generate a Standard Operating Procedure (SOP) document with step-by-step instructions, screenshots, and troubleshooting. | `procedure_name`, `connection_id` |
+| `document_procedure` | Observe or perform a procedure and generate a Standard Operating Procedure (SOP) document with step-by-step instructions, screenshots, and troubleshooting. | `procedure_name`, `device_id` |
 
 See [Demo Scenarios](demo-scenarios.md) for complete usage examples of each prompt.
 
@@ -717,7 +719,7 @@ The following key names can be used with `keyboard_hotkey`, `key_press`, and `ke
 
 ```
 1. get_host_info          → get device_id + access_code
-2. connect_device          → get connection_id
+2. connect_device          → get device_id
 3. screenshot              → see what's on screen
 4. ... interact ...
 5. disconnect_device       → clean up
@@ -734,14 +736,14 @@ disconnect_device
 ### Multi-Device Orchestration
 
 ```
-conn_a = connect_device(device_id="111222333", ...)
-conn_b = connect_device(device_id="444555666", ...)
+dev_a = connect_device(device_id="111222333", ...)
+dev_b = connect_device(device_id="444555666", ...)
 
-screenshot(connection_id=conn_a)   → see device A
-screenshot(connection_id=conn_b)   → see device B
+screenshot(device_id=dev_a)   → see device A
+screenshot(device_id=dev_b)   → see device B
 
-keyboard_type(connection_id=conn_a, text="...")
-keyboard_type(connection_id=conn_b, text="...")
+keyboard_type(device_id=dev_a, text="...")
+keyboard_type(device_id=dev_b, text="...")
 ```
 
 ### Modifier+Click (e.g. Ctrl+Click)
@@ -766,8 +768,8 @@ get_clipboard()                → get selected text
 Use `wait_for_connection_state` instead of polling with `list_connections`:
 
 ```
-conn_id = connect_device(device_id="111222333", access_code="888888")
-wait_for_connection_state(connection_id=conn_id, state="connected", timeout_ms=15000)
+dev_id = connect_device(device_id="111222333", access_code="888888")
+wait_for_connection_state(device_id=dev_id, state="connected", timeout_ms=15000)
 screenshot()                   → screen is ready
 ```
 
@@ -778,7 +780,7 @@ Use `wait_for_clipboard_change` instead of polling `get_clipboard`:
 ```
 mouse_drag(start_x=100, start_y=200, end_x=500, end_y=200)
 keyboard_hotkey(keys=["ctrl", "c"])
-wait_for_clipboard_change(connection_id=conn_id, timeout_ms=5000)
+wait_for_clipboard_change(device_id=dev_id, timeout_ms=5000)
                                → returns the copied text immediately when clipboard updates
 ```
 
@@ -786,7 +788,7 @@ wait_for_clipboard_change(connection_id=conn_id, timeout_ms=5000)
 
 ```
 // Wait for the remote desktop resolution to change (e.g. after window resize)
-wait_for_event(event="videoLayoutChanged", filter={"connectionId": conn_id}, timeout_ms=10000)
+wait_for_event(event="videoLayoutChanged", filter={"deviceId": dev_id}, timeout_ms=10000)
 screenshot()                                         → capture the new layout
 ```
 
@@ -805,7 +807,7 @@ get_recent_events(limit=50)    → see all recent events
 keyboard_hotkey(keys=["ctrl", "s"])
 
 // Poll until "Saved" appears on screen (up to 3 s)
-verify_action_result(connection_id=conn_id,
+verify_action_result(device_id=dev_id,
   expectations=[{ type: "text_present", value: "Saved" }],
   timeout_ms=3000)
     → allPassed=true: action confirmed
@@ -816,13 +818,13 @@ verify_action_result(connection_id=conn_id,
 
 ```
 // Capture baseline before action
-state = get_ui_state(connection_id=conn_id)   → hash = state.ocr.frameHash
+state = get_ui_state(device_id=dev_id)   → hash = state.ocr.frameHash
 
 // Perform action
-click_text(connection_id=conn_id, text="Submit")
+click_text(device_id=dev_id, text="Submit")
 
 // See what changed
-screen_diff_summary(connection_id=conn_id, from_hash=hash)
+screen_diff_summary(device_id=dev_id, from_hash=hash)
     → added:   ["Submission confirmed"]
     → removed: ["Submit"]
     → summary: "appeared: \"Submission confirmed\"; disappeared: \"Submit\""
@@ -832,7 +834,7 @@ screen_diff_summary(connection_id=conn_id, from_hash=hash)
 
 ```
 // Confirm delete dialog is visible before clicking OK
-assert_screen_state(connection_id=conn_id,
+assert_screen_state(device_id=dev_id,
   expectations=[
     { type: "text_present",          value: "Are you sure" },
     { type: "window_title_contains", value: "Confirm" }
@@ -964,7 +966,7 @@ These return a 403 error with a descriptive message.
 All API operations are logged to `logs/quickdesk_audit.log` (rotating, 10MB x 5 files):
 
 ```
-[2026-03-01 23:45:12.345] [ALLOW] client_1 method=screenshot params={"connectionId":"abc123"}
+[2026-03-01 23:45:12.345] [ALLOW] client_1 method=screenshot params={"deviceId":"111222333"}
 [2026-03-01 23:45:13.456] [DENY] client_2 method=mouseClick params={"x":100,"y":200} reason=permission_denied
 [2026-03-01 23:45:14.567] [DENY] client_1 method=keyboardType params={"text":"shutdown /s"} reason=dangerous_operation
 ```
@@ -1009,8 +1011,8 @@ Two MCP tools bridge AI clients to the host agent:
 
 | Tool | Description |
 |------|-------------|
-| `agent_exec` | Execute a tool on the remote host agent. Parameters: `connection_id`, `tool_name`, `arguments` |
-| `agent_list_tools` | List all tools available on the remote host agent. Parameters: `connection_id` |
+| `agent_exec` | Execute a tool on the remote host agent. Parameters: `device_id`, `tool_name`, `arguments` |
+| `agent_list_tools` | List all tools available on the remote host agent. Parameters: `device_id` |
 
 ### Example: Run a shell command via agent
 
@@ -1018,7 +1020,7 @@ Two MCP tools bridge AI clients to the host agent:
 {
   "name": "agent_exec",
   "arguments": {
-    "connection_id": "conn_1",
+    "device_id": "123456789",
     "tool_name": "run_command",
     "arguments": {
       "command": "systeminfo"
@@ -1080,8 +1082,8 @@ Record AI operation sequences as reusable workflows with parameterized replay.
 
 | Tool | Description |
 |------|-------------|
-| `start_recording` | Start recording. Params: `name`, `device_id`, `connection_id` |
-| `stop_recording` | Stop recording and save. Params: `connection_id`, `description`, `tags` |
+| `start_recording` | Start recording. Params: `name`, `device_id` |
+| `stop_recording` | Stop recording and save. Params: `device_id`, `description`, `tags` |
 | `list_workflows` | List all saved workflows |
 | `get_workflow` | Get full workflow details with all steps |
 | `replay_workflow` | Replay a workflow with optional argument overrides |

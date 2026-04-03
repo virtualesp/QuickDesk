@@ -244,7 +244,8 @@ Item {
                                     if (parent.isFav) {
                                         root.mainController.cloudDeviceManager.removeFavorite(did)
                                     } else {
-                                        root.mainController.cloudDeviceManager.addFavorite(did, "", "")
+                                        var pwd = root.mainController.remoteDeviceManager.getDevicePassword(did) || ""
+                                        root.mainController.cloudDeviceManager.addFavorite(did, "", pwd)
                                     }
                                 }
 

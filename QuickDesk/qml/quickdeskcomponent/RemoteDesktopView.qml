@@ -10,7 +10,7 @@ import QuickDesk 1.0
  * 
  * Usage:
  *   RemoteDesktopView {
- *       connectionId: "conn_1"
+ *       deviceId: "123456789"
  *       clientManager: mainController.clientManager
  *       active: visible  // Only render when visible
  *       inputEnabled: true // Enable mouse/keyboard input
@@ -20,7 +20,7 @@ Rectangle {
     id: root
     
     // Required properties
-    required property string connectionId
+    required property string deviceId
     required property ClientManager clientManager
     
     // Optional properties
@@ -99,7 +99,7 @@ Rectangle {
     Image {
         id: remoteCursor
         visible: root.hasVideo && frameProvider.hasCursor && mouseArea.containsMouse
-        source: frameProvider.hasCursor ? "image://cursor/" + root.connectionId + "/" + cursorVersion : ""
+        source: frameProvider.hasCursor ? "image://cursor/" + root.deviceId + "/" + cursorVersion : ""
         
         // Track cursor version for image refresh
         property int cursorVersion: 0
@@ -132,7 +132,7 @@ Rectangle {
             if (!root.clientManager) return;
             var remote = root.mapToRemote(mouse.x, mouse.y);
             if (remote) {
-                root.clientManager.sendMouseMove(root.connectionId, remote.x, remote.y);
+                root.clientManager.sendMouseMove(root.deviceId, remote.x, remote.y);
                 lastPosition = Qt.point(remote.x, remote.y);
             }
         }
@@ -143,7 +143,7 @@ Rectangle {
             var remote = root.mapToRemote(mouse.x, mouse.y);
             if (remote) {
                 var button = qtButtonToProtocol(mouse.button);
-                root.clientManager.sendMousePress(root.connectionId, remote.x, remote.y, button);
+                root.clientManager.sendMousePress(root.deviceId, remote.x, remote.y, button);
             }
         }
         
@@ -152,7 +152,7 @@ Rectangle {
             var remote = root.mapToRemote(mouse.x, mouse.y);
             if (remote) {
                 var button = qtButtonToProtocol(mouse.button);
-                root.clientManager.sendMouseRelease(root.connectionId, remote.x, remote.y, button);
+                root.clientManager.sendMouseRelease(root.deviceId, remote.x, remote.y, button);
             }
         }
         
@@ -161,7 +161,7 @@ Rectangle {
             var remote = root.mapToRemote(wheel.x, wheel.y);
             if (remote) {
                 root.clientManager.sendMouseWheel(
-                    root.connectionId, remote.x, remote.y,
+                    root.deviceId, remote.x, remote.y,
                     wheel.angleDelta.x, wheel.angleDelta.y);
             }
         }
@@ -244,14 +244,14 @@ Rectangle {
 
         // Intercept Ctrl+V: if clipboard contains files, upload them instead
         if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)) {
-            if (root.clientManager.pasteFilesFromClipboard(root.connectionId)) {
+            if (root.clientManager.pasteFilesFromClipboard(root.deviceId)) {
                 event.accepted = true
                 return
             }
         }
 
         root.clientManager.sendKeyPress(
-            root.connectionId, KeyboardStateTracker.getLastNativeKeycode(),
+            root.deviceId, KeyboardStateTracker.getLastNativeKeycode(),
             KeyboardStateTracker.getLockStates());
         event.accepted = true;
     }
@@ -260,7 +260,7 @@ Rectangle {
         if (!root.inputEnabled || !root.clientManager) return;
 
         root.clientManager.sendKeyRelease(
-            root.connectionId, KeyboardStateTracker.getLastNativeKeycode(),
+            root.deviceId, KeyboardStateTracker.getLastNativeKeycode(),
             KeyboardStateTracker.getLockStates());
         event.accepted = true;
     }
@@ -269,7 +269,7 @@ Rectangle {
     VideoFrameProvider {
         id: frameProvider
         videoSink: videoOutput.videoSink
-        connectionId: root.connectionId
+        deviceId: root.deviceId
         sharedMemoryManager: root.clientManager ? root.clientManager.sharedMemoryManager : null
         active: root.active && root.visible
     }
@@ -278,20 +278,20 @@ Rectangle {
     Connections {
         target: root.clientManager
         
-        function onVideoFrameReady(connId, frameIndex) {
-            if (connId === root.connectionId) {
+        function onVideoFrameReady(deviceId, frameIndex) {
+            if (deviceId === root.deviceId) {
                 frameProvider.onVideoFrameReady(frameIndex)
             }
         }
         
-        function onCursorShapeChanged(connId, width, height, hotspotX, hotspotY, data) {
-            if (connId === root.connectionId) {
+        function onCursorShapeChanged(deviceId, width, height, hotspotX, hotspotY, data) {
+            if (deviceId === root.deviceId) {
                 frameProvider.onCursorShapeChanged(width, height, hotspotX, hotspotY, data)
             }
         }
 
-        function onVideoLayoutChanged(connId, widthDips, heightDips) {
-            if (connId === root.connectionId) {
+        function onVideoLayoutChanged(deviceId, widthDips, heightDips) {
+            if (deviceId === root.deviceId) {
                 root.remoteDipWidth = widthDips
                 root.remoteDipHeight = heightDips
             }

@@ -14,7 +14,7 @@ namespace quickdesk {
 /**
  * @brief Image provider for remote cursor images
  * 
- * Provides cursor images to QML via the "image://cursor/connectionId/version" URL scheme.
+ * Provides cursor images to QML via the "image://cursor/deviceId/version" URL scheme.
  * The version is appended to force QML to reload the image when cursor changes.
  */
 class CursorImageProvider : public QQuickImageProvider {
@@ -25,12 +25,10 @@ public:
     QImage requestImage(const QString& id, QSize* size, 
                         const QSize& requestedSize) override;
 
-    // Set cursor image for a connection
-    void setCursor(const QString& connectionId, const QImage& image, 
+    void setCursor(const QString& deviceId, const QImage& image, 
                    const QPoint& hotspot);
     
-    // Clear cursor for a connection
-    void clearCursor(const QString& connectionId);
+    void clearCursor(const QString& deviceId);
     
     // Get singleton instance
     static CursorImageProvider* instance();

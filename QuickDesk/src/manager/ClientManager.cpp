@@ -41,20 +41,17 @@ void ClientManager::setMessaging(NativeMessaging* messaging)
         connect(m_messaging, &NativeMessaging::errorOccurred,
                 this, &ClientManager::onMessagingError);
     } else {
-        // Clear all state when messaging is disconnected (process stopped)
-        QStringList ids = m_connections.keys();
-        for (const auto& connId : ids) {
-            m_connections[connId].rtcState = RtcStatus::Disconnected;
-            emit connectionStateChanged(connId, "disconnected", QJsonObject());
-            m_sharedMemoryManager->detach(connId);
-            m_connections.remove(connId);
-            emit connectionRemoved(connId);
+        QStringList deviceIds = m_connections.keys();
+        for (const auto& devId : deviceIds) {
+            emit connectionStateChanged(devId, "disconnected", QJsonObject());
+            m_sharedMemoryManager->detach(devId);
+            emit connectionRemoved(devId);
         }
+        m_connections.clear();
+        m_connIdToDeviceId.clear();
+        m_activeDeviceId.clear();
 
-        m_activeConnectionId.clear();
-        // Note: Don't reset m_connectionCounter to avoid ID conflicts after restart
-
-        if (!ids.isEmpty()) {
+        if (!deviceIds.isEmpty()) {
             emit connectionCountChanged();
             emit activeConnectionChanged();
             emit connectionListChanged();
@@ -71,14 +68,27 @@ QString ClientManager::connectToHost(const QString& deviceId,
         return QString();
     }
 
+    // Reject duplicate connections to the same device
+    if (m_connections.contains(deviceId)) {
+        auto& existing = m_connections[deviceId];
+        if (existing.rtcState != RtcStatus::Disconnected &&
+            existing.rtcState != RtcStatus::Failed) {
+            LOG_INFO("Device {} already connected (connectionId={}), reusing",
+                     deviceId.toStdString(), existing.connectionId.toStdString());
+            return deviceId;
+        }
+        // Previous connection is dead — clean up and reconnect
+        removeConnection(deviceId);
+    }
+
     QString connectionId = generateConnectionId();
 
-    // Create connection info
     ConnectionInfo conn;
     conn.connectionId = connectionId;
     conn.deviceId = deviceId;
     conn.rtcState = RtcStatus::Connecting;
-    m_connections[connectionId] = conn;
+    m_connections[deviceId] = conn;
+    m_connIdToDeviceId[connectionId] = deviceId;
 
     QJsonObject message;
     message["type"] = "connectToHost";
@@ -87,7 +97,6 @@ QString ClientManager::connectToHost(const QString& deviceId,
     message["accessCode"] = accessCode;
     message["serverUrl"] = serverUrl;
     
-    // Always send the latest video codec preference from settings
     QString videoCodec = core::LocalConfigCenter::instance().preferredVideoCodec();
     if (!videoCodec.isEmpty()) {
         message["preferredVideoCodec"] = videoCodec;
@@ -107,47 +116,47 @@ QString ClientManager::connectToHost(const QString& deviceId,
     m_messaging->sendMessage(message);
 
     emit connectionCountChanged();
-    emit connectionAdded(connectionId);
+    emit connectionAdded(deviceId);
     emit connectionListChanged();
 
-    // Set as active if first connection
-    if (m_activeConnectionId.isEmpty()) {
-        setActiveConnectionId(connectionId);
+    if (m_activeDeviceId.isEmpty()) {
+        setActiveDeviceId(deviceId);
     }
 
-    return connectionId;
+    return deviceId;
 }
 
-void ClientManager::disconnectFromHost(const QString& connectionId)
+void ClientManager::disconnectFromHost(const QString& deviceId)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         return;
     }
 
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
+
     QJsonObject message;
     message["type"] = "disconnectFromHost";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     m_messaging->sendMessage(message);
 
-    if (m_connections.contains(connectionId)) {
-        m_connections[connectionId].rtcState = RtcStatus::Disconnected;
-        emit connectionStateChanged(connectionId, "disconnected", QJsonObject());
+    if (m_connections.contains(deviceId)) {
+        m_connections[deviceId].rtcState = RtcStatus::Disconnected;
+        emit connectionStateChanged(deviceId, "disconnected", QJsonObject());
     }
 
-    m_sharedMemoryManager->detach(connectionId);
-
-    m_connections.remove(connectionId);
+    m_sharedMemoryManager->detach(deviceId);
+    removeConnection(deviceId);
 
     emit connectionCountChanged();
-    emit connectionRemoved(connectionId);
+    emit connectionRemoved(deviceId);
     emit connectionListChanged();
 
-    // Update active connection if needed
-    if (m_activeConnectionId == connectionId) {
+    if (m_activeDeviceId == deviceId) {
         if (m_connections.isEmpty()) {
-            setActiveConnectionId(QString());
+            setActiveDeviceId(QString());
         } else {
-            setActiveConnectionId(m_connections.firstKey());
+            setActiveDeviceId(m_connections.firstKey());
         }
     }
 }
@@ -162,16 +171,16 @@ void ClientManager::disconnectAll()
     message["type"] = "disconnectAll";
     m_messaging->sendMessage(message);
 
-    QStringList ids = m_connections.keys();
-    for (const auto& connId : ids) {
-        m_connections[connId].rtcState = RtcStatus::Disconnected;
-        emit connectionStateChanged(connId, "disconnected", QJsonObject());
-        m_sharedMemoryManager->detach(connId);
-        m_connections.remove(connId);
-        emit connectionRemoved(connId);
+    QStringList deviceIds = m_connections.keys();
+    for (const auto& devId : deviceIds) {
+        m_connections[devId].rtcState = RtcStatus::Disconnected;
+        emit connectionStateChanged(devId, "disconnected", QJsonObject());
+        m_sharedMemoryManager->detach(devId);
+        emit connectionRemoved(devId);
     }
-
-    m_activeConnectionId.clear();
+    m_connections.clear();
+    m_connIdToDeviceId.clear();
+    m_activeDeviceId.clear();
 
     emit connectionCountChanged();
     emit activeConnectionChanged();
@@ -197,275 +206,291 @@ void ClientManager::sendHello(const QString& deviceId,
     m_messaging->sendMessage(message);
 }
 
-void ClientManager::sendMouseMove(const QString& connectionId, int x, int y)
+void ClientManager::sendMouseMove(const QString& deviceId, int x, int y)
 {
-    sendMouseEvent(connectionId, "move", x, y, 0, 0, 0);
+    sendMouseEvent(deviceId, "move", x, y, 0, 0, 0);
 }
 
-void ClientManager::sendMousePress(const QString& connectionId, int x, int y, int button)
+void ClientManager::sendMousePress(const QString& deviceId, int x, int y, int button)
 {
-    sendMouseEvent(connectionId, "press", x, y, button, 0, 0);
+    sendMouseEvent(deviceId, "press", x, y, button, 0, 0);
 }
 
-void ClientManager::sendMouseRelease(const QString& connectionId, int x, int y, int button)
+void ClientManager::sendMouseRelease(const QString& deviceId, int x, int y, int button)
 {
-    sendMouseEvent(connectionId, "release", x, y, button, 0, 0);
+    sendMouseEvent(deviceId, "release", x, y, button, 0, 0);
 }
 
-void ClientManager::sendMouseWheel(const QString& connectionId, int x, int y, int deltaX, int deltaY)
+void ClientManager::sendMouseWheel(const QString& deviceId, int x, int y, int deltaX, int deltaY)
 {
-    sendMouseEvent(connectionId, "wheel", x, y, 0, deltaX, deltaY);
+    sendMouseEvent(deviceId, "wheel", x, y, 0, deltaX, deltaY);
 }
 
-void ClientManager::sendKeyPress(const QString& connectionId, int nativeScanCode, int lockStates)
+void ClientManager::sendKeyPress(const QString& deviceId, int nativeScanCode, int lockStates)
 {
-    sendKeyboardEvent(connectionId, "press", nativeScanCode, lockStates);
+    sendKeyboardEvent(deviceId, "press", nativeScanCode, lockStates);
 }
 
-void ClientManager::sendKeyRelease(const QString& connectionId, int nativeScanCode, int lockStates)
+void ClientManager::sendKeyRelease(const QString& deviceId, int nativeScanCode, int lockStates)
 {
-    sendKeyboardEvent(connectionId, "release", nativeScanCode, lockStates);
+    sendKeyboardEvent(deviceId, "release", nativeScanCode, lockStates);
 }
 
-void ClientManager::syncClipboard(const QString& connectionId, const QString& text)
+void ClientManager::syncClipboard(const QString& deviceId, const QString& text)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         return;
     }
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
 
     QJsonObject message;
     message["type"] = "clipboardSync";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     message["text"] = text;
     m_messaging->sendMessage(message);
 }
 
-void ClientManager::sendAgentCommand(const QString& connectionId,
+void ClientManager::sendAgentCommand(const QString& deviceId,
                                      const QString& jsonData)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         return;
     }
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
 
     QJsonObject message;
     message["type"] = "agentBridgeSend";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     message["data"] = jsonData;
     m_messaging->sendMessage(message);
 }
 
-void ClientManager::setTargetFramerate(const QString& connectionId, int framerate)
+void ClientManager::setTargetFramerate(const QString& deviceId, int framerate)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         LOG_WARN("Cannot set framerate: messaging not ready");
         return;
     }
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
 
-    // Clamp to valid range
     framerate = qBound(1, framerate, 60);
-
-    LOG_INFO("Setting target framerate for {}: {} FPS", 
-             connectionId.toStdString(), framerate);
+    LOG_INFO("Setting target framerate for {}: {} FPS", deviceId.toStdString(), framerate);
 
     QJsonObject message;
     message["type"] = "setFramerate";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     message["framerate"] = framerate;
     m_messaging->sendMessage(message);
 }
 
-void ClientManager::setResolution(const QString& connectionId, int width, int height, int dpi)
+void ClientManager::setResolution(const QString& deviceId, int width, int height, int dpi)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         LOG_WARN("Cannot set resolution: messaging not ready");
         return;
     }
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
 
-    // Validate dimensions
     if (width <= 0 || height <= 0 || width > 8192 || height > 8192) {
         LOG_WARN("Invalid resolution: {}x{}", width, height);
         return;
     }
 
     LOG_INFO("Setting resolution for {}: {}x{} @ {} DPI", 
-             connectionId.toStdString(), width, height, dpi);
+             deviceId.toStdString(), width, height, dpi);
 
     QJsonObject message;
     message["type"] = "setResolution";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     message["width"] = width;
     message["height"] = height;
     message["dpi"] = dpi;
     m_messaging->sendMessage(message);
 }
 
-void ClientManager::setFramerateBoost(const QString& connectionId, bool enabled, 
+void ClientManager::setFramerateBoost(const QString& deviceId, bool enabled, 
                                       int captureIntervalMs, int boostDurationMs)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         LOG_WARN("Cannot set framerate boost: messaging not ready");
         return;
     }
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
 
-    // Clamp to valid ranges
     captureIntervalMs = qBound(10, captureIntervalMs, 1000);
     boostDurationMs = qBound(100, boostDurationMs, 1000);
 
     LOG_INFO("Setting framerate boost for {}: enabled={}, interval={}ms, duration={}ms", 
-             connectionId.toStdString(), enabled, captureIntervalMs, boostDurationMs);
+             deviceId.toStdString(), enabled, captureIntervalMs, boostDurationMs);
 
     QJsonObject message;
     message["type"] = "setFramerateBoost";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     message["enabled"] = enabled;
     message["captureIntervalMs"] = captureIntervalMs;
     message["boostDurationMs"] = boostDurationMs;
     m_messaging->sendMessage(message);
 }
 
-void ClientManager::setBitrate(const QString& connectionId, int minBitrateBps)
+void ClientManager::setBitrate(const QString& deviceId, int minBitrateBps)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         LOG_WARN("Cannot set bitrate: messaging not ready");
         return;
     }
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
 
-    // Validate bitrate (allow 0 to disable, or reasonable range)
     if (minBitrateBps < 0) {
         LOG_WARN("Invalid bitrate: {} (must be >= 0)", minBitrateBps);
         return;
     }
 
     LOG_INFO("Setting bitrate for {}: {} MiB ({} bps)", 
-             connectionId.toStdString(), 
+             deviceId.toStdString(), 
              minBitrateBps / 1024.0 / 1024.0, 
              minBitrateBps);
 
     QJsonObject message;
     message["type"] = "setBitrate";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     message["minBitrateBps"] = minBitrateBps;
     m_messaging->sendMessage(message);
 }
 
-void ClientManager::setAudioEnabled(const QString& connectionId, bool enabled)
+void ClientManager::setAudioEnabled(const QString& deviceId, bool enabled)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         LOG_WARN("Cannot set audio: messaging not ready");
         return;
     }
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
 
-    LOG_INFO("Setting audio enabled for {}: {}", 
-             connectionId.toStdString(), enabled);
+    LOG_INFO("Setting audio enabled for {}: {}", deviceId.toStdString(), enabled);
 
     QJsonObject message;
     message["type"] = "setAudioEnabled";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     message["enabled"] = enabled;
     m_messaging->sendMessage(message);
 }
 
-void ClientManager::sendAction(const QString& connectionId, const QString& action)
+void ClientManager::sendAction(const QString& deviceId, const QString& action)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         LOG_WARN("Cannot send action: messaging not ready");
         return;
     }
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
 
-    LOG_INFO("Sending action '{}' for {}", action.toStdString(),
-             connectionId.toStdString());
+    LOG_INFO("Sending action '{}' for {}", action.toStdString(), deviceId.toStdString());
 
     QJsonObject message;
     message["type"] = "sendAction";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     message["action"] = action;
     m_messaging->sendMessage(message);
 }
 
-bool ClientManager::supportsSendAttentionSequence(const QString& connectionId) const
+bool ClientManager::supportsSendAttentionSequence(const QString& deviceId) const
 {
-    auto it = m_connections.find(connectionId);
+    auto it = m_connections.find(deviceId);
     if (it == m_connections.end())
         return false;
     return it.value().supportsSendAttentionSequence;
 }
 
-bool ClientManager::supportsLockWorkstation(const QString& connectionId) const
+bool ClientManager::supportsLockWorkstation(const QString& deviceId) const
 {
-    auto it = m_connections.find(connectionId);
+    auto it = m_connections.find(deviceId);
     if (it == m_connections.end())
         return false;
     return it.value().supportsLockWorkstation;
 }
 
-void ClientManager::startFileUpload(const QString& connectionId, const QUrl& fileUrl)
+void ClientManager::startFileUpload(const QString& deviceId, const QUrl& fileUrl)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         LOG_WARN("Cannot start file upload: messaging not ready");
         return;
     }
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
 
     QString filePath = fileUrl.toLocalFile();
-    LOG_INFO("Starting file upload for {}: {}", connectionId.toStdString(),
+    LOG_INFO("Starting file upload for {}: {}", deviceId.toStdString(),
              filePath.toStdString());
 
     QJsonObject message;
     message["type"] = "startFileUpload";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     message["filePath"] = filePath;
     m_messaging->sendMessage(message);
 }
 
-void ClientManager::cancelFileUpload(const QString& connectionId,
+void ClientManager::cancelFileUpload(const QString& deviceId,
                                      const QString& transferId)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         LOG_WARN("Cannot cancel file upload: messaging not ready");
         return;
     }
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
 
-    LOG_INFO("Cancelling file upload: transfer={} connection={}",
-             transferId.toStdString(), connectionId.toStdString());
+    LOG_INFO("Cancelling file upload: transfer={} device={}",
+             transferId.toStdString(), deviceId.toStdString());
 
     QJsonObject message;
     message["type"] = "cancelFileUpload";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     message["transferId"] = transferId;
     m_messaging->sendMessage(message);
 }
 
-void ClientManager::startFileDownload(const QString& connectionId)
+void ClientManager::startFileDownload(const QString& deviceId)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         LOG_WARN("Cannot start file download: messaging not ready");
         return;
     }
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
 
     QString saveDir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
     LOG_INFO("Starting file download for {}, saveDir={}",
-             connectionId.toStdString(), saveDir.toStdString());
+             deviceId.toStdString(), saveDir.toStdString());
 
     QJsonObject message;
     message["type"] = "startFileDownload";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     message["saveDir"] = saveDir;
     m_messaging->sendMessage(message);
 }
 
-void ClientManager::cancelFileDownload(const QString& connectionId,
+void ClientManager::cancelFileDownload(const QString& deviceId,
                                        const QString& transferId)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         LOG_WARN("Cannot cancel file download: messaging not ready");
         return;
     }
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
 
-    LOG_INFO("Cancelling file download: transfer={} connection={}",
-             transferId.toStdString(), connectionId.toStdString());
+    LOG_INFO("Cancelling file download: transfer={} device={}",
+             transferId.toStdString(), deviceId.toStdString());
 
     QJsonObject message;
     message["type"] = "cancelFileDownload";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     message["transferId"] = transferId;
     m_messaging->sendMessage(message);
 }
@@ -486,7 +511,7 @@ bool ClientManager::deleteDownloadedFile(const QString& filePath)
     return QFile::remove(filePath);
 }
 
-bool ClientManager::pasteFilesFromClipboard(const QString& connectionId)
+bool ClientManager::pasteFilesFromClipboard(const QString& deviceId)
 {
     const QMimeData* mimeData = QGuiApplication::clipboard()->mimeData();
     if (!mimeData || !mimeData->hasUrls()) {
@@ -499,7 +524,7 @@ bool ClientManager::pasteFilesFromClipboard(const QString& connectionId)
         if (url.isLocalFile()) {
             QFileInfo fi(url.toLocalFile());
             if (fi.exists() && fi.isFile()) {
-                startFileUpload(connectionId, url);
+                startFileUpload(deviceId, url);
                 anyStarted = true;
             }
         }
@@ -507,9 +532,9 @@ bool ClientManager::pasteFilesFromClipboard(const QString& connectionId)
     return anyStarted;
 }
 
-bool ClientManager::supportsFileTransfer(const QString& connectionId) const
+bool ClientManager::supportsFileTransfer(const QString& deviceId) const
 {
-    auto it = m_connections.find(connectionId);
+    auto it = m_connections.find(deviceId);
     if (it == m_connections.end())
         return false;
     return it.value().supportsFileTransfer;
@@ -520,15 +545,15 @@ int ClientManager::connectionCount() const
     return m_connections.size();
 }
 
-QString ClientManager::activeConnectionId() const
+QString ClientManager::activeDeviceId() const
 {
-    return m_activeConnectionId;
+    return m_activeDeviceId;
 }
 
-void ClientManager::setActiveConnectionId(const QString& id)
+void ClientManager::setActiveDeviceId(const QString& deviceId)
 {
-    if (m_activeConnectionId != id) {
-        m_activeConnectionId = id;
+    if (m_activeDeviceId != deviceId) {
+        m_activeDeviceId = deviceId;
         emit activeConnectionChanged();
     }
 }
@@ -538,63 +563,57 @@ QList<ConnectionInfo> ClientManager::connections() const
     return m_connections.values();
 }
 
-ConnectionInfo ClientManager::getConnection(const QString& connectionId) const
+ConnectionInfo ClientManager::getConnection(const QString& deviceId) const
 {
-    return m_connections.value(connectionId);
+    return m_connections.value(deviceId);
 }
 
-QStringList ClientManager::connectionIds() const
+QStringList ClientManager::connectedDeviceIds() const
 {
     return m_connections.keys();
 }
 
-RtcStatus::Status ClientManager::getConnectionRtcState(const QString& connectionId) const
+RtcStatus::Status ClientManager::getConnectionRtcState(const QString& deviceId) const
 {
-    if (m_connections.contains(connectionId)) {
-        return m_connections[connectionId].rtcState;
+    if (m_connections.contains(deviceId)) {
+        return m_connections[deviceId].rtcState;
     }
     return RtcStatus::Disconnected;
 }
 
-QString ClientManager::getSignalingState(const QString& connectionId) const
+QString ClientManager::getSignalingState(const QString& deviceId) const
 {
-    if (m_connections.contains(connectionId)) {
-        return m_connections[connectionId].signalingState;
+    if (m_connections.contains(deviceId)) {
+        return m_connections[deviceId].signalingState;
     }
     return "disconnected";
 }
 
-int ClientManager::getSignalingRetryCount(const QString& connectionId) const
+int ClientManager::getSignalingRetryCount(const QString& deviceId) const
 {
-    if (m_connections.contains(connectionId)) {
-        return m_connections[connectionId].signalingRetryCount;
+    if (m_connections.contains(deviceId)) {
+        return m_connections[deviceId].signalingRetryCount;
     }
     return 0;
 }
 
-int ClientManager::getSignalingNextRetryIn(const QString& connectionId) const
+int ClientManager::getSignalingNextRetryIn(const QString& deviceId) const
 {
-    if (m_connections.contains(connectionId)) {
-        return m_connections[connectionId].signalingNextRetryIn;
+    if (m_connections.contains(deviceId)) {
+        return m_connections[deviceId].signalingNextRetryIn;
     }
     return 0;
 }
 
-QString ClientManager::getSignalingError(const QString& connectionId) const
+QString ClientManager::getSignalingError(const QString& deviceId) const
 {
-    if (m_connections.contains(connectionId)) {
-        return m_connections[connectionId].signalingError;
+    if (m_connections.contains(deviceId)) {
+        return m_connections[deviceId].signalingError;
     }
     return QString();
 }
 
-QString ClientManager::getConnectionDeviceId(const QString& connectionId) const
-{
-    if (m_connections.contains(connectionId)) {
-        return m_connections[connectionId].deviceId;
-    }
-    return QString();
-}
+// --- Message handling (internal connectionId → external deviceId) ---
 
 void ClientManager::onMessageReceived(const QJsonObject& message)
 {
@@ -659,7 +678,6 @@ void ClientManager::onMessageReceived(const QJsonObject& message)
     } else if (type == "agentBridgeResponse") {
         handleAgentBridgeResponse(message);
     } else if (type == "setFramerateResponse" || type == "setResolutionResponse" || type == "setFramerateBoostResponse" || type == "setBitrateResponse") {
-        // Acknowledgement responses - just log success/failure
         bool success = message["success"].toBool();
         if (!success) {
             QString error = message["error"].toString();
@@ -675,10 +693,36 @@ void ClientManager::onMessagingError(const QString& error)
     emit errorOccurred("", "MESSAGING_ERROR", error);
 }
 
+// --- Private helpers ---
+
+QString ClientManager::connectionIdFor(const QString& deviceId) const
+{
+    auto it = m_connections.find(deviceId);
+    if (it != m_connections.end())
+        return it->connectionId;
+    return {};
+}
+
+QString ClientManager::findDeviceId(const QString& connectionId) const
+{
+    return m_connIdToDeviceId.value(connectionId);
+}
+
 QString ClientManager::generateConnectionId()
 {
     return QString("conn_%1").arg(++m_connectionCounter);
 }
+
+void ClientManager::removeConnection(const QString& deviceId)
+{
+    auto it = m_connections.find(deviceId);
+    if (it != m_connections.end()) {
+        m_connIdToDeviceId.remove(it->connectionId);
+        m_connections.erase(it);
+    }
+}
+
+// --- Message handlers ---
 
 void ClientManager::handleHelloResponse(const QJsonObject& message)
 {
@@ -689,93 +733,86 @@ void ClientManager::handleHelloResponse(const QJsonObject& message)
 
 void ClientManager::handleSignalingStateChanged(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) {
+        LOG_WARN("Signaling state changed for unknown connection: {}", connId.toStdString());
+        return;
+    }
+
     QString state = message["state"].toString();
     int retryCount = message["retryCount"].toInt();
     int nextRetryIn = message["nextRetryIn"].toInt();
     QString error = message["error"].toString();
 
-    LOG_INFO("Client signaling state changed: connection={}, state={}, retry={}, next={}s, error={}",
-             connectionId.toStdString(), state.toStdString(), retryCount, nextRetryIn, error.toStdString());
+    LOG_INFO("Client signaling state changed: device={}, state={}, retry={}, next={}s, error={}",
+             deviceId.toStdString(), state.toStdString(), retryCount, nextRetryIn, error.toStdString());
 
-    // Update signaling state for this specific connection
-    if (m_connections.contains(connectionId)) {
-        m_connections[connectionId].signalingState = state;
-        m_connections[connectionId].signalingRetryCount = retryCount;
-        m_connections[connectionId].signalingNextRetryIn = nextRetryIn;
-        m_connections[connectionId].signalingError = error;
-        
-        // Emit signal with connection ID
-        emit signalingStateChanged(connectionId, state, retryCount, nextRetryIn, error);
-    } else {
-        LOG_WARN("Signaling state changed for unknown connection: {}", connectionId.toStdString());
-    }
+    m_connections[deviceId].signalingState = state;
+    m_connections[deviceId].signalingRetryCount = retryCount;
+    m_connections[deviceId].signalingNextRetryIn = nextRetryIn;
+    m_connections[deviceId].signalingError = error;
+    
+    emit signalingStateChanged(deviceId, state, retryCount, nextRetryIn, error);
 }
 
 void ClientManager::handleConnectToHostResponse(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
-
-    if (connectionId.isEmpty()) {
+    QString connId = message["connectionId"].toString();
+    if (connId.isEmpty()) {
         LOG_WARN("connectToHostResponse missing connectionId");
         return;
     }
 
-    if (!m_connections.contains(connectionId)) {
-        ConnectionInfo conn;
-        conn.connectionId = connectionId;
-        conn.rtcState = RtcStatus::Connecting;
-        m_connections[connectionId] = conn;
-
-        emit connectionCountChanged();
-        emit connectionAdded(connectionId);
-        emit connectionListChanged();
-
-        if (m_activeConnectionId.isEmpty()) {
-            setActiveConnectionId(connectionId);
-        }
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) {
+        // Unexpected response — we don't know which device this belongs to
+        LOG_WARN("connectToHostResponse for unknown connectionId: {}", connId.toStdString());
+        return;
     }
+    // Connection already tracked from connectToHost()
 }
 
 void ClientManager::handleConnectionStateChanged(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     QString stateStr = message["state"].toString();
     QJsonObject hostInfo = message["hostInfo"].toObject();
 
-    if (m_connections.contains(connectionId)) {
-        // Convert string to enum
-        if (stateStr == "connecting") {
-            m_connections[connectionId].rtcState = RtcStatus::Connecting;
-        } else if (stateStr == "connected") {
-            m_connections[connectionId].rtcState = RtcStatus::Connected;
-        } else if (stateStr == "disconnected") {
-            m_connections[connectionId].rtcState = RtcStatus::Disconnected;
-        } else if (stateStr == "failed") {
-            m_connections[connectionId].rtcState = RtcStatus::Failed;
-        }
-        
-        if (hostInfo.contains("resolution")) {
-            QString resolution = hostInfo["resolution"].toString();
-            QStringList parts = resolution.split('x');
-            if (parts.size() == 2) {
-                m_connections[connectionId].width = parts[0].toInt();
-                m_connections[connectionId].height = parts[1].toInt();
-            }
-        }
-        if (hostInfo.contains("deviceName")) {
-            m_connections[connectionId].deviceName = hostInfo["deviceName"].toString();
+    if (stateStr == "connecting") {
+        m_connections[deviceId].rtcState = RtcStatus::Connecting;
+    } else if (stateStr == "connected") {
+        m_connections[deviceId].rtcState = RtcStatus::Connected;
+    } else if (stateStr == "disconnected") {
+        m_connections[deviceId].rtcState = RtcStatus::Disconnected;
+    } else if (stateStr == "failed") {
+        m_connections[deviceId].rtcState = RtcStatus::Failed;
+    }
+    
+    if (hostInfo.contains("resolution")) {
+        QString resolution = hostInfo["resolution"].toString();
+        QStringList parts = resolution.split('x');
+        if (parts.size() == 2) {
+            m_connections[deviceId].width = parts[0].toInt();
+            m_connections[deviceId].height = parts[1].toInt();
         }
     }
+    if (hostInfo.contains("deviceName")) {
+        m_connections[deviceId].deviceName = hostInfo["deviceName"].toString();
+    }
 
-    LOG_INFO("Connection {} RTC state changed to: {}", connectionId.toStdString(), stateStr.toStdString());
-    emit connectionStateChanged(connectionId, stateStr, hostInfo);
+    LOG_INFO("Connection {} (device {}) RTC state changed to: {}", connId.toStdString(), deviceId.toStdString(), stateStr.toStdString());
+    emit connectionStateChanged(deviceId, stateStr, hostInfo);
     emit connectionListChanged();
 }
 
 void ClientManager::handleConnectionListChanged(const QJsonObject& message)
 {
     m_connections.clear();
+    m_connIdToDeviceId.clear();
     
     QJsonArray connections = message["connections"].toArray();
     for (const QJsonValue& value : connections) {
@@ -786,7 +823,6 @@ void ClientManager::handleConnectionListChanged(const QJsonObject& message)
         conn.deviceName = obj["deviceName"].toString();
         conn.connectedAt = obj["connectedAt"].toString();
         
-        // Convert string state to enum
         QString stateStr = obj["state"].toString();
         if (stateStr == "connecting") {
             conn.rtcState = RtcStatus::Connecting;
@@ -800,7 +836,8 @@ void ClientManager::handleConnectionListChanged(const QJsonObject& message)
             conn.rtcState = RtcStatus::Disconnected;
         }
         
-        m_connections[conn.connectionId] = conn;
+        m_connections[conn.deviceId] = conn;
+        m_connIdToDeviceId[conn.connectionId] = conn.deviceId;
     }
 
     emit connectionCountChanged();
@@ -809,141 +846,146 @@ void ClientManager::handleConnectionListChanged(const QJsonObject& message)
 
 void ClientManager::handleVideoFrameReady(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     int frameIndex = message["frameIndex"].toInt();
     int width = message["width"].toInt();
     int height = message["height"].toInt();
     QString sharedMemoryName = message["sharedMemoryName"].toString();
     
-    // Attach to shared memory if not already attached
-    if (!m_sharedMemoryManager->isAttached(connectionId)) {
-        if (!m_sharedMemoryManager->attach(connectionId, sharedMemoryName)) {
-            LOG_WARN("Failed to attach to shared memory for connection {}", 
-                     connectionId.toStdString());
+    if (!m_sharedMemoryManager->isAttached(deviceId)) {
+        if (!m_sharedMemoryManager->attach(deviceId, sharedMemoryName)) {
+            LOG_WARN("Failed to attach to shared memory for device {}", 
+                     deviceId.toStdString());
             return;
         }
         LOG_INFO("Attached to shared memory: {} ({}x{})", 
                  sharedMemoryName.toStdString(), width, height);
     }
     
-    // Update connection info with resolution
-    if (m_connections.contains(connectionId)) {
-        m_connections[connectionId].width = width;
-        m_connections[connectionId].height = height;
+    if (m_connections.contains(deviceId)) {
+        m_connections[deviceId].width = width;
+        m_connections[deviceId].height = height;
     }
     
-    emit videoFrameReady(connectionId, frameIndex);
+    emit videoFrameReady(deviceId, frameIndex);
 }
 
 void ClientManager::handleClipboardReceived(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     QString text = message["text"].toString();
-    
-    emit clipboardReceived(connectionId, text);
+    emit clipboardReceived(deviceId, text);
 }
 
 void ClientManager::handleError(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
     QString code = message["code"].toString();
     QString errorMsg = message["message"].toString();
     
-    LOG_WARN("Client error: {} {} {}", connectionId.toStdString(), code.toStdString(), errorMsg.toStdString());
-    emit errorOccurred(connectionId, code, errorMsg);
+    LOG_WARN("Client error: device={} {} {}", deviceId.toStdString(), code.toStdString(), errorMsg.toStdString());
+    emit errorOccurred(deviceId, code, errorMsg);
 }
 
 void ClientManager::handleConnectionFailed(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     QString errorCode = message["errorCode"].toString();
     QString errorMsg = message["message"].toString();
     
-    qWarning() << "Connection failed:" << connectionId 
+    qWarning() << "Connection failed: device" << deviceId
                << "error:" << errorCode << "-" << errorMsg;
     
-    // Update connection state
-    if (m_connections.contains(connectionId)) {
-        m_connections[connectionId].rtcState = RtcStatus::Failed;
-        emit connectionStateChanged(connectionId, "failed", QJsonObject());
+    if (m_connections.contains(deviceId)) {
+        m_connections[deviceId].rtcState = RtcStatus::Failed;
+        emit connectionStateChanged(deviceId, "failed", QJsonObject());
     }
     
-    // Emit error with specific error code
-    emit errorOccurred(connectionId, errorCode, errorMsg);
+    emit errorOccurred(deviceId, errorCode, errorMsg);
     
-    // Remove failed connection from list
-    m_connections.remove(connectionId);
+    removeConnection(deviceId);
     emit connectionCountChanged();
-    emit connectionRemoved(connectionId);
+    emit connectionRemoved(deviceId);
     emit connectionListChanged();
     
-    // Update active connection if needed
-    if (m_activeConnectionId == connectionId) {
+    if (m_activeDeviceId == deviceId) {
         if (m_connections.isEmpty()) {
-            setActiveConnectionId(QString());
+            setActiveDeviceId(QString());
         } else {
-            setActiveConnectionId(m_connections.firstKey());
+            setActiveDeviceId(m_connections.firstKey());
         }
     }
 }
 
 void ClientManager::handleHostConnected(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
+    LOG_INFO("Host connected: device={}", deviceId.toStdString());
     
-    LOG_INFO("Host connected: {}", connectionId.toStdString());
-    
-    if (m_connections.contains(connectionId)) {
-        m_connections[connectionId].rtcState = RtcStatus::Connected;
-        emit connectionStateChanged(connectionId, "connected", QJsonObject());
+    if (m_connections.contains(deviceId)) {
+        m_connections[deviceId].rtcState = RtcStatus::Connected;
+        emit connectionStateChanged(deviceId, "connected", QJsonObject());
     }
     emit connectionListChanged();
 }
 
 void ClientManager::handleHostDisconnected(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
+    LOG_INFO("Host disconnected: device={}", deviceId.toStdString());
     
-    LOG_INFO("Host disconnected: {}", connectionId.toStdString());
-    
-    if (m_connections.contains(connectionId)) {
-        m_connections[connectionId].rtcState = RtcStatus::Disconnected;
-        emit connectionStateChanged(connectionId, "disconnected", QJsonObject());
+    if (m_connections.contains(deviceId)) {
+        m_connections[deviceId].rtcState = RtcStatus::Disconnected;
+        emit connectionStateChanged(deviceId, "disconnected", QJsonObject());
     }
     
-    // Detach from shared memory
-    m_sharedMemoryManager->detach(connectionId);
+    m_sharedMemoryManager->detach(deviceId);
     
-    // Remove disconnected connection
-    m_connections.remove(connectionId);
+    removeConnection(deviceId);
     emit connectionCountChanged();
-    emit connectionRemoved(connectionId);
+    emit connectionRemoved(deviceId);
     emit connectionListChanged();
     
-    // Update active connection if needed
-    if (m_activeConnectionId == connectionId) {
+    if (m_activeDeviceId == deviceId) {
         if (m_connections.isEmpty()) {
-            setActiveConnectionId(QString());
+            setActiveDeviceId(QString());
         } else {
-            setActiveConnectionId(m_connections.firstKey());
+            setActiveDeviceId(m_connections.firstKey());
         }
     }
 }
 
 void ClientManager::handleHostConnectionFailed(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     int errorCode = message["errorCode"].toInt();
     
-    LOG_WARN("Host connection failed: {} error code: {}", connectionId.toStdString(), errorCode);
+    LOG_WARN("Host connection failed: device={} error code: {}", deviceId.toStdString(), errorCode);
     
-    // Update connection state
-    if (m_connections.contains(connectionId)) {
-        m_connections[connectionId].rtcState = RtcStatus::Failed;
-        emit connectionStateChanged(connectionId, "failed", QJsonObject());
+    if (m_connections.contains(deviceId)) {
+        m_connections[deviceId].rtcState = RtcStatus::Failed;
+        emit connectionStateChanged(deviceId, "failed", QJsonObject());
     }
     
-    // Map protocol::ErrorCode to user-friendly message
     QString errorMsg;
     switch (errorCode) {
         case 1: errorMsg = tr("Authentication failed"); break;
@@ -953,29 +995,27 @@ void ClientManager::handleHostConnectionFailed(const QJsonObject& message)
         default: errorMsg = tr("Connection failed (error code: %1)").arg(errorCode); break;
     }
     
-    emit errorOccurred(connectionId, "CONNECTION_FAILED", errorMsg);
+    emit errorOccurred(deviceId, "CONNECTION_FAILED", errorMsg);
     
-    // Remove failed connection
-    m_connections.remove(connectionId);
+    removeConnection(deviceId);
     emit connectionCountChanged();
-    emit connectionRemoved(connectionId);
+    emit connectionRemoved(deviceId);
     emit connectionListChanged();
     
-    // Update active connection if needed
-    if (m_activeConnectionId == connectionId) {
+    if (m_activeDeviceId == deviceId) {
         if (m_connections.isEmpty()) {
-            setActiveConnectionId(QString());
+            setActiveDeviceId(QString());
         } else {
-            setActiveConnectionId(m_connections.firstKey());
+            setActiveDeviceId(m_connections.firstKey());
         }
     }
 }
 
 void ClientManager::handleDisconnectFromHostResponse(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
-    if (!connectionId.isEmpty()) {
-        LOG_INFO("Disconnect response received for connection: {}", connectionId.toStdString());
+    QString connId = message["connectionId"].toString();
+    if (!connId.isEmpty()) {
+        LOG_INFO("Disconnect response received for connection: {}", connId.toStdString());
     }
 }
 
@@ -987,28 +1027,28 @@ void ClientManager::handleDisconnectAllResponse(const QJsonObject& message)
 
 void ClientManager::handleCursorShapeChanged(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     int width = message["width"].toInt();
     int height = message["height"].toInt();
     int hotspotX = message["hotspotX"].toInt();
     int hotspotY = message["hotspotY"].toInt();
     QString base64Data = message["data"].toString();
     
-    // Decode base64 data
     QByteArray data = QByteArray::fromBase64(base64Data.toLatin1());
     
-    // LOG_DEBUG("Cursor shape changed for connection {}: {}x{} hotspot({}, {}) data size: {}",
-    //           connectionId.toStdString(), width, height, hotspotX, hotspotY, data.size());
-    
-    emit cursorShapeChanged(connectionId, width, height, hotspotX, hotspotY, data);
+    emit cursorShapeChanged(deviceId, width, height, hotspotX, hotspotY, data);
 }
 
 void ClientManager::handlePerformanceStatsUpdate(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
-    
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     QVariantMap stats;
-    // Timing breakdown (ms)
     stats["captureMs"]      = message["captureMs"].toDouble();
     stats["encodeMs"]       = message["encodeMs"].toDouble();
     stats["networkDelayMs"] = message["networkDelayMs"].toDouble();
@@ -1016,34 +1056,37 @@ void ClientManager::handlePerformanceStatsUpdate(const QJsonObject& message)
     stats["paintMs"]        = message["paintMs"].toDouble();
     stats["totalLatencyMs"] = message["totalLatencyMs"].toDouble();
     stats["inputRoundtripMs"] = message["inputRoundtripMs"].toDouble();
-    // Throughput
     stats["bandwidthKbps"]  = message["bandwidthKbps"].toDouble();
     stats["frameRate"]      = message["frameRate"].toDouble();
     stats["packetRate"]     = message["packetRate"].toDouble();
-    // Codec info
     stats["codec"]              = message["codec"].toString("Unknown");
     stats["frameQuality"]       = message["frameQuality"].toInt(-1);
     stats["encodedRectWidth"]   = message["encodedRectWidth"].toInt();
     stats["encodedRectHeight"]  = message["encodedRectHeight"].toInt();
     
-    emit performanceStatsUpdated(connectionId, stats);
+    emit performanceStatsUpdated(deviceId, stats);
 }
 
 void ClientManager::handleVideoLayoutChanged(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     int widthDips = message["widthDips"].toInt();
     int heightDips = message["heightDips"].toInt();
 
-    LOG_DEBUG("VideoLayout changed: connection={}, dips={}x{}",
-              connectionId.toStdString(), widthDips, heightDips);
+    LOG_DEBUG("VideoLayout changed: device={}, dips={}x{}",
+              deviceId.toStdString(), widthDips, heightDips);
 
-    emit videoLayoutChanged(connectionId, widthDips, heightDips);
+    emit videoLayoutChanged(deviceId, widthDips, heightDips);
 }
 
 void ClientManager::handleRouteChanged(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
 
     QVariantMap routeInfo;
     routeInfo["routeType"] = message["routeType"].toString();
@@ -1079,26 +1122,28 @@ void ClientManager::handleRouteChanged(const QJsonObject& message)
     }
     routeInfo["remoteCandidates"] = remoteCandidates;
 
-    LOG_INFO("Route changed: connection={}, type={}, local={}, remote={}",
-             connectionId.toStdString(),
+    LOG_INFO("Route changed: device={}, type={}, local={}, remote={}",
+             deviceId.toStdString(),
              routeInfo["routeType"].toString().toStdString(),
              routeInfo["localCandidateType"].toString().toStdString(),
              routeInfo["remoteCandidateType"].toString().toStdString());
 
-    emit routeChanged(connectionId, routeInfo);
+    emit routeChanged(deviceId, routeInfo);
 }
 
-void ClientManager::sendMouseEvent(const QString& connectionId, const QString& eventType,
+void ClientManager::sendMouseEvent(const QString& deviceId, const QString& eventType,
                                    int x, int y, int button,
                                    int wheelDeltaX, int wheelDeltaY)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         return;
     }
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
 
     QJsonObject message;
     message["type"] = "mouseEvent";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     message["eventType"] = eventType;
     message["x"] = x;
     message["y"] = y;
@@ -1108,55 +1153,53 @@ void ClientManager::sendMouseEvent(const QString& connectionId, const QString& e
     m_messaging->sendMessage(message);
 }
 
-void ClientManager::sendKeyboardEvent(const QString& connectionId, const QString& eventType,
+void ClientManager::sendKeyboardEvent(const QString& deviceId, const QString& eventType,
                                       int nativeScanCode, int lockStates)
 {
     if (!m_messaging || !m_messaging->isReady()) {
         return;
     }
+    QString connId = connectionIdFor(deviceId);
+    if (connId.isEmpty()) return;
 
     QJsonObject message;
     message["type"] = "keyboardEvent";
-    message["connectionId"] = connectionId;
+    message["connectionId"] = connId;
     message["eventType"] = eventType;
     message["nativeScanCode"] = nativeScanCode;
     message["lockStates"] = lockStates;
     m_messaging->sendMessage(message);
 }
 
-bool ClientManager::saveFrameToFile(const QString& connectionId, 
+bool ClientManager::saveFrameToFile(const QString& deviceId, 
                                      const QString& filePath)
 {
-    if (!m_sharedMemoryManager->isAttached(connectionId)) {
+    if (!m_sharedMemoryManager->isAttached(deviceId)) {
         LOG_WARN("Cannot save frame: not attached to shared memory for {}", 
-                 connectionId.toStdString());
+                 deviceId.toStdString());
         return false;
     }
     
-    // Read YUV frame and convert to QImage for saving
-    QVideoFrame videoFrame = m_sharedMemoryManager->readVideoFrame(connectionId);
+    QVideoFrame videoFrame = m_sharedMemoryManager->readVideoFrame(deviceId);
     if (!videoFrame.isValid()) {
         LOG_WARN("Cannot save frame: failed to read video frame for {}", 
-                 connectionId.toStdString());
+                 deviceId.toStdString());
         return false;
     }
     
-    // Convert YUV frame to QImage
     QImage frame = videoFrame.toImage();
     if (frame.isNull()) {
         LOG_WARN("Cannot save frame: failed to convert video frame to image for {}", 
-                 connectionId.toStdString());
+                 deviceId.toStdString());
         return false;
     }
     
-    // Ensure directory exists
     QFileInfo fileInfo(filePath);
     QDir dir = fileInfo.dir();
     if (!dir.exists()) {
         dir.mkpath(".");
     }
     
-    // Save to file
     bool success = frame.save(filePath);
     if (success) {
         LOG_INFO("Saved frame to: {} ({}x{})", 
@@ -1182,12 +1225,15 @@ QJsonObject ClientManager::getIceConfig() const
 
 void ClientManager::handleHostCapabilities(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     bool supportsSAS = message["supportsSendAttentionSequence"].toBool();
     bool supportsLock = message["supportsLockWorkstation"].toBool();
     bool supportsFile = message["supportsFileTransfer"].toBool();
 
-    auto it = m_connections.find(connectionId);
+    auto it = m_connections.find(deviceId);
     if (it != m_connections.end()) {
         it->supportsSendAttentionSequence = supportsSAS;
         it->supportsLockWorkstation = supportsLock;
@@ -1195,50 +1241,61 @@ void ClientManager::handleHostCapabilities(const QJsonObject& message)
     }
 
     LOG_INFO("Host capabilities for {}: SAS={} Lock={} FileTransfer={}",
-             connectionId.toStdString(), supportsSAS, supportsLock, supportsFile);
+             deviceId.toStdString(), supportsSAS, supportsLock, supportsFile);
 
-    emit hostCapabilitiesChanged(connectionId, supportsSAS, supportsLock, supportsFile);
+    emit hostCapabilitiesChanged(deviceId, supportsSAS, supportsLock, supportsFile);
 }
 
 void ClientManager::handleFileTransferProgress(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     QString transferId = message["transferId"].toString();
     QString filename = message["filename"].toString();
     double bytesSent = message["bytesSent"].toDouble();
     double totalBytes = message["totalBytes"].toDouble();
 
-    emit fileTransferProgress(connectionId, transferId, filename,
-                              bytesSent, totalBytes);
+    emit fileTransferProgress(deviceId, transferId, filename, bytesSent, totalBytes);
 }
 
 void ClientManager::handleFileTransferComplete(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     QString transferId = message["transferId"].toString();
     QString filename = message["filename"].toString();
 
     LOG_INFO("File transfer complete: {} (transfer={})",
              filename.toStdString(), transferId.toStdString());
 
-    emit fileTransferComplete(connectionId, transferId, filename);
+    emit fileTransferComplete(deviceId, transferId, filename);
 }
 
 void ClientManager::handleFileTransferError(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     QString transferId = message["transferId"].toString();
     QString errorMessage = message["errorMessage"].toString();
 
     LOG_ERROR("File transfer error: {} (transfer={})",
               errorMessage.toStdString(), transferId.toStdString());
 
-    emit fileTransferError(connectionId, transferId, errorMessage);
+    emit fileTransferError(deviceId, transferId, errorMessage);
 }
 
 void ClientManager::handleFileDownloadStarted(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     QString transferId = message["transferId"].toString();
     QString filename = message["filename"].toString();
     double totalBytes = message["totalBytes"].toDouble();
@@ -1247,24 +1304,29 @@ void ClientManager::handleFileDownloadStarted(const QJsonObject& message)
              filename.toStdString(), static_cast<uint64_t>(totalBytes),
              transferId.toStdString());
 
-    emit fileDownloadStarted(connectionId, transferId, filename, totalBytes);
+    emit fileDownloadStarted(deviceId, transferId, filename, totalBytes);
 }
 
 void ClientManager::handleFileDownloadProgress(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     QString transferId = message["transferId"].toString();
     QString filename = message["filename"].toString();
     double bytesReceived = message["bytesReceived"].toDouble();
     double totalBytes = message["totalBytes"].toDouble();
 
-    emit fileDownloadProgress(connectionId, transferId, filename,
-                              bytesReceived, totalBytes);
+    emit fileDownloadProgress(deviceId, transferId, filename, bytesReceived, totalBytes);
 }
 
 void ClientManager::handleFileDownloadComplete(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     QString transferId = message["transferId"].toString();
     QString filename = message["filename"].toString();
     QString savePath = message["savePath"].toString();
@@ -1273,31 +1335,35 @@ void ClientManager::handleFileDownloadComplete(const QJsonObject& message)
              filename.toStdString(), savePath.toStdString(),
              transferId.toStdString());
 
-    emit fileDownloadComplete(connectionId, transferId, filename, savePath);
+    emit fileDownloadComplete(deviceId, transferId, filename, savePath);
 }
 
 void ClientManager::handleFileDownloadError(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
+
     QString transferId = message["transferId"].toString();
     QString errorMessage = message["errorMessage"].toString();
 
     LOG_ERROR("File download error: {} (transfer={})",
               errorMessage.toStdString(), transferId.toStdString());
 
-    emit fileDownloadError(connectionId, transferId, errorMessage);
+    emit fileDownloadError(deviceId, transferId, errorMessage);
 }
 
 void ClientManager::handleAgentBridgeResponse(const QJsonObject& message)
 {
-    QString connectionId = message["connectionId"].toString();
-    QString data = message["data"].toString();
+    QString connId = message["connectionId"].toString();
+    QString deviceId = findDeviceId(connId);
+    if (deviceId.isEmpty()) return;
 
-    // Parse the JSON data string into an object for the AgentHandler
+    QString data = message["data"].toString();
     QJsonDocument doc = QJsonDocument::fromJson(data.toUtf8());
     QJsonObject response = doc.isObject() ? doc.object() : QJsonObject{{"raw", data}};
 
-    emit agentBridgeResponseReceived(connectionId, response);
+    emit agentBridgeResponseReceived(deviceId, response);
 }
 
 } // namespace quickdesk

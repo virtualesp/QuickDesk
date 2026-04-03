@@ -10,6 +10,7 @@
 #include <QPointer>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QHash>
 #include <QList>
 #include <QMap>
 #include <QStringList>
@@ -24,130 +25,129 @@ namespace quickdesk {
 class NativeMessaging;
 
 /**
- * @brief Connection information for remote hosts
+ * @brief Connection information for remote hosts.
+ *
+ * Keyed by deviceId externally. The connectionId field is an internal
+ * implementation detail used only for communication with the native
+ * client process via NativeMessaging.
  */
 struct ConnectionInfo {
-    QString connectionId;
+    QString connectionId;   // internal only — for NativeMessaging routing
     QString deviceId;
     QString deviceName;
-    RtcStatus::Status rtcState = RtcStatus::Disconnected;  // WebRTC P2P connection state
+    RtcStatus::Status rtcState = RtcStatus::Disconnected;
     QString connectedAt;
     int width = 0;
     int height = 0;
     
-    // Signaling state for this connection
     QString signalingState = "disconnected";
     int signalingRetryCount = 0;
     int signalingNextRetryIn = 0;
     QString signalingError;
 
-    // Negotiated host capabilities
     bool supportsSendAttentionSequence = false;
     bool supportsLockWorkstation = false;
     bool supportsFileTransfer = false;
 };
 
 /**
- * @brief Manages communication with the Client process
+ * @brief Manages communication with the Client process.
+ *
+ * All public APIs identify remote sessions by deviceId (the stable
+ * 9-digit device identifier). The internal connectionId (e.g. "conn_1")
+ * is used only inside this class for NativeMessaging routing and is
+ * never exposed to callers.
  */
 class ClientManager : public QObject {
     Q_OBJECT
     Q_PROPERTY(int connectionCount READ connectionCount NOTIFY connectionCountChanged)
-    Q_PROPERTY(QString activeConnectionId READ activeConnectionId 
-               WRITE setActiveConnectionId NOTIFY activeConnectionChanged)
-    Q_PROPERTY(QStringList connectionIds READ connectionIds NOTIFY connectionListChanged)
+    Q_PROPERTY(QString activeDeviceId READ activeDeviceId
+               WRITE setActiveDeviceId NOTIFY activeConnectionChanged)
+    Q_PROPERTY(QStringList connectedDeviceIds READ connectedDeviceIds NOTIFY connectionListChanged)
     Q_PROPERTY(SharedMemoryManager* sharedMemoryManager READ sharedMemoryManager CONSTANT)
 
 public:
     explicit ClientManager(QObject* parent = nullptr);
     ~ClientManager() override = default;
 
-    // Set the Native Messaging handler
     void setMessaging(NativeMessaging* messaging);
     
-    // ICE server configuration (full config with lifetimeDuration)
     void setIceConfig(const QJsonObject& iceConfig);
     QJsonObject getIceConfig() const;
 
-    // Connection management
+    // Connection management — all identified by deviceId
     Q_INVOKABLE QString connectToHost(const QString& deviceId,
                                       const QString& accessCode,
                                       const QString& serverUrl);
-    Q_INVOKABLE void disconnectFromHost(const QString& connectionId);
+    Q_INVOKABLE void disconnectFromHost(const QString& deviceId);
     Q_INVOKABLE void disconnectAll();
     Q_INVOKABLE void sendHello(const QString& deviceId = QString(),
                                const QString& preferredVideoCodec = QString());
 
     // Input events
-    Q_INVOKABLE void sendMouseMove(const QString& connectionId, int x, int y);
-    Q_INVOKABLE void sendMousePress(const QString& connectionId, int x, int y, int button);
-    Q_INVOKABLE void sendMouseRelease(const QString& connectionId, int x, int y, int button);
-    Q_INVOKABLE void sendMouseWheel(const QString& connectionId, int x, int y, int deltaX, int deltaY);
-    Q_INVOKABLE void sendKeyPress(const QString& connectionId, int nativeScanCode, int lockStates);
-    Q_INVOKABLE void sendKeyRelease(const QString& connectionId, int nativeScanCode, int lockStates);
+    Q_INVOKABLE void sendMouseMove(const QString& deviceId, int x, int y);
+    Q_INVOKABLE void sendMousePress(const QString& deviceId, int x, int y, int button);
+    Q_INVOKABLE void sendMouseRelease(const QString& deviceId, int x, int y, int button);
+    Q_INVOKABLE void sendMouseWheel(const QString& deviceId, int x, int y, int deltaX, int deltaY);
+    Q_INVOKABLE void sendKeyPress(const QString& deviceId, int nativeScanCode, int lockStates);
+    Q_INVOKABLE void sendKeyRelease(const QString& deviceId, int nativeScanCode, int lockStates);
 
     // Clipboard
-    Q_INVOKABLE void syncClipboard(const QString& connectionId, const QString& text);
+    Q_INVOKABLE void syncClipboard(const QString& deviceId, const QString& text);
 
-    // Agent bridge — send a JSON command to the remote host agent
-    Q_INVOKABLE void sendAgentCommand(const QString& connectionId,
+    // Agent bridge
+    Q_INVOKABLE void sendAgentCommand(const QString& deviceId,
                                       const QString& jsonData);
 
     // Video control
-    Q_INVOKABLE void setTargetFramerate(const QString& connectionId, int framerate);
-    Q_INVOKABLE void setResolution(const QString& connectionId, int width, int height, int dpi = 96);
-    Q_INVOKABLE void setFramerateBoost(const QString& connectionId, bool enabled, 
+    Q_INVOKABLE void setTargetFramerate(const QString& deviceId, int framerate);
+    Q_INVOKABLE void setResolution(const QString& deviceId, int width, int height, int dpi = 96);
+    Q_INVOKABLE void setFramerateBoost(const QString& deviceId, bool enabled, 
                                        int captureIntervalMs = 30, int boostDurationMs = 300);
-    Q_INVOKABLE void setBitrate(const QString& connectionId, int minBitrateBps);
+    Q_INVOKABLE void setBitrate(const QString& deviceId, int minBitrateBps);
 
     // Audio control
-    Q_INVOKABLE void setAudioEnabled(const QString& connectionId, bool enabled);
+    Q_INVOKABLE void setAudioEnabled(const QString& deviceId, bool enabled);
 
     // Remote actions (Ctrl+Alt+Del, Lock Screen)
-    Q_INVOKABLE void sendAction(const QString& connectionId, const QString& action);
-    Q_INVOKABLE bool supportsSendAttentionSequence(const QString& connectionId) const;
-    Q_INVOKABLE bool supportsLockWorkstation(const QString& connectionId) const;
+    Q_INVOKABLE void sendAction(const QString& deviceId, const QString& action);
+    Q_INVOKABLE bool supportsSendAttentionSequence(const QString& deviceId) const;
+    Q_INVOKABLE bool supportsLockWorkstation(const QString& deviceId) const;
 
     // File transfer (Client -> Host upload)
-    Q_INVOKABLE void startFileUpload(const QString& connectionId, const QUrl& fileUrl);
-    Q_INVOKABLE void cancelFileUpload(const QString& connectionId, const QString& transferId);
-    Q_INVOKABLE bool supportsFileTransfer(const QString& connectionId) const;
+    Q_INVOKABLE void startFileUpload(const QString& deviceId, const QUrl& fileUrl);
+    Q_INVOKABLE void cancelFileUpload(const QString& deviceId, const QString& transferId);
+    Q_INVOKABLE bool supportsFileTransfer(const QString& deviceId) const;
 
     // File download (Host -> Client)
-    Q_INVOKABLE void startFileDownload(const QString& connectionId);
-    Q_INVOKABLE void cancelFileDownload(const QString& connectionId, const QString& transferId);
+    Q_INVOKABLE void startFileDownload(const QString& deviceId);
+    Q_INVOKABLE void cancelFileDownload(const QString& deviceId, const QString& transferId);
 
     // Downloaded file operations
     Q_INVOKABLE void openDownloadedFile(const QString& filePath);
     Q_INVOKABLE void openContainingFolder(const QString& filePath);
     Q_INVOKABLE bool deleteDownloadedFile(const QString& filePath);
 
-    // Clipboard file paste (returns true if clipboard contained files and upload was started)
-    Q_INVOKABLE bool pasteFilesFromClipboard(const QString& connectionId);
+    // Clipboard file paste
+    Q_INVOKABLE bool pasteFilesFromClipboard(const QString& deviceId);
 
     // State getters
     int connectionCount() const;
-    QString activeConnectionId() const;
-    void setActiveConnectionId(const QString& id);
+    QString activeDeviceId() const;
+    void setActiveDeviceId(const QString& deviceId);
     QList<ConnectionInfo> connections() const;
-    ConnectionInfo getConnection(const QString& connectionId) const;
-    QStringList connectionIds() const;
-    Q_INVOKABLE RtcStatus::Status getConnectionRtcState(const QString& connectionId) const;
+    ConnectionInfo getConnection(const QString& deviceId) const;
+    QStringList connectedDeviceIds() const;
+    Q_INVOKABLE RtcStatus::Status getConnectionRtcState(const QString& deviceId) const;
     
-    // Get signaling state for a specific connection
-    Q_INVOKABLE QString getSignalingState(const QString& connectionId) const;
-    Q_INVOKABLE int getSignalingRetryCount(const QString& connectionId) const;
-    Q_INVOKABLE int getSignalingNextRetryIn(const QString& connectionId) const;
-    Q_INVOKABLE QString getSignalingError(const QString& connectionId) const;
-    
-    // Get device ID for a connection
-    Q_INVOKABLE QString getConnectionDeviceId(const QString& connectionId) const;
+    Q_INVOKABLE QString getSignalingState(const QString& deviceId) const;
+    Q_INVOKABLE int getSignalingRetryCount(const QString& deviceId) const;
+    Q_INVOKABLE int getSignalingNextRetryIn(const QString& deviceId) const;
+    Q_INVOKABLE QString getSignalingError(const QString& deviceId) const;
 
-    // Shared memory access
     SharedMemoryManager* sharedMemoryManager() const { return m_sharedMemoryManager.get(); }
 
-    // Frame testing - save current frame to file (for debugging)
-    Q_INVOKABLE bool saveFrameToFile(const QString& connectionId, 
+    Q_INVOKABLE bool saveFrameToFile(const QString& deviceId, 
                                      const QString& filePath);
 
 signals:
@@ -156,79 +156,71 @@ signals:
     
     void helloResponseReceived(const QString& version);
     
-    // Signaling state changed for a specific connection
-    void signalingStateChanged(const QString& connectionId,
+    void signalingStateChanged(const QString& deviceId,
                                const QString& state,
                                int retryCount,
                                int nextRetryIn,
                                const QString& error);
     
-    void connectionStateChanged(const QString& connectionId, 
+    void connectionStateChanged(const QString& deviceId, 
                                 const QString& state,
                                 const QJsonObject& hostInfo);
-    void connectionAdded(const QString& connectionId);
-    void connectionRemoved(const QString& connectionId);
+    void connectionAdded(const QString& deviceId);
+    void connectionRemoved(const QString& deviceId);
     void connectionListChanged();
-    void videoFrameReady(const QString& connectionId, int frameIndex);
-    void clipboardReceived(const QString& connectionId, const QString& text);
+    void videoFrameReady(const QString& deviceId, int frameIndex);
+    void clipboardReceived(const QString& deviceId, const QString& text);
 
-    // Agent bridge response received from the remote host agent.
-    void agentBridgeResponseReceived(const QString& connectionId,
+    void agentBridgeResponseReceived(const QString& deviceId,
                                      const QJsonObject& response);
-    void errorOccurred(const QString& connectionId, 
+    void errorOccurred(const QString& deviceId, 
                        const QString& code, 
                        const QString& message);
-    void cursorShapeChanged(const QString& connectionId, 
+    void cursorShapeChanged(const QString& deviceId, 
                             int width, int height,
                             int hotspotX, int hotspotY,
                             const QByteArray& data);
     
-    // Detailed performance statistics update (QVariantMap keys match JSON field names)
-    void performanceStatsUpdated(const QString& connectionId,
+    void performanceStatsUpdated(const QString& deviceId,
                                  const QVariantMap& stats);
 
-    // Host display DIP dimensions changed (for correct mouse coordinate mapping)
-    void videoLayoutChanged(const QString& connectionId,
+    void videoLayoutChanged(const QString& deviceId,
                             int widthDips, int heightDips);
 
-    // ICE route changed (P2P direct/stun/relay)
-    void routeChanged(const QString& connectionId,
+    void routeChanged(const QString& deviceId,
                       const QVariantMap& routeInfo);
 
-    // Host capabilities negotiated
-    void hostCapabilitiesChanged(const QString& connectionId,
+    void hostCapabilitiesChanged(const QString& deviceId,
                                  bool supportsSendAttentionSequence,
                                  bool supportsLockWorkstation,
                                  bool supportsFileTransfer);
 
-    // File upload signals
-    void fileTransferProgress(const QString& connectionId,
+    void fileTransferProgress(const QString& deviceId,
                               const QString& transferId,
                               const QString& filename,
                               double bytesSent,
                               double totalBytes);
-    void fileTransferComplete(const QString& connectionId,
+    void fileTransferComplete(const QString& deviceId,
                               const QString& transferId,
                               const QString& filename);
-    void fileTransferError(const QString& connectionId,
+    void fileTransferError(const QString& deviceId,
                            const QString& transferId,
                            const QString& errorMessage);
 
-    // File download signals
-    void fileDownloadStarted(const QString& connectionId,
+    void fileDownloadStarted(const QString& deviceId,
                              const QString& transferId,
                              const QString& filename,
                              double totalBytes);
-    void fileDownloadProgress(const QString& connectionId,
+    void fileDownloadProgress(const QString& deviceId,
                               const QString& transferId,
                               const QString& filename,
                               double bytesReceived,
                               double totalBytes);
-    void fileDownloadComplete(const QString& connectionId,
+    void fileDownloadComplete(const QString& deviceId,
                               const QString& transferId,
                               const QString& filename,
                               const QString& savePath);
-    void fileDownloadError(const QString& connectionId,
+    void fileDownloadError(const QString& deviceId,
                            const QString& transferId,
                            const QString& errorMessage);
 
@@ -239,14 +231,20 @@ private slots:
 private:
     QPointer<NativeMessaging> m_messaging;
     std::unique_ptr<SharedMemoryManager> m_sharedMemoryManager;
-    QMap<QString, ConnectionInfo> m_connections;  // Each connection has its own signaling state
-    QString m_activeConnectionId;
+    QMap<QString, ConnectionInfo> m_connections;  // key = deviceId
+    QHash<QString, QString> m_connIdToDeviceId;   // connectionId -> deviceId reverse lookup
+    QString m_activeDeviceId;
     int m_connectionCounter = 0;
     
-    // ICE server configuration (full config object with iceServers + lifetimeDuration)
     QJsonObject m_iceConfig;
 
+    // Resolve internal connectionId from a deviceId
+    QString connectionIdFor(const QString& deviceId) const;
+    // Reverse-lookup: find deviceId from an internal connectionId (used in message handlers)
+    QString findDeviceId(const QString& connectionId) const;
     QString generateConnectionId();
+    void removeConnection(const QString& deviceId);
+
     void handleHelloResponse(const QJsonObject& message);
     void handleSignalingStateChanged(const QJsonObject& message);
     void handleConnectToHostResponse(const QJsonObject& message);
@@ -275,10 +273,10 @@ private:
     void handleFileDownloadError(const QJsonObject& message);
     void handleAgentBridgeResponse(const QJsonObject& message);
     
-    void sendMouseEvent(const QString& connectionId, const QString& eventType,
+    void sendMouseEvent(const QString& deviceId, const QString& eventType,
                         int x, int y, int button,
                         int wheelDeltaX, int wheelDeltaY);
-    void sendKeyboardEvent(const QString& connectionId, const QString& eventType,
+    void sendKeyboardEvent(const QString& deviceId, const QString& eventType,
                            int nativeScanCode, int lockStates);
 };
 

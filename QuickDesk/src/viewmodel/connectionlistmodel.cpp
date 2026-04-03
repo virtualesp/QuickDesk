@@ -24,8 +24,6 @@ QVariant ConnectionListModel::data(const QModelIndex& index, int role) const
 
     const auto& conn = m_connections[index.row()];
     switch (role) {
-    case ConnectionIdRole:
-        return conn.connectionId;
     case DeviceIdRole:
         return conn.deviceId;
     case NameRole:
@@ -40,30 +38,28 @@ QVariant ConnectionListModel::data(const QModelIndex& index, int role) const
 QHash<int, QByteArray> ConnectionListModel::roleNames() const
 {
     return {
-        {ConnectionIdRole, "connectionId"},
         {DeviceIdRole, "deviceId"},
         {NameRole, "name"},
         {StateRole, "state"},
     };
 }
 
-int ConnectionListModel::addConnection(const QString& connectionId, const QString& deviceId)
+int ConnectionListModel::addConnection(const QString& deviceId)
 {
-    // Check if already exists
     for (int i = 0; i < m_connections.size(); ++i) {
-        if (m_connections[i].connectionId == connectionId) {
-            qDebug() << "ConnectionListModel: connection already exists:" << connectionId;
+        if (m_connections[i].deviceId == deviceId) {
+            qDebug() << "ConnectionListModel: device already exists:" << deviceId;
             return i;
         }
     }
 
     int row = m_connections.size();
     beginInsertRows(QModelIndex(), row, row);
-    m_connections.append({connectionId, deviceId, deviceId, QStringLiteral("connecting")});
+    m_connections.append({deviceId, deviceId, QStringLiteral("connecting")});
     endInsertRows();
 
     emit countChanged();
-    qDebug() << "ConnectionListModel: added connection:" << connectionId << "total:" << m_connections.size();
+    qDebug() << "ConnectionListModel: added device:" << deviceId << "total:" << m_connections.size();
     return row;
 }
 
@@ -72,14 +68,14 @@ void ConnectionListModel::removeConnection(int index)
     if (index < 0 || index >= m_connections.size())
         return;
 
-    auto connId = m_connections[index].connectionId;
+    auto devId = m_connections[index].deviceId;
 
     beginRemoveRows(QModelIndex(), index, index);
     m_connections.removeAt(index);
     endRemoveRows();
 
     emit countChanged();
-    qDebug() << "ConnectionListModel: removed connection:" << connId << "remaining:" << m_connections.size();
+    qDebug() << "ConnectionListModel: removed device:" << devId << "remaining:" << m_connections.size();
 }
 
 void ConnectionListModel::clear()
@@ -94,44 +90,28 @@ void ConnectionListModel::clear()
     emit countChanged();
 }
 
-void ConnectionListModel::updateState(const QString& connectionId, const QString& state)
+void ConnectionListModel::updateState(const QString& deviceId, const QString& state)
 {
     for (int i = 0; i < m_connections.size(); ++i) {
-        if (m_connections[i].connectionId == connectionId) {
+        if (m_connections[i].deviceId == deviceId) {
             if (m_connections[i].state != state) {
                 m_connections[i].state = state;
                 QModelIndex modelIndex = index(i);
                 emit dataChanged(modelIndex, modelIndex, {StateRole});
-                qDebug() << "ConnectionListModel: updated state:" << connectionId << "->" << state;
+                qDebug() << "ConnectionListModel: updated state:" << deviceId << "->" << state;
             }
             return;
         }
     }
 }
 
-int ConnectionListModel::indexOf(const QString& connectionId) const
-{
-    for (int i = 0; i < m_connections.size(); ++i) {
-        if (m_connections[i].connectionId == connectionId)
-            return i;
-    }
-    return -1;
-}
-
-int ConnectionListModel::indexOfDeviceId(const QString& deviceId) const
+int ConnectionListModel::indexOf(const QString& deviceId) const
 {
     for (int i = 0; i < m_connections.size(); ++i) {
         if (m_connections[i].deviceId == deviceId)
             return i;
     }
     return -1;
-}
-
-QString ConnectionListModel::connectionIdAt(int index) const
-{
-    if (index < 0 || index >= m_connections.size())
-        return {};
-    return m_connections[index].connectionId;
 }
 
 QString ConnectionListModel::deviceIdAt(int index) const

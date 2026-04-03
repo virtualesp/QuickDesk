@@ -39,15 +39,13 @@ public:
     QJsonObject handleAgentListTools(const QJsonObject& params);
 
     // Called on the main thread when an agentBridgeResponse arrives.
-    void onAgentResponse(const QString& connectionId,
+    void onAgentResponse(const QString& deviceId,
                          const QJsonObject& response);
 
 private:
-    bool isConnectionValid(const QString& connectionId) const;
+    bool isConnectionValid(const QString& deviceId) const;
 
-    // Sends the payload to the host agent and blocks the *calling thread*
-    // via QWaitCondition until the matching response arrives or timeout.
-    QJsonObject sendAndWait(const QString& connectionId,
+    QJsonObject sendAndWait(const QString& deviceId,
                             const QJsonObject& payload,
                             int timeoutMs = 10000);
 

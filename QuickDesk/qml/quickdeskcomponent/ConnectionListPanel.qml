@@ -14,10 +14,10 @@ ColumnLayout {
     property string title: panelType === "clients" ? qsTr("Connected Clients") : qsTr("My Remote Connections")
     property var listModel: panelType === "clients" ? 
         (mainController && mainController.hostManager ? mainController.hostManager.clientIds : []) :
-        (mainController && mainController.clientManager ? mainController.clientManager.connectionIds : [])
+        (mainController && mainController.clientManager ? mainController.clientManager.connectedDeviceIds : [])
     
-    signal viewConnectionRequested(string connectionId)
-    signal disconnectRequested(string connectionId)  // 统一的断开信号
+    signal viewConnectionRequested(string deviceId)
+    signal disconnectRequested(string deviceId)  // 统一的断开信号
     
     spacing: Theme.spacingSmall
     
@@ -87,10 +87,7 @@ ColumnLayout {
                         
                         onDoubleClicked: {
                             if (root.panelType === "connections") {
-                                var state = root.mainController.clientManager.getConnectionState(modelData)
-                                if (state === "connected" || state === "已连接") {
-                                    root.viewConnectionRequested(modelData)
-                                }
+                                root.viewConnectionRequested(modelData)
                             }
                         }
                     }
@@ -118,12 +115,9 @@ ColumnLayout {
                             Layout.fillWidth: true
                             text: {
                                 if (root.panelType === "clients") {
-                                    // 客户端：显示 device_id (从 client_id 提取)
                                     return root.mainController.hostManager.getClientDeviceId(modelData) || modelData
                                 } else {
-                                    // 远程连接：显示对端的 device_id
-                                    var deviceId = root.mainController.clientManager.getConnectionDeviceId(modelData)
-                                    return deviceId || modelData
+                                    return modelData
                                 }
                             }
                             font.pixelSize: Theme.fontSizeMedium

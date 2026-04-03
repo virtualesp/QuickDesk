@@ -68,19 +68,16 @@ public:
     // If not all pass, polls until timeoutMs elapses (0 = no wait).
     // Returns the verification result.
     VerificationResult verifyActionResult(
-        const QString& connectionId,
+        const QString& deviceId,
         const QList<VerificationCondition>& conditions,
         int timeoutMs);
 
-    // Immediately check all conditions; no polling.
     VerificationResult assertScreenState(
-        const QString& connectionId,
+        const QString& deviceId,
         const QList<VerificationCondition>& conditions);
 
-    // Compare the OCR snapshot stored under fromHash with the current frame.
-    // If fromHash is empty, captures a fresh snapshot as the "from" state.
     ScreenDiff screenDiffSummary(
-        const QString& connectionId,
+        const QString& deviceId,
         const QString& fromHash,
         QString& errorOut);
 
@@ -97,7 +94,7 @@ private:
                                     const QString& windowTitle);
 
     // Run OCR on the current frame (using cache).
-    bool runOcr(const QString& connectionId,
+    bool runOcr(const QString& deviceId,
                 OcrResult& result,
                 QString& errorOut);
 

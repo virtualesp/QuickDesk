@@ -122,7 +122,7 @@ pub struct DangerousPattern {
 #[allow(dead_code)]
 pub struct ConfirmationRequest {
     pub id: String,
-    pub connection_id: String,
+    pub device_id: String,
     pub tool_name: String,
     pub arguments: Value,
     pub risk: RiskAssessment,
@@ -142,7 +142,7 @@ pub struct ConfirmationResponse {
 pub struct AuditEntry {
     pub id: i64,
     pub timestamp: String,
-    pub connection_id: String,
+    pub device_id: String,
     pub tool_name: String,
     pub arguments_summary: String,
     pub risk_level: String,
@@ -181,6 +181,7 @@ impl TrustEngine {
         conn.execute_batch("PRAGMA journal_mode=WAL;")
             .map_err(|e| format!("pragma: {e}"))?;
         Self::init_tables(&conn)?;
+        Self::migrate_audit_device_column(&conn)?;
 
         let policy = Self::load_policy(&conn);
 
@@ -207,7 +208,7 @@ impl TrustEngine {
             "CREATE TABLE IF NOT EXISTS audit_log (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp       TEXT NOT NULL,
-                connection_id   TEXT NOT NULL,
+                device_id       TEXT NOT NULL,
                 tool_name       TEXT NOT NULL,
                 arguments_summary TEXT DEFAULT '',
                 risk_level      TEXT NOT NULL,
@@ -216,7 +217,6 @@ impl TrustEngine {
                 user_decision   TEXT DEFAULT ''
             );
             CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_log(timestamp);
-            CREATE INDEX IF NOT EXISTS idx_audit_conn ON audit_log(connection_id);
 
             CREATE TABLE IF NOT EXISTS trust_policy (
                 id      INTEGER PRIMARY KEY CHECK (id = 1),
@@ -224,6 +224,35 @@ impl TrustEngine {
             );",
         )
         .map_err(|e| format!("init audit tables: {e}"))
+    }
+
+    /// Renames legacy `connection_id` column to `device_id` for existing databases.
+    fn migrate_audit_device_column(conn: &Connection) -> Result<(), String> {
+        let mut stmt = conn
+            .prepare("SELECT name FROM pragma_table_info('audit_log')")
+            .map_err(|e| format!("pragma_table_info audit_log: {e}"))?;
+        let cols: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .map_err(|e| format!("read audit_log columns: {e}"))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if cols.iter().any(|c| c == "connection_id") && !cols.iter().any(|c| c == "device_id") {
+            conn.execute(
+                "ALTER TABLE audit_log RENAME COLUMN connection_id TO device_id",
+                [],
+            )
+            .map_err(|e| format!("migrate audit_log column: {e}"))?;
+            let _ = conn.execute("DROP INDEX IF EXISTS idx_audit_conn", []);
+        }
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_audit_device ON audit_log(device_id)",
+            [],
+        )
+        .map_err(|e| format!("create idx_audit_device: {e}"))?;
+
+        Ok(())
     }
 
     fn load_policy(conn: &Connection) -> TrustPolicy {
@@ -369,7 +398,7 @@ impl TrustEngine {
     #[allow(dead_code)]
     pub fn create_confirmation(
         &self,
-        connection_id: &str,
+        device_id: &str,
         tool_name: &str,
         arguments: &Value,
         risk: &RiskAssessment,
@@ -379,7 +408,7 @@ impl TrustEngine {
 
         let req = ConfirmationRequest {
             id: id.clone(),
-            connection_id: connection_id.to_string(),
+            device_id: device_id.to_string(),
             tool_name: tool_name.to_string(),
             arguments: arguments.clone(),
             risk: risk.clone(),
@@ -408,7 +437,7 @@ impl TrustEngine {
 
     pub fn log_audit(
         &self,
-        connection_id: &str,
+        device_id: &str,
         tool_name: &str,
         arguments: &Value,
         risk_level: RiskLevel,
@@ -424,42 +453,42 @@ impl TrustEngine {
         let db = self.audit_db.lock().unwrap();
         let _ = db.execute(
             "INSERT INTO audit_log
-                (timestamp, connection_id, tool_name, arguments_summary,
+                (timestamp, device_id, tool_name, arguments_summary,
                  risk_level, action, outcome, user_decision)
              VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
-            params![now, connection_id, tool_name, args_summary, level_str, action, outcome, user_decision],
+            params![now, device_id, tool_name, args_summary, level_str, action, outcome, user_decision],
         );
     }
 
     pub fn get_audit_log(
         &self,
-        connection_id: Option<&str>,
+        device_id: Option<&str>,
         limit: i64,
     ) -> Vec<AuditEntry> {
         let db = self.audit_db.lock().unwrap();
-        let (sql, conn_param) = if let Some(cid) = connection_id {
+        let (sql, conn_param) = if let Some(did) = device_id {
             (
-                "SELECT id, timestamp, connection_id, tool_name, arguments_summary,
+                "SELECT id, timestamp, device_id, tool_name, arguments_summary,
                         risk_level, action, outcome, user_decision
-                 FROM audit_log WHERE connection_id=?1
+                 FROM audit_log WHERE device_id=?1
                  ORDER BY timestamp DESC LIMIT ?2".to_string(),
-                Some(cid.to_string()),
+                Some(did.to_string()),
             )
         } else {
             (
-                "SELECT id, timestamp, connection_id, tool_name, arguments_summary,
+                "SELECT id, timestamp, device_id, tool_name, arguments_summary,
                         risk_level, action, outcome, user_decision
                  FROM audit_log ORDER BY timestamp DESC LIMIT ?1".to_string(),
                 None,
             )
         };
 
-        if let Some(cid) = conn_param {
+        if let Some(did) = conn_param {
             let mut stmt = match db.prepare(&sql) {
                 Ok(s) => s,
                 Err(_) => return vec![],
             };
-            stmt.query_map(params![cid, limit], Self::map_audit_row)
+            stmt.query_map(params![did, limit], Self::map_audit_row)
                 .ok()
                 .map(|r| r.filter_map(|x| x.ok()).collect())
                 .unwrap_or_default()
@@ -479,7 +508,7 @@ impl TrustEngine {
         Ok(AuditEntry {
             id: row.get(0)?,
             timestamp: row.get(1)?,
-            connection_id: row.get(2)?,
+            device_id: row.get(2)?,
             tool_name: row.get(3)?,
             arguments_summary: row.get(4)?,
             risk_level: row.get(5)?,

@@ -65,10 +65,10 @@ struct FrameData {
 };
 
 /**
- * @brief Per-connection shared memory handle using QSharedMemory
+ * @brief Per-device shared memory handle using QSharedMemory
  */
 struct SharedMemoryHandle {
-    QString connectionId;
+    QString deviceId;
     QString sharedMemoryName;
     quint32 lastFrameIndex = 0;
     std::unique_ptr<QSharedMemory> sharedMemory;
@@ -78,7 +78,7 @@ struct SharedMemoryHandle {
 /**
  * @brief Manages shared memory regions for video frame transfer
  * 
- * Each connection to a remote host has its own shared memory region.
+ * Each device connection has its own shared memory region.
  * This class handles attaching to, reading from, and detaching from
  * these shared memory regions.
  * 
@@ -93,18 +93,18 @@ public:
     ~SharedMemoryManager() override;
 
     /**
-     * @brief Attach to shared memory for a connection
-     * @param connectionId The connection identifier
+     * @brief Attach to shared memory for a device
+     * @param deviceId The device identifier
      * @param sharedMemoryName The native name of the shared memory region
      * @return true if successfully attached
      */
-    bool attach(const QString& connectionId, const QString& sharedMemoryName);
+    bool attach(const QString& deviceId, const QString& sharedMemoryName);
 
     /**
-     * @brief Detach from shared memory for a connection
-     * @param connectionId The connection identifier
+     * @brief Detach from shared memory for a device
+     * @param deviceId The device identifier
      */
-    void detach(const QString& connectionId);
+    void detach(const QString& deviceId);
 
     /**
      * @brief Detach from all shared memory regions
@@ -112,59 +112,58 @@ public:
     void detachAll();
 
     /**
-     * @brief Check if attached to shared memory for a connection
-     * @param connectionId The connection identifier
+     * @brief Check if attached to shared memory for a device
+     * @param deviceId The device identifier
      * @return true if attached
      */
-    bool isAttached(const QString& connectionId) const;
+    bool isAttached(const QString& deviceId) const;
 
     /**
      * @brief Read the current frame as QVideoFrame for GPU rendering (YUV I420)
-     * @param connectionId The connection identifier
+     * @param deviceId The device identifier
      * @return QVideoFrame ready for VideoOutput, or invalid frame if failed
-     * @note This is the preferred method for efficient GPU rendering
      */
-    QVideoFrame readVideoFrame(const QString& connectionId);
+    QVideoFrame readVideoFrame(const QString& deviceId);
 
     /**
      * @brief Lock shared memory and get frame data without copying
-     * @param connectionId The connection identifier
+     * @param deviceId The device identifier
      * @return FrameData with pointer to raw data, call unlockFrame() when done
      * @note The returned data pointer is only valid until unlockFrame() is called
      */
-    FrameData lockFrame(const QString& connectionId);
+    FrameData lockFrame(const QString& deviceId);
 
     /**
      * @brief Unlock shared memory after reading frame data
-     * @param connectionId The connection identifier
+     * @param deviceId The device identifier
      */
-    void unlockFrame(const QString& connectionId);
+    void unlockFrame(const QString& deviceId);
 
     /**
-     * @brief Get the last frame index for a connection
-     * @param connectionId The connection identifier
+     * @brief Get the last frame index for a device
+     * @param deviceId The device identifier
      * @return The last frame index, or 0 if not attached
      */
-    quint32 lastFrameIndex(const QString& connectionId) const;
+    quint32 lastFrameIndex(const QString& deviceId) const;
 
     /**
      * @brief Check if a new frame is available (frame index changed)
-     * @param connectionId The connection identifier
+     * @param deviceId The device identifier
      * @param currentFrameIndex The current frame index from notification
      * @return true if the frame is new
      */
-    bool isNewFrame(const QString& connectionId, quint32 currentFrameIndex) const;
+    bool isNewFrame(const QString& deviceId, quint32 currentFrameIndex) const;
 
     /**
-     * @brief Get frame dimensions for a connection
-     * @param connectionId The connection identifier
+     * @brief Get frame dimensions for a device
+     * @param deviceId The device identifier
      * @return QSize with width and height, or empty size if not available
      */
-    QSize frameSize(const QString& connectionId) const;
+    QSize frameSize(const QString& deviceId) const;
 
 signals:
-    void attachmentChanged(const QString& connectionId, bool attached);
-    void frameReadError(const QString& connectionId, const QString& error);
+    void attachmentChanged(const QString& deviceId, bool attached);
+    void frameReadError(const QString& deviceId, const QString& error);
 
 private:
     // Use std::map with unique_ptr to avoid copy issues

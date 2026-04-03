@@ -264,7 +264,7 @@ mod tests {
             tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
             bus2.publish(Event {
                 event: "connectionStateChanged".to_string(),
-                data: json!({"connectionId": "conn_1", "state": "connected"}),
+                data: json!({"deviceId": "conn_1", "state": "connected"}),
                 timestamp: 100,
             })
             .await;

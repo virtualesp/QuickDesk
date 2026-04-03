@@ -30,7 +30,7 @@ namespace quickdesk {
  *   VideoFrameProvider {
  *       id: frameProvider
  *       videoSink: videoOutput.videoSink
- *       connectionId: "conn_1"
+ *       deviceId: "123456789"
  *       sharedMemoryManager: clientManager.sharedMemoryManager
  *   }
  */
@@ -38,7 +38,7 @@ class VideoFrameProvider : public QObject {
     Q_OBJECT
     
     Q_PROPERTY(QVideoSink* videoSink READ videoSink WRITE setVideoSink NOTIFY videoSinkChanged)
-    Q_PROPERTY(QString connectionId READ connectionId WRITE setConnectionId NOTIFY connectionIdChanged)
+    Q_PROPERTY(QString deviceId READ deviceId WRITE setDeviceId NOTIFY deviceIdChanged)
     Q_PROPERTY(SharedMemoryManager* sharedMemoryManager READ sharedMemoryManager 
                WRITE setSharedMemoryManager NOTIFY sharedMemoryManagerChanged)
     Q_PROPERTY(bool active READ isActive WRITE setActive NOTIFY activeChanged)
@@ -55,8 +55,8 @@ public:
     QVideoSink* videoSink() const { return m_videoSink; }
     void setVideoSink(QVideoSink* sink);
 
-    QString connectionId() const { return m_connectionId; }
-    void setConnectionId(const QString& connectionId);
+    QString deviceId() const { return m_deviceId; }
+    void setDeviceId(const QString& deviceId);
 
     SharedMemoryManager* sharedMemoryManager() const { return m_sharedMemoryManager; }
     void setSharedMemoryManager(SharedMemoryManager* manager);
@@ -72,33 +72,15 @@ public:
     bool hasCursor() const { return !m_cursorImage.isNull(); }
 
 public slots:
-    /**
-     * @brief Push a new frame to the video sink
-     * Called when a new frame is available in shared memory
-     */
     void pushFrame();
-
-    /**
-     * @brief Handle videoFrameReady notification
-     * @param frameIndex The new frame index
-     */
     void onVideoFrameReady(quint32 frameIndex);
-    
-    /**
-     * @brief Handle cursor shape change
-     * @param width Cursor width in pixels
-     * @param height Cursor height in pixels
-     * @param hotspotX Cursor hotspot X position
-     * @param hotspotY Cursor hotspot Y position
-     * @param data Cursor pixel data in BGRA format
-     */
     void onCursorShapeChanged(int width, int height,
                               int hotspotX, int hotspotY,
                               const QByteArray& data);
 
 signals:
     void videoSinkChanged();
-    void connectionIdChanged();
+    void deviceIdChanged();
     void sharedMemoryManagerChanged();
     void activeChanged();
     void frameSizeChanged();
@@ -110,18 +92,16 @@ private:
     void updateFrameRate();
 
     QVideoSink* m_videoSink = nullptr;
-    QString m_connectionId;
+    QString m_deviceId;
     SharedMemoryManager* m_sharedMemoryManager = nullptr;
     bool m_active = true;
     QSize m_frameSize;
     int m_frameRate = 0;
     
-    // Frame rate calculation
     qint64 m_lastFrameTime = 0;
     int m_frameCount = 0;
     qint64 m_frameRateStartTime = 0;
     
-    // Cursor state
     QImage m_cursorImage;
     QPoint m_cursorHotspot;
 };

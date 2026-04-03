@@ -7,7 +7,7 @@ Item {
     id: root
     
     // Properties
-    property string connectionId: ""
+    property string deviceId: ""
     property var clientManager: null
     property var desktopView: null
     property var videoInfo: null  // Video info including original resolution
@@ -39,7 +39,7 @@ Item {
     property int activeTransferCount: 0
 
     // Signals
-    signal disconnectRequested(string connectionId)
+    signal disconnectRequested(string deviceId)
     signal fitToRemoteDesktopRequested()
     signal emergencyStopRequested()
     signal toggleVideoStats()
@@ -50,22 +50,22 @@ Item {
     
     // Apply framerate boost mode
     function applyFramerateBoostMode(mode) {
-        if (!clientManager || !connectionId) {
+        if (!clientManager || !deviceId) {
             return
         }
         
         switch(mode) {
             case boostModeOff:
-                console.log("FramerateBoost: Disabled for:", connectionId)
-                clientManager.setFramerateBoost(connectionId, false, 30, 300)
+                console.log("FramerateBoost: Disabled for:", deviceId)
+                clientManager.setFramerateBoost(deviceId, false, 30, 300)
                 break
             case boostModeOffice:
-                console.log("FramerateBoost: Office mode (30ms/300ms) for:", connectionId)
-                clientManager.setFramerateBoost(connectionId, true, 30, 300)
+                console.log("FramerateBoost: Office mode (30ms/300ms) for:", deviceId)
+                clientManager.setFramerateBoost(deviceId, true, 30, 300)
                 break
             case boostModeGaming:
-                console.log("FramerateBoost: Gaming mode (15ms/500ms) for:", connectionId)
-                clientManager.setFramerateBoost(connectionId, true, 15, 500)
+                console.log("FramerateBoost: Gaming mode (15ms/500ms) for:", deviceId)
+                clientManager.setFramerateBoost(deviceId, true, 15, 500)
                 break
         }
     }
@@ -416,7 +416,7 @@ Item {
             iconText: FluentIconGlyph.fullScreenGlyph
             enabled: root.videoInfo && root.videoInfo.frameWidth > 0 && root.videoInfo.frameHeight > 0
             onTriggered: {
-                console.log("Fit window to remote desktop requested for:", root.connectionId)
+                console.log("Fit window to remote desktop requested for:", root.deviceId)
                 root.fitToRemoteDesktopRequested()
                 root.showToast(qsTr("Window resized to fit remote desktop"), QDToast.Type.Success)
             }
@@ -437,9 +437,9 @@ Item {
             iconText: root.audioEnabled ? FluentIconGlyph.volumeGlyph : FluentIconGlyph.muteGlyph
             onTriggered: {
                 root.audioEnabled = !root.audioEnabled
-                console.log("Audio toggled:", root.audioEnabled ? "enabled" : "muted", "for:", root.connectionId)
+                console.log("Audio toggled:", root.audioEnabled ? "enabled" : "muted", "for:", root.deviceId)
                 if (root.clientManager) {
-                    root.clientManager.setAudioEnabled(root.connectionId, root.audioEnabled)
+                    root.clientManager.setAudioEnabled(root.deviceId, root.audioEnabled)
                     root.showToast(
                         root.audioEnabled ? qsTr("Audio: Enabled") : qsTr("Audio: Muted"),
                         QDToast.Type.Success
@@ -458,9 +458,9 @@ Item {
             text: qsTr("Send Ctrl+Alt+Del")
             iconText: FluentIconGlyph.keyboardShortcutGlyph
             onTriggered: {
-                console.log("Send Ctrl+Alt+Del for:", root.connectionId)
+                console.log("Send Ctrl+Alt+Del for:", root.deviceId)
                 if (root.clientManager) {
-                    root.clientManager.sendAction(root.connectionId, "sendAttentionSequenceAction")
+                    root.clientManager.sendAction(root.deviceId, "sendAttentionSequenceAction")
                     root.showToast(qsTr("Ctrl+Alt+Del sent"), QDToast.Type.Success)
                 }
             }
@@ -471,9 +471,9 @@ Item {
             text: qsTr("Lock Screen")
             iconText: FluentIconGlyph.lockGlyph
             onTriggered: {
-                console.log("Lock screen for:", root.connectionId)
+                console.log("Lock screen for:", root.deviceId)
                 if (root.clientManager) {
-                    root.clientManager.sendAction(root.connectionId, "lockWorkstationAction")
+                    root.clientManager.sendAction(root.deviceId, "lockWorkstationAction")
                     root.showToast(qsTr("Lock screen sent"), QDToast.Type.Success)
                 }
             }
@@ -488,7 +488,7 @@ Item {
             text: qsTr("Upload File")
             iconText: FluentIconGlyph.uploadGlyph
             onTriggered: {
-                console.log("Upload file for:", root.connectionId)
+                console.log("Upload file for:", root.deviceId)
                 root.uploadFileRequested()
             }
         }
@@ -498,7 +498,7 @@ Item {
             text: qsTr("Download File")
             iconText: FluentIconGlyph.downloadGlyph
             onTriggered: {
-                console.log("Download file for:", root.connectionId)
+                console.log("Download file for:", root.deviceId)
                 root.downloadFileRequested()
             }
         }
@@ -532,8 +532,8 @@ Item {
             iconText: FluentIconGlyph.cancelGlyph
             isDestructive: true
             onTriggered: {
-                console.log("Disconnect connection:", root.connectionId)
-                root.disconnectRequested(root.connectionId)
+                console.log("Disconnect connection:", root.deviceId)
+                root.disconnectRequested(root.deviceId)
             }
         }
     }
@@ -599,10 +599,10 @@ Item {
         QDMenuItem {
             text: "60 FPS" + (root.targetFramerate === 60 ? " ✓" : "")
             onTriggered: {
-                console.log("Set target framerate 60 FPS for:", root.connectionId)
+                console.log("Set target framerate 60 FPS for:", root.deviceId)
                 root.targetFramerate = 60
                 if (root.clientManager) {
-                    root.clientManager.setTargetFramerate(root.connectionId, 60)
+                    root.clientManager.setTargetFramerate(root.deviceId, 60)
                     root.showToast(qsTr("Target Framerate: 60 FPS"), QDToast.Type.Success)
                 }
             }
@@ -611,10 +611,10 @@ Item {
         QDMenuItem {
             text: "30 FPS" + (root.targetFramerate === 30 ? " ✓" : "")
             onTriggered: {
-                console.log("Set target framerate 30 FPS for:", root.connectionId)
+                console.log("Set target framerate 30 FPS for:", root.deviceId)
                 root.targetFramerate = 30
                 if (root.clientManager) {
-                    root.clientManager.setTargetFramerate(root.connectionId, 30)
+                    root.clientManager.setTargetFramerate(root.deviceId, 30)
                     root.showToast(qsTr("Target Framerate: 30 FPS"), QDToast.Type.Success)
                 }
             }
@@ -623,10 +623,10 @@ Item {
         QDMenuItem {
             text: "15 FPS" + (root.targetFramerate === 15 ? " ✓" : "")
             onTriggered: {
-                console.log("Set target framerate 15 FPS for:", root.connectionId)
+                console.log("Set target framerate 15 FPS for:", root.deviceId)
                 root.targetFramerate = 15
                 if (root.clientManager) {
-                    root.clientManager.setTargetFramerate(root.connectionId, 15)
+                    root.clientManager.setTargetFramerate(root.deviceId, 15)
                     root.showToast(qsTr("Target Framerate: 15 FPS"), QDToast.Type.Success)
                 }
             }
@@ -635,10 +635,10 @@ Item {
         QDMenuItem {
             text: "5 FPS" + (root.targetFramerate === 5 ? " ✓" : "")
             onTriggered: {
-                console.log("Set target framerate 5 FPS for:", root.connectionId)
+                console.log("Set target framerate 5 FPS for:", root.deviceId)
                 root.targetFramerate = 5
                 if (root.clientManager) {
-                    root.clientManager.setTargetFramerate(root.connectionId, 5)
+                    root.clientManager.setTargetFramerate(root.deviceId, 5)
                     root.showToast(qsTr("Target Framerate: 5 FPS"), QDToast.Type.Success)
                 }
             }
@@ -671,7 +671,7 @@ Item {
                 if (root.videoInfo && root.videoInfo.originalWidth > 0 && root.videoInfo.originalHeight > 0 && root.clientManager) {
                     console.log("Restore to original resolution:", root.videoInfo.originalWidth + "x" + root.videoInfo.originalHeight)
                     root.clientManager.setResolution(
-                        root.connectionId, 
+                        root.deviceId, 
                         root.videoInfo.originalWidth, 
                         root.videoInfo.originalHeight, 
                         96
@@ -688,9 +688,9 @@ Item {
         QDMenuItem {
             text: "3840 x 2160 (4K)"
             onTriggered: {
-                console.log("Set resolution 3840x2160 for:", root.connectionId)
+                console.log("Set resolution 3840x2160 for:", root.deviceId)
                 if (root.clientManager) {
-                    root.clientManager.setResolution(root.connectionId, 3840, 2160, 96)
+                    root.clientManager.setResolution(root.deviceId, 3840, 2160, 96)
                     root.showToast(qsTr("Resolution: 3840x2160 (4K)"), QDToast.Type.Success)
                 }
             }
@@ -699,9 +699,9 @@ Item {
         QDMenuItem {
             text: "2560 x 1440 (2K)"
             onTriggered: {
-                console.log("Set resolution 2560x1440 for:", root.connectionId)
+                console.log("Set resolution 2560x1440 for:", root.deviceId)
                 if (root.clientManager) {
-                    root.clientManager.setResolution(root.connectionId, 2560, 1440, 96)
+                    root.clientManager.setResolution(root.deviceId, 2560, 1440, 96)
                     root.showToast(qsTr("Resolution: 2560x1440 (2K)"), QDToast.Type.Success)
                 }
             }
@@ -710,9 +710,9 @@ Item {
         QDMenuItem {
             text: "1920 x 1080 (FHD)"
             onTriggered: {
-                console.log("Set resolution 1920x1080 for:", root.connectionId)
+                console.log("Set resolution 1920x1080 for:", root.deviceId)
                 if (root.clientManager) {
-                    root.clientManager.setResolution(root.connectionId, 1920, 1080, 96)
+                    root.clientManager.setResolution(root.deviceId, 1920, 1080, 96)
                     root.showToast(qsTr("Resolution: 1920x1080 (FHD)"), QDToast.Type.Success)
                 }
             }
@@ -721,9 +721,9 @@ Item {
         QDMenuItem {
             text: "1600 x 900"
             onTriggered: {
-                console.log("Set resolution 1600x900 for:", root.connectionId)
+                console.log("Set resolution 1600x900 for:", root.deviceId)
                 if (root.clientManager) {
-                    root.clientManager.setResolution(root.connectionId, 1600, 900, 96)
+                    root.clientManager.setResolution(root.deviceId, 1600, 900, 96)
                     root.showToast(qsTr("Resolution: 1600x900"), QDToast.Type.Success)
                 }
             }
@@ -732,9 +732,9 @@ Item {
         QDMenuItem {
             text: "1366 x 768"
             onTriggered: {
-                console.log("Set resolution 1366x768 for:", root.connectionId)
+                console.log("Set resolution 1366x768 for:", root.deviceId)
                 if (root.clientManager) {
-                    root.clientManager.setResolution(root.connectionId, 1366, 768, 96)
+                    root.clientManager.setResolution(root.deviceId, 1366, 768, 96)
                     root.showToast(qsTr("Resolution: 1366x768"), QDToast.Type.Success)
                 }
             }
@@ -743,9 +743,9 @@ Item {
         QDMenuItem {
             text: "1280 x 720"
             onTriggered: {
-                console.log("Set resolution 1280x720 for:", root.connectionId)
+                console.log("Set resolution 1280x720 for:", root.deviceId)
                 if (root.clientManager) {
-                    root.clientManager.setResolution(root.connectionId, 1280, 720, 96)
+                    root.clientManager.setResolution(root.deviceId, 1280, 720, 96)
                     root.showToast(qsTr("Resolution: 1280x720"), QDToast.Type.Success)
                 }
             }
@@ -754,9 +754,9 @@ Item {
         QDMenuItem {
             text: "1024 x 768"
             onTriggered: {
-                console.log("Set resolution 1024x768 for:", root.connectionId)
+                console.log("Set resolution 1024x768 for:", root.deviceId)
                 if (root.clientManager) {
-                    root.clientManager.setResolution(root.connectionId, 1024, 768, 96)
+                    root.clientManager.setResolution(root.deviceId, 1024, 768, 96)
                     root.showToast(qsTr("Resolution: 1024x768"), QDToast.Type.Success)
                 }
             }
@@ -779,10 +779,10 @@ Item {
         QDMenuItem {
             text: "100 MiB" + (root.preferredMinBitrate === 104857600 ? " ✓" : "")
             onTriggered: {
-                console.log("Set bitrate 100 MiB for:", root.connectionId)
+                console.log("Set bitrate 100 MiB for:", root.deviceId)
                 root.preferredMinBitrate = 104857600  // 100 * 1024 * 1024
                 if (root.clientManager) {
-                    root.clientManager.setBitrate(root.connectionId, 104857600)
+                    root.clientManager.setBitrate(root.deviceId, 104857600)
                     root.showToast(qsTr("Bitrate: 100 MiB"), QDToast.Type.Success)
                 }
             }
@@ -791,10 +791,10 @@ Item {
         QDMenuItem {
             text: "50 MiB" + (root.preferredMinBitrate === 52428800 ? " ✓" : "")
             onTriggered: {
-                console.log("Set bitrate 50 MiB for:", root.connectionId)
+                console.log("Set bitrate 50 MiB for:", root.deviceId)
                 root.preferredMinBitrate = 52428800  // 50 * 1024 * 1024
                 if (root.clientManager) {
-                    root.clientManager.setBitrate(root.connectionId, 52428800)
+                    root.clientManager.setBitrate(root.deviceId, 52428800)
                     root.showToast(qsTr("Bitrate: 50 MiB"), QDToast.Type.Success)
                 }
             }
@@ -803,10 +803,10 @@ Item {
         QDMenuItem {
             text: "10 MiB" + (root.preferredMinBitrate === 10485760 ? " ✓" : "")
             onTriggered: {
-                console.log("Set bitrate 10 MiB for:", root.connectionId)
+                console.log("Set bitrate 10 MiB for:", root.deviceId)
                 root.preferredMinBitrate = 10485760  // 10 * 1024 * 1024
                 if (root.clientManager) {
-                    root.clientManager.setBitrate(root.connectionId, 10485760)
+                    root.clientManager.setBitrate(root.deviceId, 10485760)
                     root.showToast(qsTr("Bitrate: 10 MiB"), QDToast.Type.Success)
                 }
             }
@@ -815,10 +815,10 @@ Item {
         QDMenuItem {
             text: "5 MiB" + (root.preferredMinBitrate === 5242880 ? " ✓" : "")
             onTriggered: {
-                console.log("Set bitrate 5 MiB for:", root.connectionId)
+                console.log("Set bitrate 5 MiB for:", root.deviceId)
                 root.preferredMinBitrate = 5242880  // 5 * 1024 * 1024
                 if (root.clientManager) {
-                    root.clientManager.setBitrate(root.connectionId, 5242880)
+                    root.clientManager.setBitrate(root.deviceId, 5242880)
                     root.showToast(qsTr("Bitrate: 5 MiB"), QDToast.Type.Success)
                 }
             }
@@ -827,10 +827,10 @@ Item {
         QDMenuItem {
             text: "2 MiB" + (root.preferredMinBitrate === 2097152 ? " ✓" : "")
             onTriggered: {
-                console.log("Set bitrate 2 MiB for:", root.connectionId)
+                console.log("Set bitrate 2 MiB for:", root.deviceId)
                 root.preferredMinBitrate = 2097152  // 2 * 1024 * 1024
                 if (root.clientManager) {
-                    root.clientManager.setBitrate(root.connectionId, 2097152)
+                    root.clientManager.setBitrate(root.deviceId, 2097152)
                     root.showToast(qsTr("Bitrate: 2 MiB"), QDToast.Type.Success)
                 }
             }

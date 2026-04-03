@@ -26,21 +26,21 @@ void VideoFrameProvider::setVideoSink(QVideoSink* sink)
     m_videoSink = sink;
     emit videoSinkChanged();
     
-    LOG_DEBUG("VideoFrameProvider: videoSink set for connection {}", 
-              m_connectionId.toStdString());
+    LOG_DEBUG("VideoFrameProvider: videoSink set for device {}", 
+              m_deviceId.toStdString());
 }
 
-void VideoFrameProvider::setConnectionId(const QString& connectionId)
+void VideoFrameProvider::setDeviceId(const QString& deviceId)
 {
-    if (m_connectionId == connectionId) {
+    if (m_deviceId == deviceId) {
         return;
     }
 
-    m_connectionId = connectionId;
-    emit connectionIdChanged();
+    m_deviceId = deviceId;
+    emit deviceIdChanged();
     
-    LOG_DEBUG("VideoFrameProvider: connectionId set to {}", 
-              connectionId.toStdString());
+    LOG_DEBUG("VideoFrameProvider: deviceId set to {}", 
+              deviceId.toStdString());
 }
 
 void VideoFrameProvider::setSharedMemoryManager(SharedMemoryManager* manager)
@@ -62,8 +62,8 @@ void VideoFrameProvider::setActive(bool active)
     m_active = active;
     emit activeChanged();
     
-    LOG_DEBUG("VideoFrameProvider: active={} for connection {}", 
-              active, m_connectionId.toStdString());
+    LOG_DEBUG("VideoFrameProvider: active={} for device {}", 
+              active, m_deviceId.toStdString());
 }
 
 void VideoFrameProvider::onVideoFrameReady(quint32 frameIndex)
@@ -80,35 +80,30 @@ void VideoFrameProvider::onVideoFrameReady(quint32 frameIndex)
 void VideoFrameProvider::pushFrame()
 {
     if (!m_active || !m_videoSink || !m_sharedMemoryManager || 
-        m_connectionId.isEmpty()) {
+        m_deviceId.isEmpty()) {
         return;
     }
 
-    // Check if attached
-    if (!m_sharedMemoryManager->isAttached(m_connectionId)) {
+    if (!m_sharedMemoryManager->isAttached(m_deviceId)) {
         return;
     }
 
-    // Read video frame (efficient GPU path)
-    QVideoFrame frame = m_sharedMemoryManager->readVideoFrame(m_connectionId);
+    QVideoFrame frame = m_sharedMemoryManager->readVideoFrame(m_deviceId);
     
     if (!frame.isValid()) {
         return;
     }
 
-    // Update frame size if changed
     QSize newSize = frame.size();
     if (m_frameSize != newSize) {
         m_frameSize = newSize;
         emit frameSizeChanged();
     }
 
-    // Push frame to video sink for GPU rendering
     m_videoSink->setVideoFrame(frame);
 
     emit frameReceived();
     
-    // Update frame rate statistics
     updateFrameRate();
 }
 
@@ -123,7 +118,6 @@ void VideoFrameProvider::updateFrameRate()
     
     m_frameCount++;
     
-    // Calculate frame rate every second
     qint64 elapsed = now - m_frameRateStartTime;
     if (elapsed >= 1000) {
         int newFps = static_cast<int>(m_frameCount * 1000 / elapsed);
@@ -132,7 +126,6 @@ void VideoFrameProvider::updateFrameRate()
             emit frameRateChanged();
         }
         
-        // Reset counters
         m_frameRateStartTime = now;
         m_frameCount = 0;
     }
@@ -145,14 +138,12 @@ void VideoFrameProvider::onCursorShapeChanged(int width, int height,
                                               const QByteArray& data)
 {
     if (width <= 0 || height <= 0) {
-        // Clear cursor
         m_cursorImage = QImage();
         m_cursorHotspot = QPoint(0, 0);
         emit cursorChanged();
         return;
     }
     
-    // Expected data size: width * height * 4 (BGRA)
     int expectedSize = width * height * 4;
     if (data.size() < expectedSize) {
         LOG_WARN("Cursor data size mismatch: expected {} got {}", 
@@ -160,22 +151,15 @@ void VideoFrameProvider::onCursorShapeChanged(int width, int height,
         return;
     }
     
-    // Create QImage from BGRA data
-    // Note: QImage::Format_ARGB32 on little-endian systems is actually BGRA in memory
     m_cursorImage = QImage(reinterpret_cast<const uchar*>(data.constData()),
                            width, height, width * 4,
                            QImage::Format_ARGB32);
-    // Make a deep copy since the original data buffer may be temporary
     m_cursorImage = m_cursorImage.copy();
     
     m_cursorHotspot = QPoint(hotspotX, hotspotY);
     
-    // LOG_DEBUG("Cursor updated: {}x{} hotspot({}, {})", 
-    //           width, height, hotspotX, hotspotY);
-    
-    // Update the image provider so QML can access the cursor
     if (CursorImageProvider::instance()) {
-        CursorImageProvider::instance()->setCursor(m_connectionId, m_cursorImage, m_cursorHotspot);
+        CursorImageProvider::instance()->setCursor(m_deviceId, m_cursorImage, m_cursorHotspot);
     }
     
     emit cursorChanged();
